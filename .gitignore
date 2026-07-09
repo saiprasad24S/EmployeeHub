@@ -1,0 +1,38 @@
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# Build outputs
+dist/
+build/
+*.tsbuildinfo
+vite.config.js
+vite.config.d.ts
+
+# Python files
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Databases
+*.sqlite3
+
+# Media and Static files
+media/
+staticfiles/
+
+# IDE files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
