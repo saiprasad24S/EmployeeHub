@@ -23,30 +23,40 @@ export default function App() {
         <Route
           path="/sign-in"
           element={
-            <SignedOut>
-              <LoginPage />
-            </SignedOut>
+            <>
+              <SignedOut>
+                <LoginPage />
+              </SignedOut>
+              <SignedIn>
+                <Navigate to="/" replace />
+              </SignedIn>
+            </>
           }
         />
         <Route
           path="/*"
           element={
-            <SignedIn>
-              <AppShell>
-                <Suspense fallback={<RouteFallback />}>
-                  <Routes>
-                    <Route path="/" element={<DashboardPage />} />
-                    <Route path="/employees" element={<EmployeesPage />} />
-                    <Route path="/attendance" element={<AttendancePage />} />
-                    <Route path="/assignments" element={<AssignmentsPage />} />
-                    <Route path="/tracking/:employeeId" element={<TrackingPage />} />
-                    <Route path="/reports" element={<ReportsPage />} />
-                    <Route path="/settings" element={<SettingsPage />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                  </Routes>
-                </Suspense>
-              </AppShell>
-            </SignedIn>
+            <>
+              <SignedIn>
+                <AppShell>
+                  <Suspense fallback={<RouteFallback />}>
+                    <Routes>
+                      <Route path="/" element={<DashboardPage />} />
+                      <Route path="/employees" element={<EmployeesPage />} />
+                      <Route path="/attendance" element={<AttendancePage />} />
+                      <Route path="/assignments" element={<AssignmentsPage />} />
+                      <Route path="/tracking/:employeeId" element={<TrackingPage />} />
+                      <Route path="/reports" element={<ReportsPage />} />
+                      <Route path="/settings" element={<SettingsPage />} />
+                      <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                  </Suspense>
+                </AppShell>
+              </SignedIn>
+              <SignedOut>
+                <Navigate to="/sign-in" replace />
+              </SignedOut>
+            </>
           }
         />
       </Routes>
