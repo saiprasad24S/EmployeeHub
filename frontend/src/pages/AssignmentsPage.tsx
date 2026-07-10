@@ -166,6 +166,34 @@ export function AssignmentsPage() {
     setIsFormOpen(true)
   }
 
+  const [isGeocoding, setIsGeocoding] = useState(false)
+
+  const handleGeocode = async () => {
+    if (!patientAddress.trim()) {
+      setErrorMsg('Please enter an address first to auto-detect coordinates.')
+      return
+    }
+    setIsGeocoding(true)
+    setErrorMsg(null)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(patientAddress)}&limit=1`
+      )
+      if (!res.ok) throw new Error('Geocoding service unavailable.')
+      const data = await res.json()
+      if (data && data.length > 0) {
+        setLatitude(parseFloat(data[0].lat).toFixed(7))
+        setLongitude(parseFloat(data[0].lon).toFixed(7))
+      } else {
+        setErrorMsg('Could not find coordinates for this address. Please enter them manually.')
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to auto-detect coordinates.')
+    } finally {
+      setIsGeocoding(false)
+    }
+  }
+
   const closeForm = () => {
     setIsFormOpen(false)
     setEditingAssignment(null)
@@ -389,6 +417,25 @@ export function AssignmentsPage() {
                     resize: 'vertical',
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={handleGeocode}
+                  disabled={isGeocoding}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.8rem',
+                    borderRadius: '8px',
+                    background: 'rgba(107, 47, 160, 0.08)',
+                    color: 'var(--primary)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    marginTop: '0.2rem'
+                  }}
+                >
+                  {isGeocoding ? '🔄 Locating...' : '📍 Auto-detect Latitude/Longitude'}
+                </button>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>

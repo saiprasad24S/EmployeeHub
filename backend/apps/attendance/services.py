@@ -35,7 +35,7 @@ def validate_geofence(assignment: Assignment, latitude: float, longitude: float)
     radius = assignment.radius or settings.DEFAULT_GEOFENCE_RADIUS_METERS
     distance = distance_meters(float(latitude), float(longitude), float(assignment.latitude), float(assignment.longitude))
     if distance > radius:
-        raise ValidationError({"detail": f"Outside geofence radius by {round(distance - radius, 2)} meters."})
+        raise ValidationError({"detail": f"Geofence Verification Failed: You are outside the patient's scheduled range by {round(distance - radius, 2)} meters. Attendance was not marked."})
 
 
 def upload_selfie(image_file, folder: str) -> str:
