@@ -65,6 +65,41 @@ def _get_signing_key(token: str):
     raise AuthenticationFailed("No matching signing key found for token.")
 
 
+def _fetch_clerk_user_email(user_id: str) -> str:
+    """Fetch the user's primary email from Clerk Backend API using their user ID."""
+    secret_key = settings.CLERK_SECRET_KEY
+    if not secret_key:
+        raise AuthenticationFailed("Clerk Secret Key is not configured.")
+
+    try:
+        url = f"https://api.clerk.com/v1/users/{user_id}"
+        response = requests.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {secret_key}",
+                "Accept": "application/json"
+            },
+            timeout=10
+        )
+        response.raise_for_status()
+        data = response.json()
+        
+        # Find primary email address
+        primary_email_id = data.get("primary_email_address_id")
+        email_addresses = data.get("email_addresses", [])
+        
+        for email_data in email_addresses:
+            if email_data.get("id") == primary_email_id:
+                return email_data.get("email_address")
+                
+        if email_addresses:
+            return email_addresses[0].get("email_address")
+            
+        raise AuthenticationFailed("No email address associated with this Clerk account.")
+    except requests.RequestException as exc:
+        raise AuthenticationFailed(f"Failed to retrieve user profile from Clerk API: {exc}") from exc
+
+
 class ClerkJWTAuthentication(BaseAuthentication):
     keyword = "Bearer"
 
@@ -99,9 +134,14 @@ class ClerkJWTAuthentication(BaseAuthentication):
 
         email = claims.get("email") or claims.get("email_address")
         if not email:
-            raise AuthenticationFailed("Clerk session is missing an email address.")
+            # Fall back to Clerk Backend API using the subject ID (User ID)
+            user_id = claims.get("sub")
+            if not user_id:
+                raise AuthenticationFailed("Clerk session is missing both email and user ID.")
+            print(f"[AUTH] Email missing in token. Fetching from Clerk API for user ID: {user_id}")
+            email = _fetch_clerk_user_email(user_id)
 
-        print(f"[AUTH] Extracted email from Clerk token: {email}")
+        print(f"[AUTH] Extracted email: {email}")
 
         # Support both spellings as ADMIN to avoid typos
         if email.lower() in ("skandanhomecare@gmail.com", "skandanhomecarre@gmail.com"):
