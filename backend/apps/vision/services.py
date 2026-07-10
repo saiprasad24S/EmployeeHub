@@ -14,54 +14,102 @@ except Exception:  # pragma: no cover - optional runtime dependency
 
 
 class FaceRecognitionService:
-    similarity_threshold = 0.55
+    # InsightFace buffalo_l cosine similarity thresholds:
+    # >= 0.45 is a strong match for the same person across different conditions
+    # >= 0.35 is acceptable for same person with lighting/angle variations
+    # We use 0.40 as a balanced threshold for real-world webcam vs passport photo matching
+    similarity_threshold = 0.40
 
     def __init__(self) -> None:
         self._model = None
 
     def _load_model(self):
         if self._model is None and insightface is not None:
-            self._model = insightface.app.FaceAnalysis(name="buffalo_l")
+            self._model = insightface.app.FaceAnalysis(
+                name="buffalo_l",
+                providers=["CPUExecutionProvider"],
+            )
             self._model.prepare(ctx_id=0, det_size=(640, 640))
         return self._model
 
     def generate_embedding(self, image_file) -> list[float]:
+        """Generate a 512-dim face embedding from an image file or bytes."""
         image_bytes = image_file.read() if hasattr(image_file, "read") else image_file
         if hasattr(image_file, "seek"):
             image_file.seek(0)
         model = self._load_model()
         if model is None:
+            # Fallback hash-based embedding when insightface is unavailable
             digest = hashlib.sha256(image_bytes).digest()
             values = np.frombuffer(digest, dtype=np.uint8).astype(np.float32)
             return (values / 255.0).tolist()
+
         image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        frame = np.array(image)[:, :, ::-1]
+        frame = np.array(image)[:, :, ::-1]  # RGB -> BGR for OpenCV
+
+        # Try multiple detection sizes for better face detection
         faces = model.get(frame)
         if not faces:
-            raise ValueError("No face detected.")
-        return faces[0].embedding.astype(float).tolist()
+            # Retry with smaller detection size for close-up selfies
+            model.prepare(ctx_id=0, det_size=(320, 320))
+            faces = model.get(frame)
+            # Restore default detection size
+            model.prepare(ctx_id=0, det_size=(640, 640))
+
+        if not faces:
+            raise ValueError("No face detected in the image. Please ensure your face is clearly visible.")
+
+        # If multiple faces detected, use the largest (closest) face
+        if len(faces) > 1:
+            faces = sorted(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]), reverse=True)
+
+        embedding = faces[0].embedding.astype(np.float32)
+        # L2 normalize the embedding for consistent cosine similarity
+        norm = np.linalg.norm(embedding)
+        if norm > 0:
+            embedding = embedding / norm
+
+        return embedding.tolist()
 
     def compare_with_store(self, incoming_embedding: list[float], stored_embeddings) -> float:
+        """Compare an incoming face embedding against stored embeddings.
+        
+        Returns the highest cosine similarity score.
+        InsightFace embeddings are L2-normalized, so dot product = cosine similarity.
+        """
         if not stored_embeddings:
             return 0.0
+
         incoming = np.array(incoming_embedding, dtype=np.float32)
+        # Normalize incoming just in case
+        incoming_norm = np.linalg.norm(incoming)
+        if incoming_norm > 0:
+            incoming = incoming / incoming_norm
+
+        # Handle both list-of-lists and single list formats
         if isinstance(stored_embeddings, list) and stored_embeddings and isinstance(stored_embeddings[0], list):
             candidates = stored_embeddings
         else:
             candidates = [stored_embeddings]
+
         scores = []
         for candidate in candidates:
             stored = np.array(candidate, dtype=np.float32)
-            denominator = np.linalg.norm(incoming) * np.linalg.norm(stored)
-            if denominator == 0:
-                scores.append(0.0)
-                continue
-            scores.append(float(np.dot(incoming, stored) / denominator))
-        return max(scores) if scores else 0.0
+            stored_norm = np.linalg.norm(stored)
+            if stored_norm > 0:
+                stored = stored / stored_norm
+            # Cosine similarity via dot product of unit vectors
+            similarity = float(np.dot(incoming, stored))
+            scores.append(similarity)
+            print(f"[FACE MATCH] Cosine similarity: {similarity:.4f} (threshold: {self.similarity_threshold})")
+
+        best_score = max(scores) if scores else 0.0
+        print(f"[FACE MATCH] Best score: {best_score:.4f}, Match: {best_score >= self.similarity_threshold}")
+        return best_score
 
 
 class LivenessService:
-    minimum_liveness_score = 0.75
+    minimum_liveness_score = 0.5  # Lowered for browser-based captures
 
     def is_live(self, image_file, liveness_score: float | None = None) -> bool:
         if liveness_score is not None:

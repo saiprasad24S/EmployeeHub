@@ -83,7 +83,12 @@ class UploadProfilePhotoView(APIView):
         if not photo_file:
             return Response({"detail": "No photo file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-        result = cloudinary.uploader.upload(photo_file, folder="profile_photos", resource_type="image")
-        employee.profile_photo = result["secure_url"]
+        from django.core.files.storage import default_storage
+        import uuid
+        import os
+        ext = os.path.splitext(getattr(photo_file, "name", ".jpg"))[1] or ".jpg"
+        filename = f"profile_photos/{uuid.uuid4()}{ext}"
+        saved_name = default_storage.save(filename, photo_file)
+        employee.profile_photo = default_storage.url(saved_name)
         employee.save(update_fields=["profile_photo"])
         return Response({"detail": "Profile photo updated.", "profile_photo": employee.profile_photo})

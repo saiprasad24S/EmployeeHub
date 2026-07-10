@@ -150,7 +150,16 @@ CLOUDINARY_STORAGE = {
     "API_SECRET": _env("CLOUDINARY_API_SECRET", default=""),
 }
 
-DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+# Fall back to local file storage if Cloudinary config is missing or invalid
+if (
+    not CLOUDINARY_STORAGE["CLOUD_NAME"]
+    or not CLOUDINARY_STORAGE["API_KEY"]
+    or not CLOUDINARY_STORAGE["API_SECRET"]
+    or "noapeFhi" in CLOUDINARY_STORAGE["CLOUD_NAME"]
+):
+    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+else:
+    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 CLERK_SECRET_KEY = _env("CLERK_SECRET_KEY", default="")
 CLERK_JWKS_URL = _env("CLERK_JWKS_URL", default="")

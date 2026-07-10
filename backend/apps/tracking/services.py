@@ -17,7 +17,8 @@ def get_latest_location(employee: Employee) -> LocationLog | None:
 
 
 def get_employee_route(employee: Employee) -> list[dict]:
-    logs = LocationLog.objects.filter(employee=employee).order_by("timestamp")
+    today = timezone.localdate()
+    logs = LocationLog.objects.filter(employee=employee, timestamp__date=today).order_by("timestamp")
     return [
         {
             "latitude": float(log.latitude),

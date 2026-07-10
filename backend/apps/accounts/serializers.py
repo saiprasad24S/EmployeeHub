@@ -5,6 +5,7 @@ from apps.accounts.models import Admin, Employee
 
 class EmployeeSerializer(serializers.ModelSerializer):
     is_face_registered = serializers.SerializerMethodField()
+    profile_photo = serializers.SerializerMethodField()
 
     class Meta:
         model = Employee
@@ -28,6 +29,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
     def get_is_face_registered(self, obj: Employee) -> bool:
         return bool(obj.face_embedding)
+
+    def get_profile_photo(self, obj: Employee) -> str:
+        if not obj.profile_photo:
+            return ""
+        if obj.profile_photo.startswith("/"):
+            request = self.context.get("request")
+            if request:
+                return request.build_absolute_uri(obj.profile_photo)
+            return f"http://localhost:8000{obj.profile_photo}"
+        return obj.profile_photo
 
 
 class EmployeeCreateSerializer(serializers.ModelSerializer):

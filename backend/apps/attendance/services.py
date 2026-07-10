@@ -39,8 +39,13 @@ def validate_geofence(assignment: Assignment, latitude: float, longitude: float)
 
 
 def upload_selfie(image_file, folder: str) -> str:
-    result = cloudinary.uploader.upload(image_file, folder=folder, resource_type="image")
-    return result["secure_url"]
+    from django.core.files.storage import default_storage
+    import uuid
+    import os
+    ext = os.path.splitext(getattr(image_file, "name", ".jpg"))[1] or ".jpg"
+    filename = f"{folder}/{uuid.uuid4()}{ext}"
+    saved_name = default_storage.save(filename, image_file)
+    return default_storage.url(saved_name)
 
 
 @transaction.atomic
