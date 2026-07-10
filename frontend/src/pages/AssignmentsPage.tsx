@@ -145,7 +145,7 @@ export function AssignmentsPage() {
     setPatientAddress('')
     setLatitude('12.9716') // default Bangalore coords
     setLongitude('77.5946')
-    setRadius('100')
+    setRadius('0.1') // default to 0.1 km (100 meters)
     setVisitDate(new Date().toISOString().slice(0, 10))
     setStatusVal('PENDING')
     setErrorMsg(null)
@@ -159,7 +159,7 @@ export function AssignmentsPage() {
     setPatientAddress(assignment.patient_address)
     setLatitude(assignment.latitude)
     setLongitude(assignment.longitude)
-    setRadius(assignment.radius.toString())
+    setRadius((assignment.radius / 1000).toString()) // convert stored meters back to km for form editing
     setVisitDate(assignment.visit_date)
     setStatusVal(assignment.status)
     setErrorMsg(null)
@@ -215,7 +215,7 @@ export function AssignmentsPage() {
       patient_address: patientAddress,
       latitude: latitude,
       longitude: longitude,
-      radius: parseInt(radius),
+      radius: Math.round(parseFloat(radius) * 1000), // convert km input back to meters for database storage
       visit_date: visitDate,
       status: statusVal,
     }
@@ -300,7 +300,7 @@ export function AssignmentsPage() {
                       <td style={{ fontSize: '0.8rem', fontFamily: 'monospace' }}>
                         {parseFloat(assignment.latitude).toFixed(5)}, {parseFloat(assignment.longitude).toFixed(5)}
                       </td>
-                      <td>{assignment.radius} meters</td>
+                      <td>{(assignment.radius / 1000).toFixed(2)} km</td>
                       <td>
                         <span className={getStatusClass(assignment.status)}>
                           {assignment.status}
@@ -477,12 +477,13 @@ export function AssignmentsPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="stack" style={{ gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Geofence Radius (meters)</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Geofence Radius (km)</label>
                   <input
                     type="number"
+                    step="0.001"
                     value={radius}
                     onChange={(e) => setRadius(e.target.value)}
-                    placeholder="e.g. 100"
+                    placeholder="e.g. 0.1"
                     style={{
                       padding: '0.6rem',
                       borderRadius: '10px',

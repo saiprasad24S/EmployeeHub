@@ -22,5 +22,4 @@ class AssignmentSerializer(serializers.ModelSerializer):
             "visit_date",
             "status",
             "created_at",
-            "updated_at",
         ]
