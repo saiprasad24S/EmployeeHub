@@ -2,6 +2,7 @@ import { useParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
+import { RouteMap } from '../components/RouteMap'
 
 export function TrackingPage() {
   const { employeeId } = useParams()
@@ -19,11 +20,27 @@ export function TrackingPage() {
     },
   })
 
+  const points = routeQuery.data?.route || []
+
   return (
     <section className="glass-card card-soft">
-      <span className="eyebrow">Tracking</span>
-      <h3>Employee route history</h3>
-      <pre className="code-block light-block">{JSON.stringify(routeQuery.data, null, 2)}</pre>
+      <div className="section-header" style={{ marginBottom: '1rem' }}>
+        <div>
+          <span className="eyebrow">Tracking</span>
+          <h3>Employee route history</h3>
+          <p>Showing live Leaflet + OpenStreetMap routing for employee {employeeId}</p>
+        </div>
+      </div>
+      
+      {routeQuery.isLoading ? (
+        <div className="route-loading">Loading route data...</div>
+      ) : routeQuery.isError ? (
+        <div className="route-loading" style={{ color: 'var(--danger)' }}>Error loading route history</div>
+      ) : points.length === 0 ? (
+        <div className="route-loading">No tracking route recorded for today</div>
+      ) : (
+        <RouteMap points={points} />
+      )}
     </section>
   )
 }

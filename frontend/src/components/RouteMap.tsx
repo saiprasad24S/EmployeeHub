@@ -17,7 +17,7 @@ export function RouteMap({ points }: RouteMapProps) {
         />
         {points.length > 0 ? (
           <>
-            <Polyline positions={points.map((point) => [point.latitude, point.longitude])} pathOptions={{ color: '#0F6CBD', weight: 4 }} />
+            <Polyline positions={points.map((point) => [point.latitude, point.longitude])} pathOptions={{ color: '#6B2FA0', weight: 4 }} />
             <Marker position={[points[0].latitude, points[0].longitude]} />
             <Marker position={[points[points.length - 1].latitude, points[points.length - 1].longitude]} />
           </>

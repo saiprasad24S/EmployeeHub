@@ -3,14 +3,15 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { SignedIn, SignedOut } from '@clerk/clerk-react'
 import { AppShell } from './components/AppShell'
 
-const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })))
-const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })))
-const EmployeesPage = lazy(() => import('./pages/EmployeesPage').then((module) => ({ default: module.EmployeesPage })))
-const AttendancePage = lazy(() => import('./pages/AttendancePage').then((module) => ({ default: module.AttendancePage })))
-const AssignmentsPage = lazy(() => import('./pages/AssignmentsPage').then((module) => ({ default: module.AssignmentsPage })))
-const TrackingPage = lazy(() => import('./pages/TrackingPage').then((module) => ({ default: module.TrackingPage })))
-const ReportsPage = lazy(() => import('./pages/ReportsPage').then((module) => ({ default: module.ReportsPage })))
-const SettingsPage = lazy(() => import('./pages/SettingsPage').then((module) => ({ default: module.SettingsPage })))
+const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })))
+const SignUpPage = lazy(() => import('./pages/SignUpPage').then((m) => ({ default: m.SignUpPage })))
+const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
+const EmployeesPage = lazy(() => import('./pages/EmployeesPage').then((m) => ({ default: m.EmployeesPage })))
+const AttendancePage = lazy(() => import('./pages/AttendancePage').then((m) => ({ default: m.AttendancePage })))
+const AssignmentsPage = lazy(() => import('./pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage })))
+const TrackingPage = lazy(() => import('./pages/TrackingPage').then((m) => ({ default: m.TrackingPage })))
+const ReportsPage = lazy(() => import('./pages/ReportsPage').then((m) => ({ default: m.ReportsPage })))
+const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 
 function RouteFallback() {
   return <div className="glass-card route-loading">Loading page...</div>
@@ -21,11 +22,24 @@ export default function App() {
     <Suspense fallback={<RouteFallback />}>
       <Routes>
         <Route
-          path="/sign-in"
+          path="/sign-in/*"
           element={
             <>
               <SignedOut>
                 <LoginPage />
+              </SignedOut>
+              <SignedIn>
+                <Navigate to="/" replace />
+              </SignedIn>
+            </>
+          }
+        />
+        <Route
+          path="/sign-up/*"
+          element={
+            <>
+              <SignedOut>
+                <SignUpPage />
               </SignedOut>
               <SignedIn>
                 <Navigate to="/" replace />

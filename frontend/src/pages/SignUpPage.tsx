@@ -1,6 +1,6 @@
-import { SignIn } from '@clerk/clerk-react'
+import { SignUp } from '@clerk/clerk-react'
 
-export function LoginPage() {
+export function SignUpPage() {
   return (
     <div className="auth-screen">
       <div className="auth-panel">
@@ -12,8 +12,8 @@ export function LoginPage() {
             style={{ maxWidth: '360px', marginBottom: '1rem' }}
           />
           <span className="eyebrow">Skandan Home Carre Clinic LLP</span>
-          <h1>Employee Management System</h1>
-          <p>Secure Google sign-in through Clerk. The dashboard opens only for users registered as employees or admins.</p>
+          <h1>Create Your Account</h1>
+          <p>Sign up with your Google account to get started. Only registered employees and admins can access the dashboard.</p>
           <div className="hero-badges">
             <span>Clean healthcare UI</span>
             <span>Live attendance</span>
@@ -21,10 +21,10 @@ export function LoginPage() {
           </div>
         </div>
         <div className="auth-card">
-          <SignIn
-            path="/sign-in"
+          <SignUp
+            path="/sign-up"
             routing="path"
-            signUpUrl="/sign-up"
+            signInUrl="/sign-in"
             forceRedirectUrl="/"
           />
         </div>

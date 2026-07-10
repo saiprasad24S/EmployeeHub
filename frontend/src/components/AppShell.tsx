@@ -38,7 +38,11 @@ export function AppShell({ children }: PropsWithChildren) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          <div className="brand-mark">SC</div>
+          <img
+            src="https://skandanhomecarre.com/wp-content/uploads/2025/06/cropped-SKANDA-fav-192x192.png"
+            alt="Skandan Home Carre Clinic"
+            className="brand-logo"
+          />
           <div>
             <h1>Skandan</h1>
             <p>Home Carre Clinic LLP</p>
