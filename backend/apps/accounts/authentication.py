@@ -101,8 +101,10 @@ class ClerkJWTAuthentication(BaseAuthentication):
         if not email:
             raise AuthenticationFailed("Clerk session is missing an email address.")
 
-        # skandanhomecare@gmail.com is always ADMIN
-        if email.lower() == "skandanhomecare@gmail.com":
+        print(f"[AUTH] Extracted email from Clerk token: {email}")
+
+        # Support both spellings as ADMIN to avoid typos
+        if email.lower() in ("skandanhomecare@gmail.com", "skandanhomecarre@gmail.com"):
             admin, _ = Admin.objects.get_or_create(
                 email=email.lower(), defaults={"name": "Skandan Admin", "role": "SUPER_ADMIN"}
             )
