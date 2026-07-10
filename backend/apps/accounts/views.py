@@ -1,4 +1,6 @@
+import cloudinary.uploader
 from rest_framework import status, viewsets
+from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -66,3 +68,22 @@ class CurrentEmployeeView(APIView):
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(EmployeeSerializer(employee).data)
+
+
+class UploadProfilePhotoView(APIView):
+    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk: int):
+        employee = Employee.objects.filter(pk=pk).first()
+        if not employee:
+            return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        photo_file = request.FILES.get("profile_photo_file")
+        if not photo_file:
+            return Response({"detail": "No photo file provided."}, status=status.HTTP_400_BAD_REQUEST)
+
+        result = cloudinary.uploader.upload(photo_file, folder="profile_photos", resource_type="image")
+        employee.profile_photo = result["secure_url"]
+        employee.save(update_fields=["profile_photo"])
+        return Response({"detail": "Profile photo updated.", "profile_photo": employee.profile_photo})

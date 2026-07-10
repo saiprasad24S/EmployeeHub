@@ -249,6 +249,19 @@ export function EmployeePortal() {
           }
 
           setRequiresFaceReg(false)
+          // Save first captured photo as profile picture
+          if (profile && updated.length > 0) {
+            setProfile({ ...profile, profile_photo: updated[0] })
+            // Also upload the first photo as the profile picture to backend
+            const profileForm = new FormData()
+            const profileBlob = await (await fetch(updated[0])).blob()
+            profileForm.append('profile_photo_file', profileBlob, 'profile.jpg')
+            await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api/employees/${profile.id}/upload-photo/`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: profileForm,
+            }).catch(() => {}) // silently fail if upload endpoint doesn't exist yet
+          }
           alert('Face verification model profile successfully registered!')
           stopCamera()
         } catch (e: any) {
@@ -293,6 +306,10 @@ export function EmployeePortal() {
         if (cameraMode === 'checkin') {
           setSessionActive(true)
           window.localStorage.setItem('employeehub-session-active', 'true')
+          // Update profile photo from check-in selfie if not set
+          if (profile && !profile.profile_photo && tempPhoto) {
+            setProfile({ ...profile, profile_photo: tempPhoto })
+          }
           alert('Check-in Attendance successfully marked! Safety location tracking is now ACTIVE.')
         } else {
           setSessionActive(false)
@@ -404,57 +421,73 @@ export function EmployeePortal() {
             {/* Attendance actions */}
             <div className="stack">
               <div className="glass-card card-soft stack" style={{ padding: '1.75rem' }}>
-                <span className="eyebrow">Today's Schedule</span>
+                <span className="eyebrow">Attendance</span>
                 {assignmentQuery.isLoading ? (
                   <p>Loading schedule...</p>
-                ) : !assignmentQuery.data ? (
-                  <div>
-                    <h4>No Scheduled Assignment</h4>
-                    <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.5rem' }}>
-                      There are no patient visits scheduled for you today. If this is an error, please contact your administrator.
-                    </p>
-                  </div>
                 ) : (
                   <div>
-                    <h4 style={{ color: 'var(--text)', fontSize: '1.15rem' }}>Patient: {assignmentQuery.data.patient_name}</h4>
-                    <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
-                      📍 {assignmentQuery.data.patient_address}
-                    </p>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, marginTop: '0.5rem' }}>
-                      Geofence Boundary: {assignmentQuery.data.radius} meters
-                    </p>
+                    {assignmentQuery.data && (
+                      <div style={{ marginBottom: '1.5rem' }}>
+                        <h4 style={{ color: 'var(--text)', fontSize: '1.15rem' }}>Patient: {assignmentQuery.data.patient_name}</h4>
+                        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
+                          📍 {assignmentQuery.data.patient_address}
+                        </p>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, marginTop: '0.5rem' }}>
+                          Geofence Boundary: {assignmentQuery.data.radius} meters
+                        </p>
+                      </div>
+                    )}
 
-                    <div style={{ marginTop: '2rem' }}>
-                      {locationPermGranted === false && (
-                        <div
-                          style={{
-                            background: 'rgba(239, 68, 68, 0.08)',
-                            color: 'var(--danger)',
-                            padding: '0.8rem',
-                            borderRadius: '10px',
-                            fontSize: '0.85rem',
-                            marginBottom: '1rem',
-                            fontWeight: 600,
-                          }}
-                        >
-                          ⚠️ Location permissions are disabled. Please enable GPS and allow location access to continue.
-                        </div>
-                      )}
+                    {!assignmentQuery.data && (
+                      <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
+                        No specific assignment scheduled today. You can still mark attendance.
+                      </p>
+                    )}
 
+                    {locationPermGranted === false && (
+                      <div
+                        style={{
+                          background: 'rgba(239, 68, 68, 0.08)',
+                          color: 'var(--danger)',
+                          padding: '0.8rem',
+                          borderRadius: '10px',
+                          fontSize: '0.85rem',
+                          marginBottom: '1rem',
+                          fontWeight: 600,
+                        }}
+                      >
+                        ⚠️ Location permissions are disabled. Please enable GPS and allow location access to continue.
+                      </div>
+                    )}
+
+                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
                       {!sessionActive ? (
                         <button
                           className="btn-primary pulse-button"
                           disabled={locationPermGranted === false}
                           onClick={() => startCamera('checkin')}
+                          style={{ flex: 1, minWidth: '200px' }}
                         >
-                          Check In & Start Tracking
+                          ✅ Mark Attendance (Check In)
                         </button>
                       ) : (
-                        <button className="btn-primary" style={{ background: 'var(--danger)' }} onClick={() => startCamera('checkout')}>
-                          Check Out & Stop Tracking
+                        <button
+                          className="btn-primary"
+                          style={{ background: 'var(--danger)', flex: 1, minWidth: '200px' }}
+                          onClick={() => startCamera('checkout')}
+                        >
+                          🔴 Attendance Logout (Check Out)
                         </button>
                       )}
                     </div>
+
+                    {sessionActive && (
+                      <div style={{ marginTop: '1rem', padding: '0.8rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px' }}>
+                        <p style={{ fontSize: '0.85rem', color: '#10B981', fontWeight: 600, margin: 0 }}>
+                          🟢 Location tracking is ACTIVE — your movement is being logged for safety.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
