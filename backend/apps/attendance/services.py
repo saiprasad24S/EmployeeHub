@@ -96,20 +96,7 @@ def validate_liveness(image_file, liveness_score: float | None = None) -> None:
 
 def verify_face_against_employee(employee: Employee, image_file) -> float:
     if not employee.face_embedding:
-        if employee.profile_photo:
-            try:
-                import requests
-                print(f"[FACE] Fetching profile photo from URL to generate embedding: {employee.profile_photo}")
-                response = requests.get(employee.profile_photo, timeout=10)
-                response.raise_for_status()
-                embedding = face_service.generate_embedding(response.content)
-                employee.face_embedding = [embedding]
-                employee.save(update_fields=["face_embedding"])
-            except Exception as exc:
-                print(f"[FACE ERROR] Failed to generate embedding from profile photo: {exc}")
-                raise ValidationError({"detail": f"Failed to extract face embedding from profile photo: {exc}"})
-        else:
-            raise ValidationError({"detail": "Face not registered."})
+        raise ValidationError({"detail": "Face not registered."})
 
     incoming_embedding = face_service.generate_embedding(image_file)
     score = face_service.compare_with_store(incoming_embedding, employee.face_embedding)

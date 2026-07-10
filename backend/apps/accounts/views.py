@@ -31,7 +31,7 @@ class AuthLoginView(APIView):
                     "role": "EMPLOYEE",
                     "email": principal.email,
                     "employee": EmployeeSerializer(employee).data,
-                    "requires_face_registration": not bool(employee.face_embedding) and not bool(employee.profile_photo),
+                    "requires_face_registration": not bool(employee.face_embedding),
                 }
             )
         return Response({"detail": "Unable to resolve account role."}, status=status.HTTP_400_BAD_REQUEST)

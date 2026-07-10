@@ -42,18 +42,6 @@ class FaceVerifyView(APIView):
             employee = Employee.objects.filter(pk=request.data.get("employee_id")).first()
             if not employee:
                 return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
-        # Generate embedding on the fly if profile_photo exists but face_embedding is empty
-        if not employee.face_embedding and employee.profile_photo:
-            try:
-                import requests
-                res = requests.get(employee.profile_photo, timeout=10)
-                res.raise_for_status()
-                emb = face_service.generate_embedding(res.content)
-                employee.face_embedding = [emb]
-                employee.save(update_fields=["face_embedding"])
-            except Exception as exc:
-                return Response({"detail": f"Failed to extract face embedding from profile photo: {exc}"}, status=status.HTTP_400_BAD_REQUEST)
-
         if not employee.face_embedding:
             return Response({"detail": "Face not registered."}, status=status.HTTP_400_BAD_REQUEST)
 
