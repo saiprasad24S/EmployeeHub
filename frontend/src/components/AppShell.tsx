@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState, type PropsWithChildren } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { SignOutButton, UserButton } from '@clerk/clerk-react'
+import { useSearch } from '../context/SearchContext'
 
 const navItems = [
   { label: 'Dashboard', to: '/' },
@@ -8,13 +9,13 @@ const navItems = [
   { label: 'Attendance', to: '/attendance' },
   { label: 'Assignments', to: '/assignments' },
   { label: 'Live Tracking', to: '/tracking/EMP001' },
-  { label: 'Reports', to: '/reports' },
   { label: 'Settings', to: '/settings' },
 ]
 
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const location = useLocation()
+  const { searchQuery, setSearchQuery } = useSearch()
   const currentDate = useMemo(() => new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date()), [])
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = window.localStorage.getItem('employeehub-theme')
@@ -75,7 +76,12 @@ export function AppShell({ children }: PropsWithChildren) {
           <div className="topbar-actions">
             <label className="search-shell">
               <span>Search</span>
-              <input type="search" placeholder="Search employees, visits, routes" />
+              <input
+                type="search"
+                placeholder="Search by email, emp ID, or location"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+              />
             </label>
             <button
               className="theme-toggle"

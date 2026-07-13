@@ -7,13 +7,28 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.utils import timezone
 from apps.accounts.models import Employee
-from apps.attendance.models import Session
+from apps.attendance.models import Session, Attendance
 from apps.attendance.services import end_session, log_location, start_session
 from apps.common.permissions import IsAdminRole, IsEmployeeRole
 from apps.tracking.models import LocationLog
 from apps.tracking.serializers import LocationLogSerializer
 from apps.tracking.services import get_employee_route, get_latest_location, get_today_distance, get_travel_history
+
+
+def _resolve_employee(employee_id: int | str | None) -> Employee | None:
+    if employee_id in (None, ""):
+        return None
+    try:
+        pk = int(employee_id)
+    except (TypeError, ValueError):
+        pk = None
+    if pk is not None:
+        employee = Employee.objects.filter(pk=pk).first()
+        if employee:
+            return employee
+    return Employee.objects.filter(employee_id=str(employee_id)).first()
 
 
 class LocationUpdateView(APIView):
@@ -58,7 +73,7 @@ class EmployeeRouteView(APIView):
     def get(self, request, employee_id: int):
         if getattr(request.user, "role", None) == "EMPLOYEE" and request.user.employee_id != employee_id:
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
-        employee = Employee.objects.filter(pk=employee_id).first()
+        employee = _resolve_employee(employee_id)
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
         route = get_employee_route(employee)
@@ -71,7 +86,7 @@ class EmployeeTravelHistoryView(APIView):
     def get(self, request, employee_id: int):
         if getattr(request.user, "role", None) == "EMPLOYEE" and request.user.employee_id != employee_id:
             return Response({"detail": "Forbidden."}, status=status.HTTP_403_FORBIDDEN)
-        employee = Employee.objects.filter(pk=employee_id).first()
+        employee = _resolve_employee(employee_id)
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
         travel_date = request.query_params.get("date")
@@ -79,3 +94,30 @@ class EmployeeTravelHistoryView(APIView):
         if travel_date:
             parsed_date = datetime.strptime(travel_date, "%Y-%m-%d").date()
         return Response(get_travel_history(employee, parsed_date))
+
+
+class AllPresentEmployeesLocationView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        today = timezone.localdate()
+        present_employee_ids = Attendance.objects.filter(
+            attendance_type=Attendance.AttendanceType.CHECK_IN,
+            timestamp__date=today
+        ).values_list("employee_id", flat=True)
+
+        results = []
+        for emp_id in set(present_employee_ids):
+            employee = Employee.objects.filter(pk=emp_id).first()
+            if employee:
+                log = get_latest_location(employee)
+                if log:
+                    results.append({
+                        "id": employee.id,
+                        "employee_id": employee.employee_id,
+                        "name": employee.name,
+                        "latitude": float(log.latitude),
+                        "longitude": float(log.longitude),
+                        "timestamp": log.timestamp,
+                    })
+        return Response(results)

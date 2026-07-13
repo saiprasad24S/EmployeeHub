@@ -8,6 +8,7 @@ from rest_framework.views import APIView
 from apps.accounts.authentication import ClerkJWTAuthentication
 from apps.accounts.models import Employee
 from apps.accounts.serializers import EmployeeCreateSerializer, EmployeeSerializer
+from apps.attendance.services import upload_selfie
 from apps.common.permissions import IsAdminRole
 
 
@@ -27,7 +28,9 @@ class AuthLoginView(APIView):
                 }
             )
         if getattr(principal, "role", None) == "EMPLOYEE":
-            employee = Employee.objects.get(id=principal.employee_id)
+            employee = Employee.objects.filter(pk=principal.employee_id).first()
+            if not employee:
+                return Response({"detail": "Employee profile not found."}, status=status.HTTP_404_NOT_FOUND)
             return Response(
                 {
                     "role": "EMPLOYEE",
@@ -36,7 +39,7 @@ class AuthLoginView(APIView):
                     "requires_face_registration": not bool(employee.face_embedding),
                 }
             )
-        return Response({"detail": "Unable to resolve account role."}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": "Only registered employees and admins can access the dashboard."}, status=status.HTTP_403_FORBIDDEN)
 
 
 class AuthLogoutView(APIView):
@@ -83,12 +86,11 @@ class UploadProfilePhotoView(APIView):
         if not photo_file:
             return Response({"detail": "No photo file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-        from django.core.files.storage import default_storage
-        import uuid
-        import os
-        ext = os.path.splitext(getattr(photo_file, "name", ".jpg"))[1] or ".jpg"
-        filename = f"profile_photos/{uuid.uuid4()}{ext}"
-        saved_name = default_storage.save(filename, photo_file)
-        employee.profile_photo = default_storage.url(saved_name)
+        employee.profile_photo = upload_selfie(
+            photo_file,
+            folder="profile_photos",
+            timestamp=request.data.get("timestamp") or None,
+            location=request.data.get("location") or None,
+        )
         employee.save(update_fields=["profile_photo"])
         return Response({"detail": "Profile photo updated.", "profile_photo": employee.profile_photo})

@@ -22,6 +22,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "device_id",
             "is_active",
             "is_face_registered",
+            "default_address",
+            "default_latitude",
+            "default_longitude",
+            "default_radius",
             "created_at",
             "updated_at",
         ]
@@ -44,7 +48,21 @@ class EmployeeSerializer(serializers.ModelSerializer):
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Employee
-        fields = ["employee_id", "name", "email", "phone", "department", "designation", "profile_photo", "device_id", "is_active"]
+        fields = [
+            "employee_id",
+            "name",
+            "email",
+            "phone",
+            "department",
+            "designation",
+            "profile_photo",
+            "device_id",
+            "is_active",
+            "default_address",
+            "default_latitude",
+            "default_longitude",
+            "default_radius",
+        ]
 
 
 class AdminSerializer(serializers.ModelSerializer):

@@ -216,6 +216,37 @@ export function EmployeePortal() {
     }
   }
 
+  const buildAnnotatedPhoto = async (base64Image: string) => {
+    const img = new Image()
+    img.src = base64Image
+    await new Promise((resolve) => {
+      img.onload = resolve
+    })
+
+    const canvas = document.createElement('canvas')
+    canvas.width = img.width || 1080
+    canvas.height = img.height || 1440
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return null
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
+    ctx.fillRect(0, canvas.height - 150, canvas.width, 150)
+
+    ctx.fillStyle = '#ffffff'
+    ctx.font = 'bold 28px Inter, sans-serif'
+    const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+    const locationText = currentCoords ? `Location: ${currentCoords.latitude.toFixed(5)}, ${currentCoords.longitude.toFixed(5)}` : 'Location: unavailable'
+    const lines = [`Captured: ${timestamp}`, locationText]
+    lines.forEach((line, index) => {
+      ctx.fillText(line, 24, canvas.height - 105 + index * 34)
+    })
+
+    return await new Promise<Blob | null>((resolve) => {
+      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95)
+    })
+  }
+
   // Handle Photo Acceptance
   const acceptPhoto = async () => {
     if (!tempPhoto) return
@@ -233,8 +264,8 @@ export function EmployeePortal() {
           if (!token) return
           const formData = new FormData()
           for (let i = 0; i < updated.length; i++) {
-            const blob = await (await fetch(updated[i])).blob()
-            formData.append('selfies', blob, `selfie_${i}.jpg`)
+            const annotatedBlob = await buildAnnotatedPhoto(updated[i])
+            formData.append('selfies', annotatedBlob || await (await fetch(updated[i])).blob(), `selfie_${i}.jpg`)
           }
 
           const res = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api/face/register`, {
@@ -254,8 +285,8 @@ export function EmployeePortal() {
             setProfile({ ...profile, profile_photo: updated[0] })
             // Also upload the first photo as the profile picture to backend
             const profileForm = new FormData()
-            const profileBlob = await (await fetch(updated[0])).blob()
-            profileForm.append('profile_photo_file', profileBlob, 'profile.jpg')
+            const profileBlob = await buildAnnotatedPhoto(updated[0])
+            profileForm.append('profile_photo_file', profileBlob || await (await fetch(updated[0])).blob(), 'profile.jpg')
             await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api/employees/${profile.id}/upload-photo/`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${token}` },
@@ -283,9 +314,9 @@ export function EmployeePortal() {
           return
         }
 
-        const blob = await (await fetch(tempPhoto)).blob()
+        const annotatedBlob = await buildAnnotatedPhoto(tempPhoto)
         const formData = new FormData()
-        formData.append('selfie', blob, 'selfie.jpg')
+        formData.append('selfie', annotatedBlob || await (await fetch(tempPhoto)).blob(), 'selfie.jpg')
         formData.append('latitude', String(currentCoords.latitude))
         formData.append('longitude', String(currentCoords.longitude))
         formData.append('liveness_score', '1.0') // simulated high confidence from camera

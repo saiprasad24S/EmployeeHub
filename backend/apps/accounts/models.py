@@ -29,6 +29,10 @@ class Employee(models.Model):
     face_embedding = models.JSONField(null=True, blank=True)
     device_id = models.CharField(max_length=128, unique=True, null=True, blank=True)
     is_active = models.BooleanField(default=True)
+    default_address = models.TextField(blank=True, default="")
+    default_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    default_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    default_radius = models.PositiveIntegerField(default=100)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

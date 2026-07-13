@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
@@ -11,14 +12,15 @@ from apps.attendance.models import Attendance, Session
 from apps.attendance.serializers import AttendanceSerializer
 from apps.attendance.services import (
     end_session,
+    generate_attendance_export,
     get_active_assignment,
+    log_location,
     record_attendance,
     start_session,
     upload_selfie,
     validate_geofence,
     validate_liveness,
     verify_face_against_employee,
-    log_location,
 )
 from apps.common.permissions import IsEmployeeRole
 
@@ -30,19 +32,39 @@ class CheckInView(APIView):
     def post(self, request):
         employee = Employee.objects.get(pk=request.user.employee_id)
         assignment = get_active_assignment(employee)
-        if not assignment:
-            return Response({"detail": "No active assignment found."}, status=status.HTTP_400_BAD_REQUEST)
 
         latitude = float(request.data["latitude"])
         longitude = float(request.data["longitude"])
-        validate_geofence(assignment, latitude, longitude)
+
+        if assignment:
+            validate_geofence(assignment, latitude, longitude)
+        else:
+            if employee.default_latitude is not None and employee.default_longitude is not None:
+                from apps.common.utils import distance_meters
+                from django.core.exceptions import ValidationError
+                radius = employee.default_radius or 100
+                distance = distance_meters(
+                    float(latitude),
+                    float(longitude),
+                    float(employee.default_latitude),
+                    float(employee.default_longitude)
+                )
+                if distance > radius:
+                    raise ValidationError({"detail": f"Geofence Verification Failed: You are outside your default work range by {round(distance - radius, 2)} meters. Attendance was not marked."})
+            else:
+                return Response({"detail": "No active assignment found and no default location set for employee."}, status=status.HTTP_400_BAD_REQUEST)
 
         selfie = request.FILES.get("selfie")
         if not selfie:
             return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
         validate_liveness(selfie, request.data.get("liveness_score"))
         verify_face_against_employee(employee, selfie)
-        photo_url = upload_selfie(selfie, folder="attendance")
+        photo_url = upload_selfie(
+            selfie,
+            folder="attendance",
+            timestamp=request.data.get("timestamp") or None,
+            location=request.data.get("location") or None,
+        )
 
         session = start_session(employee)
         attendance = record_attendance(
@@ -56,8 +78,9 @@ class CheckInView(APIView):
             address=request.data.get("address", ""),
             status=Attendance.Status.APPROVED,
         )
-        assignment.status = assignment.Status.ACTIVE
-        assignment.save(update_fields=["status"])
+        if assignment:
+            assignment.status = assignment.Status.ACTIVE
+            assignment.save(update_fields=["status"])
         log_location(
             session=session,
             employee=employee,
@@ -87,7 +110,12 @@ class CheckOutView(APIView):
             return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
         validate_liveness(selfie, request.data.get("liveness_score"))
         verify_face_against_employee(employee, selfie)
-        photo_url = upload_selfie(selfie, folder="attendance")
+        photo_url = upload_selfie(
+            selfie,
+            folder="attendance",
+            timestamp=request.data.get("timestamp") or None,
+            location=request.data.get("location") or None,
+        )
 
         latitude = float(request.data["latitude"])
         longitude = float(request.data["longitude"])
@@ -125,3 +153,24 @@ class AttendanceListView(APIView):
         if employee_id:
             queryset = queryset.filter(employee__employee_id=employee_id)
         return Response(AttendanceSerializer(queryset[:200], many=True).data)
+
+
+class AttendanceExportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        start_date = request.query_params.get("start_date")
+        end_date = request.query_params.get("end_date")
+        if not start_date or not end_date:
+            return Response({"detail": "Both start_date and end_date are required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            start = datetime.strptime(start_date, "%Y-%m-%d").date()
+            end = datetime.strptime(end_date, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"detail": "Dates must be in YYYY-MM-DD format."}, status=status.HTTP_400_BAD_REQUEST)
+
+        workbook_bytes = generate_attendance_export(start, end)
+        response = HttpResponse(workbook_bytes, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        response["Content-Disposition"] = f"attachment; filename=attendance_{start}_{end}.xlsx"
+        return response

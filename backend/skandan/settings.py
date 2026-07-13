@@ -155,7 +155,6 @@ if (
     not CLOUDINARY_STORAGE["CLOUD_NAME"]
     or not CLOUDINARY_STORAGE["API_KEY"]
     or not CLOUDINARY_STORAGE["API_SECRET"]
-    or "noapeFhi" in CLOUDINARY_STORAGE["CLOUD_NAME"]
 ):
     DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 else:

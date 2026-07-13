@@ -1,12 +1,15 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from io import BytesIO
 
 import cloudinary.uploader
 from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.utils import timezone
+from openpyxl import Workbook
+from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import Employee
@@ -38,14 +41,107 @@ def validate_geofence(assignment: Assignment, latitude: float, longitude: float)
         raise ValidationError({"detail": f"Geofence Verification Failed: You are outside the patient's scheduled range by {round(distance - radius, 2)} meters. Attendance was not marked."})
 
 
-def upload_selfie(image_file, folder: str) -> str:
+def annotate_image(image_file, *, timestamp: str | None = None, location: str | None = None):
+    image_file.seek(0)
+    img = Image.open(image_file).convert('RGBA')
+    draw = ImageDraw.Draw(img)
+    font = ImageFont.load_default()
+
+    width, height = img.size
+    margin = 24
+    box_height = 86
+    draw.rectangle([(0, height - box_height), (width, height)], fill=(0, 0, 0, 180))
+
+    label = timestamp or datetime.now().strftime('%Y-%m-%d %H:%M')
+    location_text = location or 'Location: unavailable'
+    lines = [f'Captured: {label}', location_text]
+    for index, line in enumerate(lines):
+        draw.text((margin, height - box_height + 22 + index * 28), line, fill='white', font=font)
+
+    rgb_img = img.convert('RGB')
+    buffer = BytesIO()
+    rgb_img.save(buffer, format='JPEG', quality=95)
+    buffer.seek(0)
+    return buffer
+
+
+def upload_selfie(image_file, folder: str, *, timestamp: str | None = None, location: str | None = None) -> str:
     from django.core.files.storage import default_storage
     import uuid
     import os
+
     ext = os.path.splitext(getattr(image_file, "name", ".jpg"))[1] or ".jpg"
-    filename = f"{folder}/{uuid.uuid4()}{ext}"
-    saved_name = default_storage.save(filename, image_file)
+    image_file.seek(0)
+    annotated_buffer = annotate_image(image_file, timestamp=timestamp, location=location)
+    if annotated_buffer is None:
+        annotated_buffer = BytesIO(image_file.read())
+
+    annotated_name = f"{folder}/{uuid.uuid4()}{ext}"
+    annotated_file = SimpleUploadedFile(
+        getattr(image_file, 'name', 'selfie.jpg'),
+        annotated_buffer.getvalue(),
+        content_type='image/jpeg',
+    )
+    saved_name = default_storage.save(annotated_name, annotated_file)
     return default_storage.url(saved_name)
+
+
+def generate_attendance_export(start_date: date, end_date: date) -> bytes:
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = 'Attendance'
+    headers = [
+        'SNo', 'Date', 'Emp ID', 'Name', 'Email', 'Phone Number', 'Login Time', 'Logout Time', 'Total Hours',
+        'Days Present', 'Days Absent'
+    ]
+    sheet.append(headers)
+
+    employees = Employee.objects.all().order_by('employee_id')
+    current_date = start_date
+    while current_date <= end_date:
+        for index, employee in enumerate(employees, start=1):
+            sessions = Session.objects.filter(employee=employee, login_time__date=current_date).order_by('login_time')
+            if not sessions.exists():
+                sheet.append([
+                    index,
+                    current_date.strftime('%Y-%m-%d'),
+                    employee.employee_id,
+                    employee.name,
+                    employee.email,
+                    employee.phone,
+                    '',
+                    '',
+                    '',
+                    '0',
+                    '1',
+                ])
+                continue
+
+            session = sessions.first()
+            login_time = session.login_time
+            logout_time = session.logout_time or ''
+            total_hours = ''
+            if logout_time:
+                delta = logout_time - login_time
+                total_hours = f"{int(delta.total_seconds() // 3600)}:{int((delta.total_seconds() % 3600) // 60):02d}"
+            sheet.append([
+                index,
+                current_date.strftime('%Y-%m-%d'),
+                employee.employee_id,
+                employee.name,
+                employee.email,
+                employee.phone,
+                login_time.strftime('%H:%M:%S') if login_time else '',
+                logout_time.strftime('%H:%M:%S') if logout_time else '',
+                total_hours,
+                '1' if session.login_time else '0',
+                '0',
+            ])
+        current_date += timedelta(days=1)
+
+    output = BytesIO()
+    workbook.save(output)
+    return output.getvalue()
 
 
 @transaction.atomic

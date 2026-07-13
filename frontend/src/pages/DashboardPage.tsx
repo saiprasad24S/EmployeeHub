@@ -1,11 +1,16 @@
+import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
 import { MetricCard } from '../components/MetricCard'
-import { RouteMap } from '../components/RouteMap'
+import { LiveLocationsMap } from '../components/LiveLocationsMap'
+import { useSearch } from '../context/SearchContext'
 
 export function DashboardPage() {
   const { getToken } = useAuth()
+  const { searchQuery } = useSearch()
+
+  // Fetch metrics (total, present, absent)
   const metricsQuery = useQuery({
     queryKey: ['dashboard-metrics'],
     queryFn: async () => {
@@ -17,47 +22,91 @@ export function DashboardPage() {
     },
   })
 
+  // Fetch live locations of present employees
+  const locationsQuery = useQuery({
+    queryKey: ['dashboard-locations'],
+    queryFn: async () => {
+      const token = await getToken()
+      if (!token) throw new Error('Missing token')
+      const response = await authedFetch('/api/location/all-present-locations', token)
+      if (!response.ok) throw new Error('Unable to load locations')
+      return response.json() as Promise<
+        Array<{ id: number; employee_id: string; name: string; latitude: number; longitude: number }>
+      >
+    },
+  })
+
+  const totalEmployees = metricsQuery.data?.total_employees ?? 0
+  const presentCount = metricsQuery.data?.present_employees ?? 0
+  const absentCount = metricsQuery.data?.absent_employees ?? 0
+  const locations = locationsQuery.data ?? []
+  const filteredLocations = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    if (!q) return locations
+    return locations.filter((location) => {
+      return [location.name, location.employee_id].some((value) => value.toLowerCase().includes(q))
+    })
+  }, [locations, searchQuery])
+
   return (
-    <section className="page-grid">
+    <section className="page-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="hero-card hero-split">
         <div className="hero-copy">
           <span className="eyebrow">Today at a glance</span>
           <h3>Attendance, routing, and field coverage</h3>
-          <p>Premium healthcare operations dashboard designed for Skandan field employees and admins.</p>
-          <div className="hero-pills">
-            <span>Live locations</span>
-            <span>Photo proof</span>
-            <span>Geofence checks</span>
-          </div>
+          <p>Secure healthcare operations for Skandan clinicians, nurses, and admins.</p>
         </div>
-        <div className="hero-summary">
-          <MetricCard label="Present Employees" value={String(metricsQuery.data?.present_employees ?? 0)} />
-          <MetricCard label="Employees in Field" value={String(metricsQuery.data?.employees_in_field ?? 0)} />
+        <div className="hero-summary" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '1rem' }}>
+          <MetricCard label="Total Employees" value={String(totalEmployees)} />
+          <MetricCard label="Present Employees" value={String(presentCount)} />
+          <MetricCard label="Absent Employees" value={String(absentCount)} />
         </div>
       </div>
-      <div className="metrics-grid">
-          <MetricCard label="Present Employees" value={String(metricsQuery.data?.present_employees ?? 0)} />
-          <MetricCard label="Absent Employees" value={String(metricsQuery.data?.absent_employees ?? 0)} />
-          <MetricCard label="Employees in Field" value={String(metricsQuery.data?.employees_in_field ?? 0)} />
-          <MetricCard label="Completed Visits" value={String(metricsQuery.data?.completed_visits ?? 0)} />
-          <MetricCard label="Pending Visits" value={String(metricsQuery.data?.pending_visits ?? 0)} />
-          <MetricCard label="Distance Covered" value={`${Math.round(metricsQuery.data?.distance_covered_today_meters ?? 0)} m`} />
+
+      <div className="metrics-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+        <MetricCard label="Total Employees" value={String(totalEmployees)} />
+        <MetricCard label="Present Employees" value={String(presentCount)} />
+        <MetricCard label="Absent Employees" value={String(absentCount)} />
       </div>
-      <div className="split-layout">
+
+      <div className="split-layout" style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '1.5rem', alignItems: 'start' }}>
+        {/* Map Section */}
         <div className="glass-card card-soft">
-          <div className="section-header">
+          <div className="section-header" style={{ marginBottom: '1rem' }}>
             <div>
               <span className="eyebrow">Route monitoring</span>
               <h4>Live route snapshot</h4>
             </div>
-            <span className="badge success">Tracking active</span>
+            {presentCount > 0 && <span className="badge success">Tracking active</span>}
           </div>
-          <RouteMap points={[
-            { latitude: 12.9716, longitude: 77.5946 },
-            { latitude: 12.9725, longitude: 77.6021 },
-            { latitude: 12.9751, longitude: 77.6089 },
-          ]} />
+
+          {presentCount === 0 ? (
+            <div
+              style={{
+                height: '350px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(239, 68, 68, 0.05)',
+                border: '1px dashed var(--danger)',
+                borderRadius: '14px',
+                color: 'var(--danger)',
+                fontWeight: 600,
+                fontSize: '1rem',
+              }}
+            >
+              ⚠️ All employees are absent today. No present employee locations are available to display.
+            </div>
+          ) : locationsQuery.isLoading ? (
+            <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
+              Loading live locations...
+            </div>
+          ) : (
+            <LiveLocationsMap locations={filteredLocations} />
+          )}
         </div>
+
+        {/* Operational Rules */}
         <div className="glass-card card-soft stack">
           <div className="section-header">
             <div>
@@ -65,8 +114,8 @@ export function DashboardPage() {
               <h4>Attendance policy</h4>
             </div>
           </div>
-          <ul className="info-list">
-            <li>Check-in is allowed only inside the active assignment radius.</li>
+          <ul className="info-list" style={{ paddingLeft: '1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem', marginTop: '1rem', color: 'var(--muted)', fontSize: '0.9rem' }}>
+            <li>Check-in is allowed only inside the scheduled assignment radius or default location.</li>
             <li>Selfies are verified against stored InsightFace embeddings.</li>
             <li>Location logs are restricted to authenticated admins and the owning employee.</li>
             <li>GPS points are collected only during an active working session.</li>

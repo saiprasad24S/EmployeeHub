@@ -27,6 +27,7 @@ class DashboardMetricsView(APIView):
                 distance = get_today_distance(employee)
         return Response(
             {
+                "total_employees": total_employees,
                 "present_employees": len(set(present_employee_ids)),
                 "absent_employees": max(total_employees - len(set(present_employee_ids)), 0),
                 "employees_in_field": active_sessions,

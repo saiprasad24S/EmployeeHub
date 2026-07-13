@@ -14,7 +14,7 @@ export function TrackingPage() {
     queryFn: async () => {
       const token = await getToken()
       if (!token || !employeeId) throw new Error('Missing token or employee id')
-      const response = await authedFetch(`/api/location/employee/route/${employeeId}/`, token)
+      const response = await authedFetch(`/api/location/employee/route/${employeeId}`, token)
       if (!response.ok) throw new Error('Unable to load route')
       return response.json() as Promise<{ route: Array<{ latitude: number; longitude: number; timestamp: string }> }>
     },
@@ -35,9 +35,9 @@ export function TrackingPage() {
       {routeQuery.isLoading ? (
         <div className="route-loading">Loading route data...</div>
       ) : routeQuery.isError ? (
-        <div className="route-loading" style={{ color: 'var(--danger)' }}>Error loading route history</div>
+        <div className="route-loading" style={{ color: 'var(--danger)' }}>Unable to load route history right now.</div>
       ) : points.length === 0 ? (
-        <div className="route-loading">No tracking route recorded for today</div>
+        <div className="route-loading">No route recorded for today. Employees are absent or there is no live tracking data yet.</div>
       ) : (
         <RouteMap points={points} />
       )}
