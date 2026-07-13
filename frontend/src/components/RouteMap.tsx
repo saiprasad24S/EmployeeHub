@@ -6,11 +6,13 @@ type RouteMapProps = {
 }
 
 export function RouteMap({ points }: RouteMapProps) {
-  const center: LatLngExpression = points.length > 0 ? [points[0].latitude, points[0].longitude] : [12.9716, 77.5946]
+  const center: LatLngExpression = points.length > 0
+    ? [points[points.length - 1].latitude, points[points.length - 1].longitude]
+    : [12.9716, 77.5946]
 
   return (
     <div className="map-card">
-      <MapContainer center={center} zoom={13} scrollWheelZoom className="map-view">
+      <MapContainer key={`${center[0]}-${center[1]}`} center={center} zoom={13} scrollWheelZoom className="map-view">
         <TileLayer
           attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

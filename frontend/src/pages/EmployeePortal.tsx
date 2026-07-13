@@ -480,33 +480,10 @@ export function EmployeePortal() {
                         </button>
                       )}
                     </div>
-
-                    {sessionActive && (
-                      <div style={{ marginTop: '1rem', padding: '0.8rem', background: 'rgba(16, 185, 129, 0.08)', borderRadius: '10px' }}>
-                        <p style={{ fontSize: '0.85rem', color: '#10B981', fontWeight: 600, margin: 0 }}>
-                          🟢 Location tracking is ACTIVE — your movement is being logged for safety.
-                        </p>
-                      </div>
-                    )}
+                    {/* Location tracking banner removed per request */}
                   </div>
                 )}
               </div>
-
-              {/* Map history tracker */}
-              {sessionActive && (
-                <div className="glass-card card-soft stack" style={{ padding: '1.5rem' }}>
-                  <div className="section-header">
-                    <div>
-                      <span className="eyebrow">Location Tracking</span>
-                      <h4>Live Today's Route Trail</h4>
-                    </div>
-                    <span className="badge success">Active Safety Tracking</span>
-                  </div>
-                  <div style={{ height: '300px', marginTop: '1rem', borderRadius: '14px', overflow: 'hidden' }}>
-                    <RouteMap points={routeQuery.data?.route || []} />
-                  </div>
-                </div>
-              )}
             </div>
           </div>
         )}

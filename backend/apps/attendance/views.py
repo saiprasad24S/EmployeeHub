@@ -18,6 +18,7 @@ from apps.attendance.services import (
     validate_geofence,
     validate_liveness,
     verify_face_against_employee,
+    log_location,
 )
 from apps.common.permissions import IsEmployeeRole
 
@@ -57,6 +58,14 @@ class CheckInView(APIView):
         )
         assignment.status = assignment.Status.ACTIVE
         assignment.save(update_fields=["status"])
+        log_location(
+            session=session,
+            employee=employee,
+            latitude=latitude,
+            longitude=longitude,
+            accuracy=1.0,
+            is_mock=False,
+        )
         return Response(
             {"detail": "Check-in successful.", "attendance": AttendanceSerializer(attendance).data, "session_id": session.id},
             status=status.HTTP_201_CREATED,
@@ -92,6 +101,14 @@ class CheckOutView(APIView):
             longitude=longitude,
             address=request.data.get("address", ""),
             status=Attendance.Status.APPROVED,
+        )
+        log_location(
+            session=session,
+            employee=employee,
+            latitude=latitude,
+            longitude=longitude,
+            accuracy=1.0,
+            is_mock=False,
         )
         end_session(employee)
         return Response({"detail": "Check-out successful.", "attendance": AttendanceSerializer(attendance).data})
