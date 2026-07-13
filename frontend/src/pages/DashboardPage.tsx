@@ -31,7 +31,17 @@ export function DashboardPage() {
       const response = await authedFetch('/api/location/all-present-locations', token)
       if (!response.ok) throw new Error('Unable to load locations')
       return response.json() as Promise<
-        Array<{ id: number; employee_id: string; name: string; latitude: number; longitude: number }>
+        Array<{
+          id: number
+          employee_id: string
+          name: string
+          email?: string
+          department?: string
+          default_address?: string
+          profile_photo?: string
+          latitude: number
+          longitude: number
+        }>
       >
     },
   })
@@ -44,7 +54,7 @@ export function DashboardPage() {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return locations
     return locations.filter((location) => {
-      return [location.name, location.employee_id].some((value) => value.toLowerCase().includes(q))
+      return [location.name, location.employee_id, location.email, location.department, location.default_address].some((value) => (value ?? '').toLowerCase().includes(q))
     })
   }, [locations, searchQuery])
 

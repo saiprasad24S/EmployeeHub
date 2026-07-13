@@ -10,10 +10,14 @@ type Employee = {
   employee_id: string
   name: string
   email: string
+  phone: string
   department: string
   designation: string
   profile_photo: string
   default_address: string
+  default_latitude?: string | number | null
+  default_longitude?: string | number | null
+  default_radius?: number | string | null
   is_active: boolean
   is_face_registered: boolean
 }
@@ -36,6 +40,26 @@ type RoutePoint = {
   longitude: number
 }
 
+type RouteData = {
+  route: RoutePoint[]
+  distance_covered_meters: number
+  last_known_location?: { latitude: number; longitude: number; timestamp?: string; accuracy?: number } | null
+}
+
+const emptyEmployeeForm = {
+  employee_id: '',
+  name: '',
+  email: '',
+  phone: '',
+  department: '',
+  designation: '',
+  default_address: '',
+  default_latitude: '',
+  default_longitude: '',
+  default_radius: '100',
+  is_active: true,
+}
+
 export function EmployeesPage() {
   const { getToken } = useAuth()
   const { searchQuery } = useSearch()
@@ -44,6 +68,10 @@ export function EmployeesPage() {
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
   const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null)
   const [defaultAddressDraft, setDefaultAddressDraft] = useState('')
+  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false)
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
+  const [employeeForm, setEmployeeForm] = useState(emptyEmployeeForm)
+  const [employeeFormError, setEmployeeFormError] = useState<string | null>(null)
 
   const employeesQuery = useQuery({
     queryKey: ['employees'],
@@ -74,8 +102,8 @@ export function EmployeesPage() {
       const token = await getToken()
       if (!token || !selectedEmployee) throw new Error('No token')
       const response = await authedFetch(`/api/location/employee/route/${selectedEmployee.id}`, token)
-      if (!response.ok) return { route: [] as RoutePoint[], distance_covered_meters: 0 }
-      return response.json() as Promise<{ route: RoutePoint[]; distance_covered_meters: number }>
+      if (!response.ok) return { route: [] as RoutePoint[], distance_covered_meters: 0, last_known_location: null } as RouteData
+      return response.json() as Promise<RouteData>
     },
   })
 
@@ -85,7 +113,8 @@ export function EmployeesPage() {
     const q = searchQuery.trim().toLowerCase()
     if (!q) return employees
     return employees.filter((employee) => {
-      return [employee.employee_id, employee.name, employee.email, employee.default_address].some((value) => value.toLowerCase().includes(q))
+      return [employee.employee_id, employee.name, employee.email, employee.phone, employee.department, employee.default_address]
+        .some((value) => (value ?? '').toLowerCase().includes(q))
     })
   }, [employees, searchQuery])
 
@@ -111,39 +140,67 @@ export function EmployeesPage() {
     },
   })
 
-  // Group attendance by employee
+  const createEmployeeMutation = useMutation({
+    mutationFn: async (payload: Record<string, unknown>) => {
+      const token = await getToken()
+      if (!token) throw new Error('Missing token')
+      const response = await authedFetch('/api/employees/', token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.detail || 'Failed to create employee')
+      }
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      closeEmployeeModal()
+    },
+    onError: (error: any) => {
+      setEmployeeFormError(error.message || 'Unable to create employee')
+    },
+  })
+
+  const updateEmployeeMutation = useMutation({
+    mutationFn: async ({ employeeId, payload }: { employeeId: number; payload: Record<string, unknown> }) => {
+      const token = await getToken()
+      if (!token) throw new Error('Missing token')
+      const response = await authedFetch(`/api/employees/${employeeId}/`, token, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.detail || 'Failed to update employee')
+      }
+      return response.json()
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+      closeEmployeeModal()
+    },
+    onError: (error: any) => {
+      setEmployeeFormError(error.message || 'Unable to update employee')
+    },
+  })
+
   const getEmployeeAttendance = (empId: string) => {
     return attendance
       .filter((a) => a.employee_employee_id === empId)
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   }
 
-  // Get latest check-in and check-out for today
   const getTodayTimes = (empId: string) => {
     const today = new Date().toISOString().slice(0, 10)
-    const records = getEmployeeAttendance(empId).filter((a) =>
-      a.timestamp.startsWith(today)
-    )
+    const records = getEmployeeAttendance(empId).filter((a) => a.timestamp.startsWith(today))
     const checkIn = records.find((r) => r.attendance_type === 'CHECK_IN')
     const checkOut = records.find((r) => r.attendance_type === 'CHECK_OUT')
     return { checkIn, checkOut }
   }
-
-  const presentEmployees = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    return filteredEmployees.filter((employee) => {
-      const records = getEmployeeAttendance(employee.employee_id).filter((record) => record.timestamp.startsWith(today))
-      return records.some((record) => record.attendance_type === 'CHECK_IN')
-    })
-  }, [attendance, filteredEmployees])
-
-  const absentEmployees = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10)
-    return filteredEmployees.filter((employee) => {
-      const records = getEmployeeAttendance(employee.employee_id).filter((record) => record.timestamp.startsWith(today))
-      return !records.some((record) => record.attendance_type === 'CHECK_IN')
-    })
-  }, [attendance, filteredEmployees])
 
   const openAddressEditor = (employee: Employee) => {
     setEditingEmployeeId(employee.id)
@@ -152,6 +209,67 @@ export function EmployeesPage() {
 
   const saveAddress = (employee: Employee) => {
     updateEmployeeAddress.mutate({ employeeId: employee.id, address: defaultAddressDraft })
+  }
+
+  const openCreateEmployeeModal = () => {
+    setEditingEmployee(null)
+    setEmployeeForm({ ...emptyEmployeeForm })
+    setEmployeeFormError(null)
+    setIsEmployeeModalOpen(true)
+  }
+
+  const openEditEmployeeModal = (employee: Employee) => {
+    setEditingEmployee(employee)
+    setEmployeeForm({
+      employee_id: employee.employee_id,
+      name: employee.name,
+      email: employee.email,
+      phone: employee.phone || '',
+      department: employee.department || '',
+      designation: employee.designation || '',
+      default_address: employee.default_address || '',
+      default_latitude: employee.default_latitude ? String(employee.default_latitude) : '',
+      default_longitude: employee.default_longitude ? String(employee.default_longitude) : '',
+      default_radius: employee.default_radius ? String(employee.default_radius) : '100',
+      is_active: employee.is_active,
+    })
+    setEmployeeFormError(null)
+    setIsEmployeeModalOpen(true)
+  }
+
+  const closeEmployeeModal = () => {
+    setIsEmployeeModalOpen(false)
+    setEditingEmployee(null)
+    setEmployeeForm({ ...emptyEmployeeForm })
+    setEmployeeFormError(null)
+  }
+
+  const handleEmployeeSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    const payload = {
+      employee_id: employeeForm.employee_id.trim(),
+      name: employeeForm.name.trim(),
+      email: employeeForm.email.trim(),
+      phone: employeeForm.phone.trim(),
+      department: employeeForm.department.trim(),
+      designation: employeeForm.designation.trim(),
+      default_address: employeeForm.default_address.trim(),
+      default_latitude: employeeForm.default_latitude ? Number(employeeForm.default_latitude) : null,
+      default_longitude: employeeForm.default_longitude ? Number(employeeForm.default_longitude) : null,
+      default_radius: employeeForm.default_radius ? Number(employeeForm.default_radius) : 100,
+      is_active: employeeForm.is_active,
+    }
+
+    if (!payload.employee_id || !payload.name || !payload.email) {
+      setEmployeeFormError('Employee ID, name, and email are required.')
+      return
+    }
+
+    if (editingEmployee) {
+      updateEmployeeMutation.mutate({ employeeId: editingEmployee.id, payload })
+    } else {
+      createEmployeeMutation.mutate(payload)
+    }
   }
 
   return (
@@ -163,6 +281,9 @@ export function EmployeesPage() {
             <h3>Workforce Overview</h3>
             <p>All employees with their attendance status, login/logout times, and location tracking.</p>
           </div>
+          <button className="btn-primary" onClick={openCreateEmployeeModal} style={{ padding: '0.5rem 0.9rem' }}>
+            + Create Employee
+          </button>
         </div>
         <div className="table-wrap data-table-shell">
           <table>
@@ -172,6 +293,7 @@ export function EmployeesPage() {
                 <th>Employee ID</th>
                 <th>Name</th>
                 <th>Email</th>
+                <th>Phone</th>
                 <th>Department</th>
                 <th>Default Address</th>
                 <th>Today's Check-In</th>
@@ -186,16 +308,22 @@ export function EmployeesPage() {
                 return (
                   <tr key={employee.employee_id}>
                     <td>
-                      <img
-                        src={employee.profile_photo || (checkIn?.photo_url) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
-                        alt={employee.name}
-                        style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }}
-                        onClick={() => setLightboxPhoto(employee.profile_photo || (checkIn?.photo_url) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff')}
-                      />
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
+                        <img
+                          src={employee.profile_photo || (checkIn?.photo_url) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
+                          alt={employee.name}
+                          style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }}
+                          onClick={() => setLightboxPhoto(employee.profile_photo || (checkIn?.photo_url) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff')}
+                        />
+                        <button className="btn-secondary" style={{ padding: '0.2rem 0.45rem', fontSize: '0.7rem' }} onClick={() => openEditEmployeeModal(employee)}>
+                          Edit
+                        </button>
+                      </div>
                     </td>
                     <td>{employee.employee_id}</td>
                     <td style={{ fontWeight: 600 }}>{employee.name}</td>
                     <td>{employee.email}</td>
+                    <td>{employee.phone || '—'}</td>
                     <td>{employee.department}</td>
                     <td style={{ maxWidth: '220px', color: 'var(--muted)' }}>
                       {editingEmployeeId === employee.id ? (
@@ -219,7 +347,7 @@ export function EmployeesPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
                           <span>{employee.default_address || '—'}</span>
                           <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', width: 'fit-content' }} onClick={() => openAddressEditor(employee)}>
-                            Edit
+                            Edit Address
                           </button>
                         </div>
                       )}
@@ -278,7 +406,46 @@ export function EmployeesPage() {
         </div>
       </div>
 
-      {/* Selected Employee Detail + Map */}
+      {isEmployeeModalOpen && (
+        <div className="camera-modal-backdrop" onClick={closeEmployeeModal}>
+          <div className="camera-modal" style={{ maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={(event) => event.stopPropagation()}>
+            <div className="camera-header">
+              <h3 style={{ fontSize: '1.1rem' }}>{editingEmployee ? 'Edit employee' : 'Create employee'}</h3>
+              <button onClick={closeEmployeeModal} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--muted)' }}>
+                &times;
+              </button>
+            </div>
+            <form onSubmit={handleEmployeeSubmit} style={{ padding: '1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              {employeeFormError && <div style={{ padding: '0.7rem', background: 'rgba(239,68,68,0.08)', color: 'var(--danger)', borderRadius: '8px' }}>{employeeFormError}</div>}
+              <div style={{ display: 'grid', gap: '0.7rem' }}>
+                <input value={employeeForm.employee_id} onChange={(event) => setEmployeeForm({ ...employeeForm, employee_id: event.target.value })} placeholder="Employee ID" style={inputStyle} />
+                <input value={employeeForm.name} onChange={(event) => setEmployeeForm({ ...employeeForm, name: event.target.value })} placeholder="Name" style={inputStyle} />
+                <input value={employeeForm.email} onChange={(event) => setEmployeeForm({ ...employeeForm, email: event.target.value })} placeholder="Email" type="email" style={inputStyle} />
+                <input value={employeeForm.phone} onChange={(event) => setEmployeeForm({ ...employeeForm, phone: event.target.value })} placeholder="Phone" style={inputStyle} />
+                <input value={employeeForm.department} onChange={(event) => setEmployeeForm({ ...employeeForm, department: event.target.value })} placeholder="Department" style={inputStyle} />
+                <input value={employeeForm.designation} onChange={(event) => setEmployeeForm({ ...employeeForm, designation: event.target.value })} placeholder="Designation" style={inputStyle} />
+                <textarea value={employeeForm.default_address} onChange={(event) => setEmployeeForm({ ...employeeForm, default_address: event.target.value })} placeholder="Default address" rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
+                  <input value={employeeForm.default_latitude} onChange={(event) => setEmployeeForm({ ...employeeForm, default_latitude: event.target.value })} placeholder="Default latitude" style={inputStyle} />
+                  <input value={employeeForm.default_longitude} onChange={(event) => setEmployeeForm({ ...employeeForm, default_longitude: event.target.value })} placeholder="Default longitude" style={inputStyle} />
+                </div>
+                <input value={employeeForm.default_radius} onChange={(event) => setEmployeeForm({ ...employeeForm, default_radius: event.target.value })} placeholder="Default radius (meters)" style={inputStyle} />
+                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                  <input type="checkbox" checked={employeeForm.is_active} onChange={(event) => setEmployeeForm({ ...employeeForm, is_active: event.target.checked })} />
+                  {' '}Active employee
+                </label>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.4rem' }}>
+                <button type="button" className="btn-secondary" onClick={closeEmployeeModal}>Cancel</button>
+                <button type="submit" className="btn-primary" disabled={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}>
+                  {createEmployeeMutation.isPending || updateEmployeeMutation.isPending ? 'Saving…' : editingEmployee ? 'Save changes' : 'Create employee'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {selectedEmployee && (
         <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
           <div className="section-header">
@@ -288,28 +455,22 @@ export function EmployeesPage() {
                 {selectedEmployee.name} ({selectedEmployee.employee_id}) — Today's Route
               </h4>
             </div>
-            <button
-              className="ghost-button"
-              onClick={() => setSelectedEmployee(null)}
-              style={{ padding: '0.4rem 0.8rem' }}
-            >
+            <button className="ghost-button" onClick={() => setSelectedEmployee(null)} style={{ padding: '0.4rem 0.8rem' }}>
               ✕ Close
             </button>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
-            {/* Map */}
             <div style={{ height: '350px', borderRadius: '14px', overflow: 'hidden' }}>
               {routeQuery.isLoading ? (
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
                   Loading route...
                 </div>
               ) : (
-                <RouteMap points={routeQuery.data?.route || []} />
+                <RouteMap points={routeQuery.data?.route || []} lastKnownLocation={routeQuery.data?.last_known_location} />
               )}
             </div>
 
-            {/* Attendance Log */}
             <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
               <h5 style={{ marginBottom: '0.75rem', color: 'var(--text)' }}>Attendance History</h5>
               {getEmployeeAttendance(selectedEmployee.employee_id).length === 0 ? (
@@ -368,10 +529,7 @@ export function EmployeesPage() {
           <div className="camera-modal" style={{ maxWidth: '640px', width: 'min(94vw, 640px)' }} onClick={(event) => event.stopPropagation()}>
             <div className="camera-header">
               <h3 style={{ fontSize: '1.1rem' }}>Employee Photo</h3>
-              <button
-                onClick={() => setLightboxPhoto(null)}
-                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--muted)' }}
-              >
+              <button onClick={() => setLightboxPhoto(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--muted)' }}>
                 &times;
               </button>
             </div>
@@ -381,4 +539,12 @@ export function EmployeesPage() {
       )}
     </section>
   )
+}
+
+const inputStyle: React.CSSProperties = {
+  padding: '0.6rem 0.7rem',
+  borderRadius: '10px',
+  border: '1px solid var(--panel-border)',
+  background: 'var(--panel)',
+  color: 'var(--text)',
 }

@@ -17,6 +17,19 @@ from apps.tracking.serializers import LocationLogSerializer
 from apps.tracking.services import get_employee_route, get_latest_location, get_today_distance, get_travel_history
 
 
+def _serialize_location(log: LocationLog | None) -> dict | None:
+    if not log:
+        return None
+    return {
+        "latitude": float(log.latitude),
+        "longitude": float(log.longitude),
+        "timestamp": log.timestamp,
+        "accuracy": log.accuracy,
+        "speed": log.speed,
+        "battery_percentage": log.battery_percentage,
+    }
+
+
 def _resolve_employee(employee_id: int | str | None) -> Employee | None:
     if employee_id in (None, ""):
         return None
@@ -77,7 +90,13 @@ class EmployeeRouteView(APIView):
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
         route = get_employee_route(employee)
-        return Response({"employee_id": employee.employee_id, "route": route, "distance_covered_meters": get_today_distance(employee)})
+        last_known_location = _serialize_location(get_latest_location(employee))
+        return Response({
+            "employee_id": employee.employee_id,
+            "route": route,
+            "distance_covered_meters": get_today_distance(employee),
+            "last_known_location": last_known_location,
+        })
 
 
 class EmployeeTravelHistoryView(APIView):
@@ -116,6 +135,10 @@ class AllPresentEmployeesLocationView(APIView):
                         "id": employee.id,
                         "employee_id": employee.employee_id,
                         "name": employee.name,
+                        "email": employee.email,
+                        "department": employee.department,
+                        "default_address": employee.default_address,
+                        "profile_photo": employee.profile_photo,
                         "latitude": float(log.latitude),
                         "longitude": float(log.longitude),
                         "timestamp": log.timestamp,

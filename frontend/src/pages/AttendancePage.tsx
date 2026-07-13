@@ -104,7 +104,7 @@ export function AttendancePage() {
         <div className="glass-card" style={{ padding: '0.75rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
           <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
           <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-          <button className="btn-primary" onClick={handleExport} disabled={isExporting}>
+          <button className="btn-primary" onClick={handleExport} disabled={isExporting} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
             {isExporting ? 'Downloading…' : 'Download Excel'}
           </button>
         </div>

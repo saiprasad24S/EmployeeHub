@@ -98,9 +98,6 @@ export function AppShell({ children }: PropsWithChildren) {
                 <span className="theme-toggle-knob" />
               </span>
             </button>
-            <button className="icon-button" type="button" aria-label="Notifications">
-              3
-            </button>
             <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </header>

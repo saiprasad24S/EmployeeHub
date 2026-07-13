@@ -341,11 +341,9 @@ export function EmployeePortal() {
           if (profile && !profile.profile_photo && tempPhoto) {
             setProfile({ ...profile, profile_photo: tempPhoto })
           }
-          alert('Check-in Attendance successfully marked! Safety location tracking is now ACTIVE.')
         } else {
           setSessionActive(false)
           window.localStorage.setItem('employeehub-session-active', 'false')
-          alert('Check-out completed. Safety location tracking is now OFF.')
         }
 
         queryClient.invalidateQueries({ queryKey: ['my-assignment'] })
