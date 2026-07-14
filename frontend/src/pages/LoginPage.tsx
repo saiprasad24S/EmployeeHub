@@ -11,16 +11,17 @@ export function LoginPage() {
             className="auth-illustration"
             style={{ maxWidth: '360px', marginBottom: '1rem' }}
           />
-          <span className="eyebrow">Skandan Home Carre Clinic LLP</span>
-          <h1>Employee Management System</h1>
-
+          <div>
+            <span className="eyebrow">Skandan Home Carre Clinic LLP</span>
+            <h1>Employee Management System</h1>
+          </div>
         </div>
         <div className="auth-card">
           <SignIn
             path="/sign-in"
             routing="path"
             signUpUrl="/sign-up"
-            forceRedirectUrl="/"
+            afterSignInUrl="/"
           />
         </div>
       </div>

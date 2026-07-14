@@ -39,6 +39,13 @@ The backend can be configured using either `DATABASE_URL` or explicit `DB_*` var
    ```
 3. Open the app in the browser at the URL shown by Vite.
 
+### Frontend lint
+
+```bash
+cd frontend
+npm run lint
+```
+
 ## Testing
 
 ### Backend tests

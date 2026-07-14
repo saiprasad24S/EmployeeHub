@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
@@ -68,10 +68,14 @@ export function EmployeesPage() {
   const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
   const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null)
   const [defaultAddressDraft, setDefaultAddressDraft] = useState('')
+  const [defaultAddressCoordinates, setDefaultAddressCoordinates] = useState<{ latitude?: number | null; longitude?: number | null }>({})
+  const [defaultRadiusDraft, setDefaultRadiusDraft] = useState<number | string>('100')
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [employeeForm, setEmployeeForm] = useState(emptyEmployeeForm)
   const [employeeFormError, setEmployeeFormError] = useState<string | null>(null)
+  const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null)
+  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null)
 
   const employeesQuery = useQuery({
     queryKey: ['employees'],
@@ -107,25 +111,31 @@ export function EmployeesPage() {
     },
   })
 
-  const employees = employeesQuery.data?.results ?? []
   const attendance = attendanceQuery.data ?? []
   const filteredEmployees = useMemo(() => {
+    const employees = employeesQuery.data?.results ?? []
     const q = searchQuery.trim().toLowerCase()
     if (!q) return employees
     return employees.filter((employee) => {
       return [employee.employee_id, employee.name, employee.email, employee.phone, employee.department, employee.default_address]
         .some((value) => (value ?? '').toLowerCase().includes(q))
     })
-  }, [employees, searchQuery])
+  }, [employeesQuery.data?.results, searchQuery])
+  const employees = employeesQuery.data?.results ?? []
 
   const updateEmployeeAddress = useMutation({
-    mutationFn: async ({ employeeId, address }: { employeeId: number; address: string }) => {
+    mutationFn: async ({ employeeId, address, latitude, longitude, radius }: { employeeId: number; address: string; latitude?: number | null; longitude?: number | null; radius?: number }) => {
       const token = await getToken()
       if (!token) throw new Error('Missing token')
       const response = await authedFetch(`/api/employees/${employeeId}/`, token, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ default_address: address }),
+        body: JSON.stringify({
+          default_address: address,
+          default_latitude: latitude ?? null,
+          default_longitude: longitude ?? null,
+          default_radius: radius ?? 100,
+        }),
       })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
@@ -137,17 +147,27 @@ export function EmployeesPage() {
       queryClient.invalidateQueries({ queryKey: ['employees'] })
       setEditingEmployeeId(null)
       setDefaultAddressDraft('')
+      setDefaultAddressCoordinates({})
+      setDefaultRadiusDraft('100')
     },
   })
 
   const createEmployeeMutation = useMutation({
-    mutationFn: async (payload: Record<string, unknown>) => {
+    mutationFn: async ({ payload, file }: { payload: Record<string, unknown>; file?: File | null }) => {
       const token = await getToken()
       if (!token) throw new Error('Missing token')
+      const formData = new FormData()
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value === true || value === false ? String(value) : String(value))
+        }
+      })
+      if (file) {
+        formData.append('profile_photo_file', file)
+      }
       const response = await authedFetch('/api/employees/', token, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: formData,
       })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
@@ -165,13 +185,21 @@ export function EmployeesPage() {
   })
 
   const updateEmployeeMutation = useMutation({
-    mutationFn: async ({ employeeId, payload }: { employeeId: number; payload: Record<string, unknown> }) => {
+    mutationFn: async ({ employeeId, payload, file }: { employeeId: number; payload: Record<string, unknown>; file?: File | null }) => {
       const token = await getToken()
       if (!token) throw new Error('Missing token')
+      const formData = new FormData()
+      Object.entries(payload).forEach(([key, value]) => {
+        if (value !== undefined && value !== null) {
+          formData.append(key, value === true || value === false ? String(value) : String(value))
+        }
+      })
+      if (file) {
+        formData.append('profile_photo_file', file)
+      }
       const response = await authedFetch(`/api/employees/${employeeId}/`, token, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: formData,
       })
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
@@ -205,16 +233,58 @@ export function EmployeesPage() {
   const openAddressEditor = (employee: Employee) => {
     setEditingEmployeeId(employee.id)
     setDefaultAddressDraft(employee.default_address || '')
+    setDefaultAddressCoordinates({
+      latitude: employee.default_latitude ? Number(employee.default_latitude) : null,
+      longitude: employee.default_longitude ? Number(employee.default_longitude) : null,
+    })
+    setDefaultRadiusDraft(employee.default_radius ?? '100')
   }
 
   const saveAddress = (employee: Employee) => {
-    updateEmployeeAddress.mutate({ employeeId: employee.id, address: defaultAddressDraft })
+    updateEmployeeAddress.mutate({
+      employeeId: employee.id,
+      address: defaultAddressDraft,
+      latitude: defaultAddressCoordinates.latitude ?? null,
+      longitude: defaultAddressCoordinates.longitude ?? null,
+      radius: Number(defaultRadiusDraft) || 100,
+    })
   }
+
+  useEffect(() => {
+    const addressToGeocode = editingEmployee ? employeeForm.default_address : defaultAddressDraft
+    if (!addressToGeocode?.trim()) {
+      return
+    }
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(addressToGeocode)}`)
+        const data = (await response.json()) as Array<{ lat: string; lon: string }>
+        if (data[0]) {
+          const latitude = Number(data[0].lat)
+          const longitude = Number(data[0].lon)
+          setDefaultAddressCoordinates({ latitude, longitude })
+          if (editingEmployee) {
+            setEmployeeForm((current) => ({
+              ...current,
+              default_latitude: String(latitude),
+              default_longitude: String(longitude),
+            }))
+          }
+        }
+      } catch {
+        // Ignore geocoding failures and keep the typed address as-is.
+      }
+    }, 700)
+
+    return () => window.clearTimeout(timer)
+  }, [defaultAddressDraft, editingEmployee, employeeForm.default_address])
 
   const openCreateEmployeeModal = () => {
     setEditingEmployee(null)
     setEmployeeForm({ ...emptyEmployeeForm })
     setEmployeeFormError(null)
+    setProfilePhotoFile(null)
+    setProfilePhotoPreview(null)
     setIsEmployeeModalOpen(true)
   }
 
@@ -242,6 +312,8 @@ export function EmployeesPage() {
     setEditingEmployee(null)
     setEmployeeForm({ ...emptyEmployeeForm })
     setEmployeeFormError(null)
+    setProfilePhotoFile(null)
+    setProfilePhotoPreview(null)
   }
 
   const handleEmployeeSubmit = (event: React.FormEvent) => {
@@ -266,9 +338,9 @@ export function EmployeesPage() {
     }
 
     if (editingEmployee) {
-      updateEmployeeMutation.mutate({ employeeId: editingEmployee.id, payload })
+      updateEmployeeMutation.mutate({ employeeId: editingEmployee.id, payload, file: profilePhotoFile })
     } else {
-      createEmployeeMutation.mutate(payload)
+      createEmployeeMutation.mutate({ payload, file: profilePhotoFile })
     }
   }
 
@@ -298,7 +370,6 @@ export function EmployeesPage() {
                 <th>Default Address</th>
                 <th>Today's Check-In</th>
                 <th>Today's Check-Out</th>
-                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -334,13 +405,53 @@ export function EmployeesPage() {
                             rows={2}
                             style={{ minWidth: '220px', padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
                           />
-                          <div style={{ display: 'flex', gap: '0.4rem' }}>
-                            <button className="btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }} onClick={() => saveAddress(employee)}>
-                              Save
-                            </button>
-                            <button className="btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }} onClick={() => setEditingEmployeeId(null)}>
-                              Cancel
-                            </button>
+                          <div style={{ display: 'grid', gap: '0.65rem' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                              <input
+                                type="number"
+                                value={defaultAddressCoordinates.latitude ?? ''}
+                                onChange={(event) => setDefaultAddressCoordinates((current) => ({
+                                  ...current,
+                                  latitude: event.target.value ? Number(event.target.value) : null,
+                                }))}
+                                placeholder="Latitude"
+                                style={{ padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
+                              />
+                              <input
+                                type="number"
+                                value={defaultAddressCoordinates.longitude ?? ''}
+                                onChange={(event) => setDefaultAddressCoordinates((current) => ({
+                                  ...current,
+                                  longitude: event.target.value ? Number(event.target.value) : null,
+                                }))}
+                                placeholder="Longitude"
+                                style={{ padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
+                              />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                              <input
+                                type="number"
+                                value={defaultRadiusDraft}
+                                onChange={(event) => setDefaultRadiusDraft(event.target.value)}
+                                placeholder="Radius (meters)"
+                                style={{ padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
+                              />
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}>
+                                <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                                  {defaultAddressCoordinates.latitude && defaultAddressCoordinates.longitude
+                                    ? `Coords: ${defaultAddressCoordinates.latitude.toFixed(5)}, ${defaultAddressCoordinates.longitude.toFixed(5)}`
+                                    : 'Coordinates will auto-update when address is valid.'}
+                                </span>
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '0.4rem' }}>
+                              <button className="btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }} onClick={() => saveAddress(employee)}>
+                                Save
+                              </button>
+                              <button className="btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }} onClick={() => setEditingEmployeeId(null)}>
+                                Cancel
+                              </button>
+                            </div>
                           </div>
                         </div>
                       ) : (
@@ -385,11 +496,6 @@ export function EmployeesPage() {
                       )}
                     </td>
                     <td>
-                      <span className={`status-pill ${employee.is_active ? 'active' : 'inactive'}`}>
-                        {employee.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td>
                       <button
                         className="btn-secondary"
                         style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
@@ -430,10 +536,21 @@ export function EmployeesPage() {
                   <input value={employeeForm.default_longitude} onChange={(event) => setEmployeeForm({ ...employeeForm, default_longitude: event.target.value })} placeholder="Default longitude" style={inputStyle} />
                 </div>
                 <input value={employeeForm.default_radius} onChange={(event) => setEmployeeForm({ ...employeeForm, default_radius: event.target.value })} placeholder="Default radius (meters)" style={inputStyle} />
-                <label style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
-                  <input type="checkbox" checked={employeeForm.is_active} onChange={(event) => setEmployeeForm({ ...employeeForm, is_active: event.target.checked })} />
-                  {' '}Active employee
-                </label>
+                <div>
+                  <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.8rem', color: 'var(--muted)' }}>Profile photo</label>
+                  <input type="file" accept="image/*" onChange={(event) => {
+                    const file = event.target.files?.[0] ?? null
+                    setProfilePhotoFile(file)
+                    if (file) {
+                      setProfilePhotoPreview(URL.createObjectURL(file))
+                    } else {
+                      setProfilePhotoPreview(editingEmployee?.profile_photo || null)
+                    }
+                  }} />
+                  {(profilePhotoPreview || editingEmployee?.profile_photo) && (
+                    <img src={profilePhotoPreview || editingEmployee?.profile_photo || ''} alt="Profile preview" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', marginTop: '0.6rem' }} />
+                  )}
+                </div>
               </div>
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.4rem' }}>
                 <button type="button" className="btn-secondary" onClick={closeEmployeeModal}>Cancel</button>

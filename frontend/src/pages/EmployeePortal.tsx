@@ -25,7 +25,7 @@ type AssignmentData = {
 }
 
 export function EmployeePortal() {
-  const { getToken } = useAuth()
+  const { getToken, signOut } = useAuth()
   const queryClient = useQueryClient()
   const videoRef = useRef<HTMLVideoElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -35,6 +35,8 @@ export function EmployeePortal() {
   const [requiresFaceReg, setRequiresFaceReg] = useState(false)
   const [isLoadingProfile, setIsLoadingProfile] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
+  const [attendanceError, setAttendanceError] = useState<string | null>(null)
+  const [cameraError, setCameraError] = useState<string | null>(null)
 
   // Camera capture state
   const [isCameraOpen, setIsCameraOpen] = useState(false)
@@ -166,14 +168,28 @@ export function EmployeePortal() {
     return () => clearInterval(logInterval)
   }, [sessionActive, profile, getToken, queryClient])
 
+  useEffect(() => {
+    if (stream && videoRef.current) {
+      videoRef.current.srcObject = stream
+      videoRef.current.play().catch(() => {})
+    }
+  }, [stream])
+
   // Open Camera stream
   const startCamera = async (mode: 'register' | 'checkin' | 'checkout') => {
     setCameraMode(mode)
     setTempPhoto(null)
+    setCameraError(null)
+    setAttendanceError(null)
     setIsCameraOpen(true)
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setCurrentCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-    })
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setCurrentCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+      },
+      () => {
+        setLocationPermGranted(false)
+      }
+    )
 
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -184,9 +200,10 @@ export function EmployeePortal() {
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream
       }
-    } catch (err) {
-      alert('Could not access camera. Please check permissions.')
+    } catch (err: any) {
+      setCameraError('Could not access camera. Please check permissions and browser settings.')
       setIsCameraOpen(false)
+      console.error('Camera access failed', err)
     }
   }
 
@@ -309,7 +326,7 @@ export function EmployeePortal() {
         const token = await getToken()
         if (!token) return
         if (!currentCoords) {
-          alert('Obtaining location coordinates. Please verify GPS is enabled.')
+          setAttendanceError('Obtaining location coordinates. Please verify GPS is enabled and allow location access.')
           setSubmitting(false)
           return
         }
@@ -329,15 +346,24 @@ export function EmployeePortal() {
           body: formData,
         })
 
-        const resData = await res.json().catch(() => ({}))
+        const responseText = await res.text().catch(() => '')
+        let resData: any = {}
+        if (responseText) {
+          try {
+            resData = JSON.parse(responseText)
+          } catch {
+            resData = { detail: responseText }
+          }
+        }
         if (!res.ok) {
-          throw new Error(resData.detail || 'Attendance request failed')
+          throw new Error(resData.detail || resData.error || responseText || 'Attendance request failed')
         }
 
+        setCameraError(null)
+        setAttendanceError(null)
         if (cameraMode === 'checkin') {
           setSessionActive(true)
           window.localStorage.setItem('employeehub-session-active', 'true')
-          // Update profile photo from check-in selfie if not set
           if (profile && !profile.profile_photo && tempPhoto) {
             setProfile({ ...profile, profile_photo: tempPhoto })
           }
@@ -350,7 +376,7 @@ export function EmployeePortal() {
         queryClient.invalidateQueries({ queryKey: ['my-route', profile?.id] })
         stopCamera()
       } catch (e: any) {
-        alert(`Error: ${e.message}`)
+        setCameraError(e.message || 'Attendance request failed.')
       } finally {
         setSubmitting(false)
       }
@@ -364,11 +390,17 @@ export function EmployeePortal() {
           <div className="unregistered-icon">⚠️</div>
           <h2>Access Restricted</h2>
           <p style={{ margin: '1rem 0 2rem 0', lineHeight: 1.6 }}>{authError}</p>
-          <SignOutButton>
-            <button className="btn-primary" style={{ background: 'var(--danger)' }}>
-              Log Out / Switch Account
-            </button>
-          </SignOutButton>
+          <button
+            className="btn-primary"
+            style={{ background: 'var(--danger)' }}
+            onClick={() => {
+              window.localStorage.setItem('employeehub-session-active', 'false')
+              setSessionActive(false)
+              void signOut()
+            }}
+          >
+            Log Out / Switch Account
+          </button>
         </div>
       </div>
     )
@@ -397,15 +429,35 @@ export function EmployeePortal() {
           </div>
         </div>
         <div>
-          <SignOutButton>
-            <button className="ghost-button danger" style={{ padding: '0.6rem 1.2rem', borderRadius: '12px' }}>
-              Log Out
-            </button>
-          </SignOutButton>
+          <button
+            className="ghost-button danger"
+            style={{ padding: '0.6rem 1.2rem', borderRadius: '12px' }}
+            onClick={() => {
+              window.localStorage.setItem('employeehub-session-active', 'false')
+              setSessionActive(false)
+              void signOut()
+            }}
+          >
+            Log Out
+          </button>
         </div>
       </header>
 
       <main className="portal-content">
+        {(attendanceError || authError) && (
+          <div
+            style={{
+              background: 'rgba(239,68,68,0.1)',
+              color: 'var(--danger)',
+              padding: '1rem',
+              borderRadius: '12px',
+              marginBottom: '1rem',
+              border: '1px solid rgba(239,68,68,0.2)',
+            }}
+          >
+            <strong>⚠️ {attendanceError || authError}</strong>
+          </div>
+        )}
         {requiresFaceReg ? (
           <div className="glass-card card-soft registration-card">
             <span className="eyebrow">Biometric Enrollment</span>
@@ -563,13 +615,20 @@ export function EmployeePortal() {
                   Capture Photo
                 </button>
               ) : (
-                <div className="button-group-row">
-                  <button className="btn-secondary" onClick={() => setTempPhoto(null)} disabled={submitting}>
-                    Retake
-                  </button>
-                  <button className="btn-primary" onClick={acceptPhoto} disabled={submitting}>
-                    {submitting ? 'Verifying...' : 'Submit'}
-                  </button>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  <div className="button-group-row">
+                    <button className="btn-secondary" onClick={() => setTempPhoto(null)} disabled={submitting}>
+                      Retake
+                    </button>
+                    <button className="btn-primary" onClick={acceptPhoto} disabled={submitting}>
+                      {submitting ? 'Verifying...' : 'Submit'}
+                    </button>
+                  </div>
+                  {cameraError && (
+                    <div style={{ color: 'var(--danger)', fontSize: '0.9rem', textAlign: 'center' }}>
+                      {cameraError}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
