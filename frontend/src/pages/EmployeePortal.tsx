@@ -12,6 +12,11 @@ type EmployeeData = {
   department: string
   designation: string
   profile_photo: string
+  default_address?: string
+  default_radius?: number
+  default_latitude?: number | string | null
+  default_longitude?: number | string | null
+  active_session?: boolean
 }
 
 type AssignmentData = {
@@ -101,6 +106,9 @@ export function EmployeePortal() {
         }
         setProfile(data.employee)
         setRequiresFaceReg(data.requires_face_registration)
+        const hasActiveSession = Boolean(data.active_session)
+        setSessionActive(hasActiveSession)
+        window.localStorage.setItem('employeehub-session-active', hasActiveSession ? 'true' : 'false')
         setIsLoadingProfile(false)
       } catch (err: any) {
         setAuthError(err.message || 'Verification failed')
@@ -344,20 +352,22 @@ export function EmployeePortal() {
         const token = await getToken()
         if (!token) return
 
+        let latestCoords = currentCoords
         try {
           const pos = await requestCurrentPosition()
-          setCurrentCoords({
+          latestCoords = {
             latitude: pos.coords.latitude,
             longitude: pos.coords.longitude,
             accuracy: pos.coords.accuracy ?? undefined,
-          })
+          }
+          setCurrentCoords(latestCoords)
         } catch (err) {
           setAttendanceError('Unable to refresh location. Please ensure GPS is enabled and try again.')
           setSubmitting(false)
           return
         }
 
-        if (!currentCoords) {
+        if (!latestCoords) {
           setAttendanceError('Obtaining location coordinates. Please verify GPS is enabled and allow location access.')
           setSubmitting(false)
           return
@@ -366,9 +376,9 @@ export function EmployeePortal() {
         const annotatedBlob = await buildAnnotatedPhoto(tempPhoto)
         const formData = new FormData()
         formData.append('selfie', annotatedBlob || await (await fetch(tempPhoto)).blob(), 'selfie.jpg')
-        formData.append('latitude', String(currentCoords.latitude))
-        formData.append('longitude', String(currentCoords.longitude))
-        formData.append('accuracy', String(currentCoords.accuracy ?? 0))
+        formData.append('latitude', String(latestCoords.latitude))
+        formData.append('longitude', String(latestCoords.longitude))
+        formData.append('accuracy', String(latestCoords.accuracy ?? 0))
         formData.append('liveness_score', '1.0') // simulated high confidence from camera
         formData.append('address', 'Location verified via portal')
 
@@ -552,11 +562,6 @@ export function EmployeePortal() {
                       </div>
                     )}
 
-                    {!assignmentQuery.data && (
-                      <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginBottom: '1rem' }}>
-                        No specific assignment scheduled today. You can still mark attendance.
-                      </p>
-                    )}
 
                     {locationPermGranted === false && (
                       <div

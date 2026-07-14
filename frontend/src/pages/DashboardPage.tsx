@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
 import { MetricCard } from '../components/MetricCard'
 import { LiveLocationsMap } from '../components/LiveLocationsMap'
+import { RouteMap } from '../components/RouteMap'
 import { useSearch } from '../context/SearchContext'
 
 export function DashboardPage() {
@@ -58,6 +59,24 @@ export function DashboardPage() {
     })
   }, [locations, searchQuery])
 
+  const selectedEmployeeId = filteredLocations.length === 1 ? filteredLocations[0].id : null
+  const selectedEmployeeName = filteredLocations.length === 1 ? filteredLocations[0].name : ''
+
+  const employeeRouteQuery = useQuery({
+    queryKey: ['dashboard-employee-route', selectedEmployeeId],
+    enabled: Boolean(selectedEmployeeId),
+    queryFn: async () => {
+      const token = await getToken()
+      if (!token || !selectedEmployeeId) throw new Error('Missing token')
+      const response = await authedFetch(`/api/location/employee/route/${selectedEmployeeId}`, token)
+      if (!response.ok) throw new Error('Unable to load employee route')
+      return response.json() as Promise<{
+        route: Array<{ latitude: number; longitude: number; timestamp: string }>
+        last_known_location?: { latitude: number; longitude: number; timestamp?: string } | null
+      }>
+    },
+  })
+
   return (
     <section className="page-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="hero-card hero-split">
@@ -111,6 +130,18 @@ export function DashboardPage() {
             <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
               Loading live locations...
             </div>
+          ) : selectedEmployeeId ? (
+            employeeRouteQuery.isLoading ? (
+              <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
+                Loading route for {selectedEmployeeName}...
+              </div>
+            ) : employeeRouteQuery.isError ? (
+              <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(250, 204, 21, 0.1)', borderRadius: '14px', color: 'var(--warning)' }}>
+                Unable to load route for {selectedEmployeeName}. Showing current live location instead.
+              </div>
+            ) : (
+              <RouteMap points={employeeRouteQuery.data?.route || []} lastKnownLocation={employeeRouteQuery.data?.last_known_location || null} />
+            )
           ) : (
             <LiveLocationsMap locations={filteredLocations} />
           )}

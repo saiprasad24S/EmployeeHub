@@ -17,6 +17,7 @@ export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation()
   const { searchQuery, setSearchQuery } = useSearch()
   const currentDate = useMemo(() => new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date()), [])
+  const isDashboardRoute = location.pathname === '/'
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = window.localStorage.getItem('employeehub-theme')
     if (savedTheme) return savedTheme === 'dark'

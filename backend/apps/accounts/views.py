@@ -5,11 +5,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from django.core.exceptions import ValidationError
+
 from apps.accounts.authentication import ClerkJWTAuthentication
 from apps.accounts.models import Employee
 from apps.accounts.serializers import EmployeeCreateSerializer, EmployeeSerializer
-from apps.attendance.services import upload_selfie
+from apps.attendance.models import Session
+from apps.attendance.services import end_session, upload_selfie
 from apps.common.permissions import IsAdminRole
+from apps.vision.services import FaceRecognitionService
+
+face_service = FaceRecognitionService()
 
 
 class AuthLoginView(APIView):
@@ -31,12 +37,14 @@ class AuthLoginView(APIView):
             employee = Employee.objects.filter(pk=principal.employee_id).first()
             if not employee:
                 return Response({"detail": "Employee profile not found."}, status=status.HTTP_404_NOT_FOUND)
+            active_session = Session.objects.filter(employee=employee, is_active=True).exists()
             return Response(
                 {
                     "role": "EMPLOYEE",
                     "email": principal.email,
                     "employee": EmployeeSerializer(employee).data,
                     "requires_face_registration": not bool(employee.face_embedding),
+                    "active_session": active_session,
                 }
             )
         return Response({"detail": "Only registered employees and admins can access the dashboard."}, status=status.HTTP_403_FORBIDDEN)
@@ -46,6 +54,13 @@ class AuthLogoutView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        if getattr(request.user, "role", None) == "EMPLOYEE" and getattr(request.user, "employee_id", None):
+            employee = Employee.objects.filter(pk=request.user.employee_id).first()
+            if employee:
+                try:
+                    end_session(employee)
+                except Exception:
+                    pass
         return Response({"detail": "Logged out."})
 
 
@@ -60,6 +75,50 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         if self.action in {"create", "update", "partial_update"}:
             return EmployeeCreateSerializer
         return super().get_serializer_class()
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        employee = serializer.save()
+        if request.FILES.get("profile_photo_file"):
+            photo_file = request.FILES["profile_photo_file"]
+            photo_file.seek(0)
+            try:
+                employee.face_embedding = face_service.generate_embedding(photo_file)
+            except Exception:
+                employee.face_embedding = None
+            photo_file.seek(0)
+            employee.profile_photo = upload_selfie(
+                photo_file,
+                folder="profile_photos",
+                timestamp=request.data.get("timestamp") or None,
+                location=request.data.get("location") or None,
+            )
+            employee.save(update_fields=["profile_photo", "face_embedding"])
+        return Response(EmployeeSerializer(employee, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        employee = serializer.save()
+        if request.FILES.get("profile_photo_file"):
+            photo_file = request.FILES["profile_photo_file"]
+            photo_file.seek(0)
+            try:
+                employee.face_embedding = face_service.generate_embedding(photo_file)
+            except Exception:
+                employee.face_embedding = None
+            photo_file.seek(0)
+            employee.profile_photo = upload_selfie(
+                photo_file,
+                folder="profile_photos",
+                timestamp=request.data.get("timestamp") or None,
+                location=request.data.get("location") or None,
+            )
+            employee.save(update_fields=["profile_photo", "face_embedding"])
+        return Response(EmployeeSerializer(employee, context={"request": request}).data)
 
 
 class CurrentEmployeeView(APIView):
