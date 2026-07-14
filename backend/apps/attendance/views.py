@@ -2,16 +2,19 @@ from __future__ import annotations
 
 from django.http import HttpResponse
 from rest_framework import status
+from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+import traceback
 
 from apps.accounts.models import Employee
 from apps.attendance.models import Attendance, Session
 from apps.attendance.serializers import AttendanceSerializer
 from apps.attendance.services import (
     end_session,
+    ensure_default_coordinates,
     generate_attendance_export,
     get_active_assignment,
     log_location,
@@ -30,69 +33,79 @@ class CheckInView(APIView):
     permission_classes = [IsEmployeeRole]
 
     def post(self, request):
-        employee = Employee.objects.get(pk=request.user.employee_id)
-        assignment = get_active_assignment(employee)
+        try:
+            employee = Employee.objects.get(pk=request.user.employee_id)
+            assignment = get_active_assignment(employee)
 
-        latitude = float(request.data["latitude"])
-        longitude = float(request.data["longitude"])
+            latitude = float(request.data["latitude"])
+            longitude = float(request.data["longitude"])
 
-        if assignment:
-            validate_geofence(assignment, latitude, longitude)
-        else:
-            if employee.default_latitude is not None and employee.default_longitude is not None:
-                from apps.common.utils import distance_meters
+            accuracy = float(request.data.get('accuracy') or 0)
+            if assignment:
+                validate_geofence(assignment, latitude, longitude, accuracy)
+            else:
+                if employee.default_latitude is None or employee.default_longitude is None:
+                    if not employee.default_address or not ensure_default_coordinates(employee):
+                        return Response({"detail": "No active assignment found and no default location set for employee."}, status=status.HTTP_400_BAD_REQUEST)
+
+                    from apps.common.utils import distance_meters
                 from django.core.exceptions import ValidationError
                 radius = employee.default_radius or 100
                 distance = distance_meters(
                     float(latitude),
                     float(longitude),
                     float(employee.default_latitude),
-                    float(employee.default_longitude)
+                    float(employee.default_longitude),
                 )
-                if distance > radius:
+                buffer = max(10.0, accuracy * 1.5)
+                if distance > radius + buffer:
                     raise ValidationError({"detail": f"Geofence Verification Failed: You are outside your default work range by {round(distance - radius, 2)} meters. Attendance was not marked."})
-            else:
-                return Response({"detail": "No active assignment found and no default location set for employee."}, status=status.HTTP_400_BAD_REQUEST)
 
-        selfie = request.FILES.get("selfie")
-        if not selfie:
-            return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
-        validate_liveness(selfie, request.data.get("liveness_score"))
-        verify_face_against_employee(employee, selfie)
-        photo_url = upload_selfie(
-            selfie,
-            folder="attendance",
-            timestamp=request.data.get("timestamp") or None,
-            location=request.data.get("location") or None,
-        )
+            selfie = request.FILES.get("selfie")
+            if not selfie:
+                return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
+            validate_liveness(selfie, request.data.get("liveness_score"))
+            verify_face_against_employee(employee, selfie)
+            photo_url = upload_selfie(
+                selfie,
+                folder="attendance",
+                timestamp=request.data.get("timestamp") or None,
+                location=request.data.get("location") or None,
+            )
 
-        session = start_session(employee)
-        attendance = record_attendance(
-            employee=employee,
-            assignment=assignment,
-            session=session,
-            attendance_type=Attendance.AttendanceType.CHECK_IN,
-            photo_url=photo_url,
-            latitude=latitude,
-            longitude=longitude,
-            address=request.data.get("address", ""),
-            status=Attendance.Status.APPROVED,
-        )
-        if assignment:
-            assignment.status = assignment.Status.ACTIVE
-            assignment.save(update_fields=["status"])
-        log_location(
-            session=session,
-            employee=employee,
-            latitude=latitude,
-            longitude=longitude,
-            accuracy=1.0,
-            is_mock=False,
-        )
-        return Response(
-            {"detail": "Check-in successful.", "attendance": AttendanceSerializer(attendance).data, "session_id": session.id},
-            status=status.HTTP_201_CREATED,
-        )
+            session = start_session(employee)
+            attendance = record_attendance(
+                employee=employee,
+                assignment=assignment,
+                session=session,
+                attendance_type=Attendance.AttendanceType.CHECK_IN,
+                photo_url=photo_url,
+                latitude=latitude,
+                longitude=longitude,
+                address=request.data.get("address", ""),
+                status=Attendance.Status.APPROVED,
+            )
+            if assignment:
+                assignment.status = assignment.Status.ACTIVE
+                assignment.save(update_fields=["status"])
+            log_location(
+                session=session,
+                employee=employee,
+                latitude=latitude,
+                longitude=longitude,
+                accuracy=1.0,
+                is_mock=False,
+            )
+            return Response(
+                {"detail": "Check-in successful.", "attendance": AttendanceSerializer(attendance).data, "session_id": session.id},
+                status=status.HTTP_201_CREATED,
+            )
+        except ValidationError as exc:
+            print("[CHECKIN ERROR]", exc)
+            return Response({"detail": exc.detail if hasattr(exc, 'detail') else str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            print("[CHECKIN ERROR]", traceback.format_exc())
+            return Response({"detail": str(exc) or "Attendance check-in failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CheckOutView(APIView):
@@ -100,46 +113,53 @@ class CheckOutView(APIView):
     permission_classes = [IsEmployeeRole]
 
     def post(self, request):
-        employee = Employee.objects.get(pk=request.user.employee_id)
-        session = Session.objects.filter(employee=employee, is_active=True).first()
-        if not session:
-            return Response({"detail": "No active session."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            employee = Employee.objects.get(pk=request.user.employee_id)
+            session = Session.objects.filter(employee=employee, is_active=True).first()
+            if not session:
+                return Response({"detail": "No active session."}, status=status.HTTP_400_BAD_REQUEST)
 
-        selfie = request.FILES.get("selfie")
-        if not selfie:
-            return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
-        validate_liveness(selfie, request.data.get("liveness_score"))
-        verify_face_against_employee(employee, selfie)
-        photo_url = upload_selfie(
-            selfie,
-            folder="attendance",
-            timestamp=request.data.get("timestamp") or None,
-            location=request.data.get("location") or None,
-        )
+            selfie = request.FILES.get("selfie")
+            if not selfie:
+                return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
+            validate_liveness(selfie, request.data.get("liveness_score"))
+            verify_face_against_employee(employee, selfie)
+            photo_url = upload_selfie(
+                selfie,
+                folder="attendance",
+                timestamp=request.data.get("timestamp") or None,
+                location=request.data.get("location") or None,
+            )
 
-        latitude = float(request.data["latitude"])
-        longitude = float(request.data["longitude"])
-        attendance = record_attendance(
-            employee=employee,
-            assignment=get_active_assignment(employee),
-            session=session,
-            attendance_type=Attendance.AttendanceType.CHECK_OUT,
-            photo_url=photo_url,
-            latitude=latitude,
-            longitude=longitude,
-            address=request.data.get("address", ""),
-            status=Attendance.Status.APPROVED,
-        )
-        log_location(
-            session=session,
-            employee=employee,
-            latitude=latitude,
-            longitude=longitude,
-            accuracy=1.0,
-            is_mock=False,
-        )
-        end_session(employee)
-        return Response({"detail": "Check-out successful.", "attendance": AttendanceSerializer(attendance).data})
+            latitude = float(request.data["latitude"])
+            longitude = float(request.data["longitude"])
+            attendance = record_attendance(
+                employee=employee,
+                assignment=get_active_assignment(employee),
+                session=session,
+                attendance_type=Attendance.AttendanceType.CHECK_OUT,
+                photo_url=photo_url,
+                latitude=latitude,
+                longitude=longitude,
+                address=request.data.get("address", ""),
+                status=Attendance.Status.APPROVED,
+            )
+            log_location(
+                session=session,
+                employee=employee,
+                latitude=latitude,
+                longitude=longitude,
+                accuracy=1.0,
+                is_mock=False,
+            )
+            end_session(employee)
+            return Response({"detail": "Check-out successful.", "attendance": AttendanceSerializer(attendance).data})
+        except ValidationError as exc:
+            print("[CHECKOUT ERROR]", exc)
+            return Response({"detail": exc.detail if hasattr(exc, 'detail') else str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            print("[CHECKOUT ERROR]", traceback.format_exc())
+            return Response({"detail": str(exc) or "Attendance check-out failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AttendanceListView(APIView):

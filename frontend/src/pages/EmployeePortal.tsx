@@ -45,7 +45,7 @@ export function EmployeePortal() {
   const [tempPhoto, setTempPhoto] = useState<string | null>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [locationPermGranted, setLocationPermGranted] = useState<boolean | null>(null)
-  const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number } | null>(null)
+  const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number; accuracy?: number } | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   // Session state (active tracking)
@@ -182,14 +182,18 @@ export function EmployeePortal() {
     setCameraError(null)
     setAttendanceError(null)
     setIsCameraOpen(true)
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setCurrentCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-      },
-      () => {
-        setLocationPermGranted(false)
-      }
-    )
+    try {
+      const pos = await requestCurrentPosition()
+      setLocationPermGranted(true)
+      setCurrentCoords({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: pos.coords.accuracy ?? undefined,
+      })
+    } catch (err) {
+      setLocationPermGranted(false)
+      setAttendanceError('Could not obtain precise location. Please enable GPS and try again.')
+    }
 
     try {
       const mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -205,6 +209,20 @@ export function EmployeePortal() {
       setIsCameraOpen(false)
       console.error('Camera access failed', err)
     }
+  }
+
+  const requestCurrentPosition = async () => {
+    return new Promise<GeolocationPosition>((resolve, reject) => {
+      if (!('geolocation' in navigator)) {
+        reject(new Error('Geolocation is not available.'))
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        reject,
+        { enableHighAccuracy: true, timeout: 15000 }
+      )
+    })
   }
 
   // Stop Camera stream
@@ -325,6 +343,20 @@ export function EmployeePortal() {
       try {
         const token = await getToken()
         if (!token) return
+
+        try {
+          const pos = await requestCurrentPosition()
+          setCurrentCoords({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            accuracy: pos.coords.accuracy ?? undefined,
+          })
+        } catch (err) {
+          setAttendanceError('Unable to refresh location. Please ensure GPS is enabled and try again.')
+          setSubmitting(false)
+          return
+        }
+
         if (!currentCoords) {
           setAttendanceError('Obtaining location coordinates. Please verify GPS is enabled and allow location access.')
           setSubmitting(false)
@@ -336,6 +368,7 @@ export function EmployeePortal() {
         formData.append('selfie', annotatedBlob || await (await fetch(tempPhoto)).blob(), 'selfie.jpg')
         formData.append('latitude', String(currentCoords.latitude))
         formData.append('longitude', String(currentCoords.longitude))
+        formData.append('accuracy', String(currentCoords.accuracy ?? 0))
         formData.append('liveness_score', '1.0') // simulated high confidence from camera
         formData.append('address', 'Location verified via portal')
 
