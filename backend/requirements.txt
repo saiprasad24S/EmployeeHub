@@ -17,3 +17,4 @@ celery>=5.4,<6.0
 redis>=5.0,<6.0
 gunicorn>=22.0,<23.0
 django-filter>=24.2,<25.0
+# Optional: face_recognition requires Visual C++ build tools on Windows and is not required when insightface is available.

@@ -1,11 +1,17 @@
 from __future__ import annotations
 
-import hashlib
 from io import BytesIO
 from typing import Iterable
 
+import hashlib
 import numpy as np
 from PIL import Image
+
+try:
+    import face_recognition
+except Exception:  # pragma: no cover - optional runtime dependency
+    face_recognition = None
+    # face_recognition is optional. On Windows it may fail to install because dlib requires Visual C++ build tools.
 
 try:
     import insightface
@@ -14,16 +20,13 @@ except Exception:  # pragma: no cover - optional runtime dependency
 
 
 class FaceRecognitionService:
-    # InsightFace buffalo_l cosine similarity thresholds:
-    # >= 0.45 is a strong match for the same person across different conditions
-    # >= 0.35 is acceptable for same person with lighting/angle variations
-    # We use 0.40 as a balanced threshold for real-world webcam vs passport photo matching
-    similarity_threshold = 0.40
+    # Face-Recognition uses 128d embeddings. Cosine similarity on normalized vectors.
+    similarity_threshold = 0.50
 
     def __init__(self) -> None:
         self._model = None
 
-    def _load_model(self):
+    def _load_insightface_model(self):
         if self._model is None and insightface is not None:
             self._model = insightface.app.FaceAnalysis(
                 name="buffalo_l",
@@ -33,42 +36,50 @@ class FaceRecognitionService:
         return self._model
 
     def generate_embedding(self, image_file) -> list[float]:
-        """Generate a 512-dim face embedding from an image file or bytes."""
+        """Generate a face embedding from an image file or bytes."""
         image_bytes = image_file.read() if hasattr(image_file, "read") else image_file
         if hasattr(image_file, "seek"):
             image_file.seek(0)
-        model = self._load_model()
-        if model is None:
-            # Fallback hash-based embedding when insightface is unavailable
-            digest = hashlib.sha256(image_bytes).digest()
-            values = np.frombuffer(digest, dtype=np.uint8).astype(np.float32)
-            return (values / 255.0).tolist()
 
-        image = Image.open(BytesIO(image_bytes)).convert("RGB")
-        frame = np.array(image)[:, :, ::-1]  # RGB -> BGR for OpenCV
+        if face_recognition is not None:
+            image = face_recognition.load_image_file(BytesIO(image_bytes))
+            face_locations = face_recognition.face_locations(image)
+            if not face_locations:
+                raise ValueError("No face detected in the image. Please ensure your face is clearly visible.")
+            encodings = face_recognition.face_encodings(image, face_locations)
+            if not encodings:
+                raise ValueError("Unable to extract face encoding.")
+            embedding = np.array(encodings[0], dtype=np.float32)
+        else:
+            model = self._load_insightface_model()
+            if model is None:
+                digest = hashlib.sha256(image_bytes).digest()
+                values = np.frombuffer(digest, dtype=np.uint8).astype(np.float32)
+                return (values / 255.0).tolist()
 
-        # Try multiple detection sizes for better face detection
-        faces = model.get(frame)
-        if not faces:
-            # Retry with smaller detection size for close-up selfies
-            model.prepare(ctx_id=0, det_size=(320, 320))
+            image = Image.open(BytesIO(image_bytes)).convert("RGB")
+            frame = np.array(image)[:, :, ::-1]  # RGB -> BGR for OpenCV
+
             faces = model.get(frame)
-            # Restore default detection size
-            model.prepare(ctx_id=0, det_size=(640, 640))
+            if not faces:
+                model.prepare(ctx_id=0, det_size=(320, 320))
+                faces = model.get(frame)
+                model.prepare(ctx_id=0, det_size=(640, 640))
 
-        if not faces:
-            raise ValueError("No face detected in the image. Please ensure your face is clearly visible.")
+            if not faces:
+                raise ValueError("No face detected in the image. Please ensure your face is clearly visible.")
 
-        # If multiple faces detected, use the largest (closest) face
-        if len(faces) > 1:
-            faces = sorted(faces, key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]), reverse=True)
+            if len(faces) > 1:
+                faces = sorted(
+                    faces,
+                    key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
+                    reverse=True,
+                )
+            embedding = faces[0].embedding.astype(np.float32)
 
-        embedding = faces[0].embedding.astype(np.float32)
-        # L2 normalize the embedding for consistent cosine similarity
         norm = np.linalg.norm(embedding)
         if norm > 0:
             embedding = embedding / norm
-
         return embedding.tolist()
 
     def compare_with_store(self, incoming_embedding: list[float], stored_embeddings) -> float:
