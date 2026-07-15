@@ -6,6 +6,8 @@ from django.apps import AppConfig
 from django.conf import settings
 from django.db import connections
 
+from apps.common.cloudinary_service import initialize_cloudinary
+
 logger = logging.getLogger(__name__)
 
 
@@ -15,6 +17,7 @@ class SkandanConfig(AppConfig):
 
     def ready(self):
         self._validate_database_connection()
+        initialize_cloudinary()
 
     def _validate_database_connection(self) -> None:
         if os.getenv("SKIP_DB_STARTUP_VALIDATION", "").lower() in {"1", "true", "yes", "on"}:

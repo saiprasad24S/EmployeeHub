@@ -210,16 +210,16 @@ CLOUDINARY_STORAGE = {
     "API_KEY": _env("CLOUDINARY_API_KEY", default=""),
     "API_SECRET": _env("CLOUDINARY_API_SECRET", default=""),
 }
+CLOUDINARY_CLOUD_NAME = _env("CLOUDINARY_CLOUD_NAME", default="")
+CLOUDINARY_API_KEY = _env("CLOUDINARY_API_KEY", default="")
+CLOUDINARY_API_SECRET = _env("CLOUDINARY_API_SECRET", default="")
+CLOUDINARY_URL = _env("CLOUDINARY_URL", default="")
+CLOUDINARY_SECURE = _env_bool("CLOUDINARY_SECURE", default=True)
+CLOUDINARY_FOLDER = _env("CLOUDINARY_FOLDER", default="skandan")
+CLOUDINARY_MAX_SIZE = _env_int("CLOUDINARY_MAX_SIZE", default=10 * 1024 * 1024)
+CLOUDINARY_ALLOWED_FORMATS = [fmt.strip() for fmt in _env("CLOUDINARY_ALLOWED_FORMATS", default="jpg,jpeg,png,webp").split(",") if fmt.strip()]
 
-# Fall back to local file storage if Cloudinary config is missing or invalid
-if (
-    not CLOUDINARY_STORAGE["CLOUD_NAME"]
-    or not CLOUDINARY_STORAGE["API_KEY"]
-    or not CLOUDINARY_STORAGE["API_SECRET"]
-):
-    DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
-else:
-    DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
 
 CLERK_SECRET_KEY = _env("CLERK_SECRET_KEY", default="")
 CLERK_JWKS_URL = _env("CLERK_JWKS_URL", default="")

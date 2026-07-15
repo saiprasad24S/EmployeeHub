@@ -1,7 +1,10 @@
 from django.db import models
+from django.db.models.signals import post_delete, pre_save
+from django.dispatch import receiver
 
 from apps.accounts.models import Employee
 from apps.assignments.models import Assignment
+from apps.common.cloudinary_service import delete_image_from_url
 
 
 class Session(models.Model):
@@ -33,6 +36,7 @@ class Attendance(models.Model):
     session = models.ForeignKey(Session, on_delete=models.SET_NULL, null=True, blank=True, related_name="attendance_records")
     attendance_type = models.CharField(max_length=20, choices=AttendanceType.choices)
     photo_url = models.URLField(blank=True)
+    photo_public_id = models.CharField(max_length=500, blank=True, default="")
     latitude = models.DecimalField(max_digits=10, decimal_places=7)
     longitude = models.DecimalField(max_digits=10, decimal_places=7)
     address = models.TextField(blank=True)
@@ -57,6 +61,7 @@ class PatientVisit(models.Model):
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="patient_visits")
     patient_name = models.CharField(max_length=160)
     photo_url = models.URLField(blank=True)
+    photo_public_id = models.CharField(max_length=500, blank=True, default="")
     latitude = models.DecimalField(max_digits=10, decimal_places=7)
     longitude = models.DecimalField(max_digits=10, decimal_places=7)
     visit_time = models.DateTimeField(auto_now_add=True)
@@ -65,6 +70,18 @@ class PatientVisit(models.Model):
 
     class Meta:
         ordering = ["-visit_time"]
+
+
+@receiver(post_delete, sender=Attendance)
+def delete_attendance_photo(sender, instance, **kwargs):
+    if instance.photo_public_id:
+        delete_image_from_url(instance.photo_url)
+
+
+@receiver(post_delete, sender=PatientVisit)
+def delete_patient_visit_photo(sender, instance, **kwargs):
+    if instance.photo_public_id:
+        delete_image_from_url(instance.photo_url)
 
 
 class Notification(models.Model):

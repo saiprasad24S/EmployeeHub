@@ -11,7 +11,7 @@ from apps.accounts.authentication import ClerkJWTAuthentication
 from apps.accounts.models import Employee
 from apps.accounts.serializers import EmployeeCreateSerializer, EmployeeSerializer
 from apps.attendance.models import Session
-from apps.attendance.services import end_session, upload_selfie
+from apps.attendance.services import end_session, upload_profile_photo
 from apps.common.permissions import IsAdminRole
 from apps.vision.services import FaceRecognitionService
 
@@ -88,13 +88,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             except Exception:
                 employee.face_embedding = None
             photo_file.seek(0)
-            employee.profile_photo = upload_selfie(
+            upload_result = upload_profile_photo(
                 photo_file,
-                folder="profile_photos",
-                timestamp=request.data.get("timestamp") or None,
-                location=request.data.get("location") or None,
+                employee_id=employee.employee_id,
+                employee_name=employee.name,
             )
-            employee.save(update_fields=["profile_photo", "face_embedding"])
+            employee.profile_photo = upload_result["url"]
+            employee.profile_photo_public_id = upload_result["public_id"]
+            employee.save(update_fields=["profile_photo", "profile_photo_public_id", "face_embedding"])
         return Response(EmployeeSerializer(employee, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -111,13 +112,14 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             except Exception:
                 employee.face_embedding = None
             photo_file.seek(0)
-            employee.profile_photo = upload_selfie(
+            upload_result = upload_profile_photo(
                 photo_file,
-                folder="profile_photos",
-                timestamp=request.data.get("timestamp") or None,
-                location=request.data.get("location") or None,
+                employee_id=employee.employee_id,
+                employee_name=employee.name,
             )
-            employee.save(update_fields=["profile_photo", "face_embedding"])
+            employee.profile_photo = upload_result["url"]
+            employee.profile_photo_public_id = upload_result["public_id"]
+            employee.save(update_fields=["profile_photo", "profile_photo_public_id", "face_embedding"])
         return Response(EmployeeSerializer(employee, context={"request": request}).data)
 
 
@@ -145,11 +147,12 @@ class UploadProfilePhotoView(APIView):
         if not photo_file:
             return Response({"detail": "No photo file provided."}, status=status.HTTP_400_BAD_REQUEST)
 
-        employee.profile_photo = upload_selfie(
+        upload_result = upload_profile_photo(
             photo_file,
-            folder="profile_photos",
-            timestamp=request.data.get("timestamp") or None,
-            location=request.data.get("location") or None,
+            employee_id=employee.employee_id,
+            employee_name=employee.name,
         )
-        employee.save(update_fields=["profile_photo"])
+        employee.profile_photo = upload_result["url"]
+        employee.profile_photo_public_id = upload_result["public_id"]
+        employee.save(update_fields=["profile_photo", "profile_photo_public_id"])
         return Response({"detail": "Profile photo updated.", "profile_photo": employee.profile_photo})

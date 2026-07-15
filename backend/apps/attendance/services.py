@@ -5,19 +5,17 @@ from io import BytesIO
 from typing import Any
 
 import requests
-import cloudinary.uploader
 from django.conf import settings
-from django.core.files.uploadedfile import SimpleUploadedFile
 from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from openpyxl import Workbook
-from PIL import Image, ImageDraw, ImageFont
 from rest_framework.exceptions import ValidationError
 
 from apps.accounts.models import Employee
 from apps.assignments.models import Assignment
 from apps.attendance.models import Attendance, Session
+from apps.common.cloudinary_service import upload_attendance_image, upload_profile_image
 from apps.common.utils import distance_meters
 from apps.tracking.models import LocationLog
 from apps.vision.services import FaceRecognitionService, LivenessService
@@ -77,49 +75,32 @@ def validate_geofence(assignment: Assignment, latitude: float, longitude: float,
         raise ValidationError({"detail": f"Geofence Verification Failed: You are outside the patient's scheduled range by {round(distance - radius, 2)} meters. Attendance was not marked."})
 
 
-def annotate_image(image_file, *, timestamp: str | None = None, location: str | None = None):
-    image_file.seek(0)
-    img = Image.open(image_file).convert('RGBA')
-    draw = ImageDraw.Draw(img)
-    font = ImageFont.load_default()
+def upload_selfie(image_file, folder: str, *, timestamp: str | None = None, location: str | None = None) -> dict[str, str]:
+    from apps.accounts.models import Employee
 
-    width, height = img.size
-    margin = 24
-    box_height = 86
-    draw.rectangle([(0, height - box_height), (width, height)], fill=(0, 0, 0, 180))
+    employee = getattr(image_file, "employee", None)
+    if isinstance(employee, Employee):
+        employee_id = employee.employee_id
+        employee_name = employee.name
+    else:
+        employee_id = "unknown"
+        employee_name = "Unknown"
 
-    label = timestamp or datetime.now().strftime('%Y-%m-%d %H:%M')
-    location_text = location or 'Location: unavailable'
-    lines = [f'Captured: {label}', location_text]
-    for index, line in enumerate(lines):
-        draw.text((margin, height - box_height + 22 + index * 28), line, fill='white', font=font)
-
-    rgb_img = img.convert('RGB')
-    buffer = BytesIO()
-    rgb_img.save(buffer, format='JPEG', quality=95)
-    buffer.seek(0)
-    return buffer
-
-
-def upload_selfie(image_file, folder: str, *, timestamp: str | None = None, location: str | None = None) -> str:
-    from django.core.files.storage import default_storage
-    import uuid
-    import os
-
-    ext = os.path.splitext(getattr(image_file, "name", ".jpg"))[1] or ".jpg"
-    image_file.seek(0)
-    annotated_buffer = annotate_image(image_file, timestamp=timestamp, location=location)
-    if annotated_buffer is None:
-        annotated_buffer = BytesIO(image_file.read())
-
-    annotated_name = f"{folder}/{uuid.uuid4()}{ext}"
-    annotated_file = SimpleUploadedFile(
-        getattr(image_file, 'name', 'selfie.jpg'),
-        annotated_buffer.getvalue(),
-        content_type='image/jpeg',
+    attendance_type = "checkin" if folder == "attendance" else "checkout"
+    result = upload_attendance_image(
+        image_file,
+        employee_id=employee_id,
+        attendance_type=attendance_type,
+        timestamp=timestamp,
+        address=location,
+        employee_name=employee_name,
     )
-    saved_name = default_storage.save(annotated_name, annotated_file)
-    return default_storage.url(saved_name)
+    return {"url": result["url"], "public_id": result["public_id"]}
+
+
+def upload_profile_photo(image_file, *, employee_id: str, employee_name: str | None = None) -> dict[str, str]:
+    result = upload_profile_image(image_file, employee_id=employee_id, employee_name=employee_name)
+    return {"url": result["url"], "public_id": result["public_id"]}
 
 
 def get_employee_presence_summary(employee: Employee, *, reference_time: datetime | None = None) -> dict[str, Any]:
@@ -252,6 +233,7 @@ def record_attendance(
     session: Session | None,
     attendance_type: str,
     photo_url: str,
+    photo_public_id: str = "",
     latitude: float,
     longitude: float,
     address: str,
@@ -264,12 +246,33 @@ def record_attendance(
         session=session,
         attendance_type=attendance_type,
         photo_url=photo_url,
+        photo_public_id=photo_public_id,
         latitude=latitude,
         longitude=longitude,
         address=address,
         status=status,
         remarks=remarks,
     )
+
+
+def annotate_image(image_file, *, timestamp: str | None = None, location: str | None = None):
+    from PIL import Image as PILImage, ImageDraw, ImageFont
+
+    image = PILImage.open(image_file).convert("RGBA")
+    draw = ImageDraw.Draw(image)
+    font = ImageFont.load_default()
+
+    text = []
+    if timestamp:
+        text.append(timestamp)
+    if location:
+        text.append(location)
+    if text:
+        draw.text((10, 10), "\n".join(text), fill=(255, 255, 255, 255), font=font)
+    output = BytesIO()
+    image.convert("RGB").save(output, format="JPEG")
+    output.seek(0)
+    return output
 
 
 def validate_liveness(image_file, liveness_score: float | None = None) -> None:

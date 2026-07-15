@@ -5,6 +5,8 @@ from django.http import JsonResponse
 from django.urls import include, path
 from django.db import connections
 
+from apps.common.cloudinary_service import cloudinary_status
+
 
 def health_view(request):
     try:
@@ -28,6 +30,10 @@ def health_view(request):
         )
 
 
+def cloudinary_health_view(request):
+    return JsonResponse(cloudinary_status())
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
@@ -38,6 +44,7 @@ urlpatterns = [
     path("api/employees/", include("apps.accounts.employee_urls")),
     path("api/dashboard/", include("apps.analytics.urls")),
     path("api/health/database", health_view, name="database-health"),
+    path("api/health/cloudinary", cloudinary_health_view, name="cloudinary-health"),
 ]
 
 if settings.DEBUG:

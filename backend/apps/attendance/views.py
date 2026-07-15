@@ -67,12 +67,14 @@ class CheckInView(APIView):
                     return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
                 validate_liveness(selfie, request.data.get("liveness_score"))
                 verify_face_against_employee(employee, selfie)
-                photo_url = upload_selfie(
+                upload_result = upload_selfie(
                     selfie,
                     folder="attendance",
                     timestamp=request.data.get("timestamp") or None,
                     location=request.data.get("location") or None,
                 )
+                photo_url = upload_result["url"]
+                photo_public_id = upload_result["public_id"]
 
                 session = start_session(employee)
                 attendance = record_attendance(
@@ -81,6 +83,7 @@ class CheckInView(APIView):
                     session=session,
                     attendance_type=Attendance.AttendanceType.CHECK_IN,
                     photo_url=photo_url,
+                    photo_public_id=photo_public_id,
                     latitude=latitude,
                     longitude=longitude,
                     address=request.data.get("address", ""),
@@ -126,12 +129,14 @@ class CheckOutView(APIView):
                     return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
                 validate_liveness(selfie, request.data.get("liveness_score"))
                 verify_face_against_employee(employee, selfie)
-                photo_url = upload_selfie(
+                upload_result = upload_selfie(
                     selfie,
                     folder="attendance",
                     timestamp=request.data.get("timestamp") or None,
                     location=request.data.get("location") or None,
                 )
+                photo_url = upload_result["url"]
+                photo_public_id = upload_result["public_id"]
 
                 latitude = float(request.data["latitude"])
                 longitude = float(request.data["longitude"])
@@ -141,6 +146,7 @@ class CheckOutView(APIView):
                     session=session,
                     attendance_type=Attendance.AttendanceType.CHECK_OUT,
                     photo_url=photo_url,
+                    photo_public_id=photo_public_id,
                     latitude=latitude,
                     longitude=longitude,
                     address=request.data.get("address", ""),
