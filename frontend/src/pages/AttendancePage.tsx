@@ -11,6 +11,9 @@ type AttendanceRecord = {
   address: string
   timestamp: string
   status: string
+  session_login_time?: string | null
+  session_logout_time?: string | null
+  session_is_active?: boolean | null
 }
 
 type EmployeeSummary = {
@@ -56,15 +59,46 @@ export function AttendancePage() {
 
   const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
 
-  const presentEmployees = useMemo(() => employees.filter((employee) => {
-    const todayRecords = attendance.filter((record) => record.employee_employee_id === employee.employee_id && record.timestamp.startsWith(today))
-    return todayRecords.some((record) => record.attendance_type === 'CHECK_IN')
-  }), [attendance, employees, today])
+  const formatTime = (value?: string | null) => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    return new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' }).format(date)
+  }
 
-  const absentEmployees = useMemo(() => employees.filter((employee) => {
-    const todayRecords = attendance.filter((record) => record.employee_employee_id === employee.employee_id && record.timestamp.startsWith(today))
-    return !todayRecords.some((record) => record.attendance_type === 'CHECK_IN')
-  }), [attendance, employees, today])
+  const formatDuration = (login?: string | null, logout?: string | null) => {
+    if (!login || !logout) return null
+    const loginTime = new Date(login)
+    const logoutTime = new Date(logout)
+    if (Number.isNaN(loginTime.getTime()) || Number.isNaN(logoutTime.getTime())) return null
+    const diffMs = logoutTime.getTime() - loginTime.getTime()
+    if (diffMs <= 0) return null
+    const hours = Math.round(diffMs / (1000 * 60 * 60))
+    return `${hours}h`
+  }
+
+  const getEmployeeSessionSummary = (employeeId: string) => {
+    const employeeRecords = attendance.filter((record) => record.employee_employee_id === employeeId)
+    const latestRecord = employeeRecords.sort((first, second) => new Date(second.timestamp).getTime() - new Date(first.timestamp).getTime())[0]
+    const activeSession = latestRecord?.session_is_active === true
+    const todayCheckIn = employeeRecords.some((record) => record.attendance_type === 'CHECK_IN' && record.timestamp.startsWith(today))
+    const isPresent = activeSession || todayCheckIn
+    const loginTime = latestRecord?.session_login_time ?? null
+    const logoutTime = latestRecord?.session_logout_time ?? null
+    const duration = formatDuration(loginTime, logoutTime)
+
+    return {
+      isPresent,
+      loginTime,
+      logoutTime,
+      duration,
+      latestRecord,
+    }
+  }
+
+  const presentEmployees = useMemo(() => employees.filter((employee) => getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees, today])
+
+  const absentEmployees = useMemo(() => employees.filter((employee) => !getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees, today])
 
   const handleExport = async () => {
     if (!startDate || !endDate) {
@@ -116,17 +150,25 @@ export function AttendancePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {presentEmployees.length === 0 ? (
               <p style={{ color: 'var(--muted)' }}>No employees are present today.</p>
-            ) : presentEmployees.map((employee) => (
-              <div key={employee.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem', border: '1px solid var(--panel-border)', borderRadius: '12px', background: 'rgba(34,197,94,0.06)' }}>
-                <img src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'} alt={employee.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700 }}>{employee.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{employee.email}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{employee.employee_id}</div>
+            ) : presentEmployees.map((employee) => {
+              const sessionSummary = getEmployeeSessionSummary(employee.employee_id)
+              return (
+                <div key={employee.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem', border: '1px solid var(--panel-border)', borderRadius: '12px', background: 'rgba(34,197,94,0.06)' }}>
+                  <img src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'} alt={employee.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700 }}>{employee.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{employee.email}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{employee.employee_id}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
+                      {sessionSummary.loginTime ? `Login ${formatTime(sessionSummary.loginTime)}` : 'No login recorded'}
+                      {sessionSummary.logoutTime ? ` • Out ${formatTime(sessionSummary.logoutTime)}` : ''}
+                      {sessionSummary.duration ? ` (${sessionSummary.duration})` : ''}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', color: '#10B981', fontWeight: 700, fontSize: '0.82rem' }}>Present</div>
                 </div>
-                <div style={{ textAlign: 'right', color: '#10B981', fontWeight: 700, fontSize: '0.82rem' }}>Present</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
 
@@ -135,17 +177,23 @@ export function AttendancePage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {absentEmployees.length === 0 ? (
               <p style={{ color: 'var(--muted)' }}>All employees are present today.</p>
-            ) : absentEmployees.map((employee) => (
-              <div key={employee.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem', border: '1px solid var(--panel-border)', borderRadius: '12px', background: 'rgba(239,68,68,0.06)' }}>
-                <img src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'} alt={employee.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 700 }}>{employee.name}</div>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{employee.email}</div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{employee.employee_id}</div>
+            ) : absentEmployees.map((employee) => {
+              const sessionSummary = getEmployeeSessionSummary(employee.employee_id)
+              return (
+                <div key={employee.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem', border: '1px solid var(--panel-border)', borderRadius: '12px', background: 'rgba(239,68,68,0.06)' }}>
+                  <img src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'} alt={employee.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontWeight: 700 }}>{employee.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{employee.email}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{employee.employee_id}</div>
+                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
+                      {sessionSummary.logoutTime ? `Logout ${formatTime(sessionSummary.logoutTime)}${sessionSummary.duration ? ` (${sessionSummary.duration})` : ''}` : 'No active session'}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: 'right', color: '#EF4444', fontWeight: 700, fontSize: '0.82rem' }}>Absent</div>
                 </div>
-                <div style={{ textAlign: 'right', color: '#EF4444', fontWeight: 700, fontSize: '0.82rem' }}>Absent</div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

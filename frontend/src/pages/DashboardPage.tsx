@@ -4,12 +4,9 @@ import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
 import { MetricCard } from '../components/MetricCard'
 import { LiveLocationsMap } from '../components/LiveLocationsMap'
-import { RouteMap } from '../components/RouteMap'
-import { useSearch } from '../context/SearchContext'
 
 export function DashboardPage() {
   const { getToken } = useAuth()
-  const { searchQuery } = useSearch()
 
   // Fetch metrics (total, present, absent)
   const metricsQuery = useQuery({
@@ -51,31 +48,7 @@ export function DashboardPage() {
   const presentCount = metricsQuery.data?.present_employees ?? 0
   const absentCount = metricsQuery.data?.absent_employees ?? 0
   const locations = locationsQuery.data ?? []
-  const filteredLocations = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return locations
-    return locations.filter((location) => {
-      return [location.name, location.employee_id, location.email, location.department, location.default_address].some((value) => (value ?? '').toLowerCase().includes(q))
-    })
-  }, [locations, searchQuery])
-
-  const selectedEmployeeId = filteredLocations.length === 1 ? filteredLocations[0].id : null
-  const selectedEmployeeName = filteredLocations.length === 1 ? filteredLocations[0].name : ''
-
-  const employeeRouteQuery = useQuery({
-    queryKey: ['dashboard-employee-route', selectedEmployeeId],
-    enabled: Boolean(selectedEmployeeId),
-    queryFn: async () => {
-      const token = await getToken()
-      if (!token || !selectedEmployeeId) throw new Error('Missing token')
-      const response = await authedFetch(`/api/location/employee/route/${selectedEmployeeId}`, token)
-      if (!response.ok) throw new Error('Unable to load employee route')
-      return response.json() as Promise<{
-        route: Array<{ latitude: number; longitude: number; timestamp: string }>
-        last_known_location?: { latitude: number; longitude: number; timestamp?: string } | null
-      }>
-    },
-  })
+  const hasRenderableLocations = locations.some((location) => Number.isFinite(Number(location.latitude)) && Number.isFinite(Number(location.longitude)))
 
   return (
     <section className="page-grid" style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -130,20 +103,12 @@ export function DashboardPage() {
             <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
               Loading live locations...
             </div>
-          ) : selectedEmployeeId ? (
-            employeeRouteQuery.isLoading ? (
-              <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
-                Loading route for {selectedEmployeeName}...
-              </div>
-            ) : employeeRouteQuery.isError ? (
-              <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(250, 204, 21, 0.1)', borderRadius: '14px', color: 'var(--warning)' }}>
-                Unable to load route for {selectedEmployeeName}. Showing current live location instead.
-              </div>
-            ) : (
-              <RouteMap points={employeeRouteQuery.data?.route || []} lastKnownLocation={employeeRouteQuery.data?.last_known_location || null} />
-            )
+          ) : hasRenderableLocations ? (
+            <LiveLocationsMap locations={locations} />
           ) : (
-            <LiveLocationsMap locations={filteredLocations} />
+            <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(59, 130, 246, 0.05)', border: '1px dashed var(--primary)', borderRadius: '14px', color: 'var(--primary)', fontWeight: 600, fontSize: '1rem' }}>
+              No live coordinates are available yet for the active employees.
+            </div>
           )}
         </div>
 

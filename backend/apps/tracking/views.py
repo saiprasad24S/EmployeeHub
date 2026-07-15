@@ -17,17 +17,28 @@ from apps.tracking.serializers import LocationLogSerializer
 from apps.tracking.services import get_employee_route, get_latest_location, get_today_distance, get_travel_history
 
 
-def _serialize_location(log: LocationLog | None) -> dict | None:
-    if not log:
+def _serialize_location(source: object | None) -> dict | None:
+    if not source:
         return None
     return {
-        "latitude": float(log.latitude),
-        "longitude": float(log.longitude),
-        "timestamp": log.timestamp,
-        "accuracy": log.accuracy,
-        "speed": log.speed,
-        "battery_percentage": log.battery_percentage,
+        "latitude": float(getattr(source, "latitude")),
+        "longitude": float(getattr(source, "longitude")),
+        "timestamp": getattr(source, "timestamp", None),
+        "accuracy": getattr(source, "accuracy", None),
+        "speed": getattr(source, "speed", None),
+        "battery_percentage": getattr(source, "battery_percentage", None),
     }
+
+
+def _get_latest_location_source(employee: Employee) -> object | None:
+    log = get_latest_location(employee)
+    if log is not None:
+        return log
+    return (
+        Attendance.objects.filter(employee=employee)
+        .order_by("-timestamp")
+        .first()
+    )
 
 
 def _resolve_employee(employee_id: int | str | None) -> Employee | None:
@@ -74,10 +85,10 @@ class EmployeeCurrentLocationView(APIView):
         employee = Employee.objects.filter(pk=employee_id).first()
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
-        log = get_latest_location(employee)
-        if not log:
+        source = _get_latest_location_source(employee)
+        if not source:
             return Response({"detail": "No location data."}, status=status.HTTP_404_NOT_FOUND)
-        return Response(LocationLogSerializer(log).data)
+        return Response(_serialize_location(source))
 
 
 class EmployeeRouteView(APIView):
@@ -90,7 +101,7 @@ class EmployeeRouteView(APIView):
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
         route = get_employee_route(employee)
-        last_known_location = _serialize_location(get_latest_location(employee))
+        last_known_location = _serialize_location(_get_latest_location_source(employee))
         return Response({
             "employee_id": employee.employee_id,
             "route": route,
@@ -119,28 +130,24 @@ class AllPresentEmployeesLocationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        today = timezone.localdate()
-        present_employee_ids = Attendance.objects.filter(
-            attendance_type=Attendance.AttendanceType.CHECK_IN,
-            timestamp__date=today
-        ).values_list("employee_id", flat=True)
+        active_sessions = Session.objects.filter(is_active=True).select_related("employee")
 
         results = []
-        for emp_id in set(present_employee_ids):
-            employee = Employee.objects.filter(pk=emp_id).first()
-            if employee:
-                log = get_latest_location(employee)
-                if log:
-                    results.append({
-                        "id": employee.id,
-                        "employee_id": employee.employee_id,
-                        "name": employee.name,
-                        "email": employee.email,
-                        "department": employee.department,
-                        "default_address": employee.default_address,
-                        "profile_photo": employee.profile_photo,
-                        "latitude": float(log.latitude),
-                        "longitude": float(log.longitude),
-                        "timestamp": log.timestamp,
-                    })
+        for session in active_sessions:
+            employee = session.employee
+            source = _get_latest_location_source(employee)
+            if source is None:
+                continue
+            results.append({
+                "id": employee.id,
+                "employee_id": employee.employee_id,
+                "name": employee.name,
+                "email": employee.email,
+                "department": employee.department,
+                "default_address": employee.default_address,
+                "profile_photo": employee.profile_photo,
+                "latitude": float(getattr(source, "latitude")),
+                "longitude": float(getattr(source, "longitude")),
+                "timestamp": getattr(source, "timestamp", None),
+            })
         return Response(results)

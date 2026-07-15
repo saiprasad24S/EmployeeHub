@@ -14,6 +14,9 @@ class AttendanceSerializer(serializers.ModelSerializer):
     employee_name = serializers.CharField(source="employee.name", read_only=True)
     assignment_patient_name = serializers.CharField(source="assignment.patient_name", read_only=True)
     photo_url = serializers.SerializerMethodField()
+    session_login_time = serializers.DateTimeField(source="session.login_time", read_only=True)
+    session_logout_time = serializers.DateTimeField(source="session.logout_time", read_only=True)
+    session_is_active = serializers.BooleanField(source="session.is_active", read_only=True)
 
     class Meta:
         model = Attendance
@@ -27,6 +30,9 @@ class AttendanceSerializer(serializers.ModelSerializer):
             "session",
             "attendance_type",
             "photo_url",
+            "session_login_time",
+            "session_logout_time",
+            "session_is_active",
             "latitude",
             "longitude",
             "address",
