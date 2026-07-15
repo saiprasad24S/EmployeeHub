@@ -1,6 +1,10 @@
 import os
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, urlparse
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -35,6 +39,10 @@ def _env_int(name: str, default: int = 0) -> int:
     return int(value) if value is not None and value != "" else default
 
 
+def _is_placeholder(value: str) -> bool:
+    return not value or value.strip().lower() in {"replace-me", "replace-with-aiven-password", "your-aiven-host.aivencloud.com", "changeme"}
+
+
 def _database_config(url: str) -> dict:
     if not url or url.startswith("sqlite:///"):
         sqlite_path = BASE_DIR / "db.sqlite3"
@@ -45,6 +53,16 @@ def _database_config(url: str) -> dict:
     parsed = urlparse(url)
     if parsed.scheme != "mysql":
         raise ValueError("DATABASE_URL must use mysql://")
+
+    query = parse_qs(parsed.query)
+    options = {"charset": "utf8mb4"}
+    ssl_mode = query.get("ssl-mode", [None])[0]
+    ssl_ca = query.get("ssl-ca", [None])[0]
+    if ssl_mode:
+        options["ssl"] = {"ssl-mode": ssl_mode}
+        if ssl_ca:
+            options["ssl"]["ca"] = ssl_ca
+
     return {
         "ENGINE": "django.db.backends.mysql",
         "NAME": parsed.path.lstrip("/"),
@@ -52,7 +70,7 @@ def _database_config(url: str) -> dict:
         "PASSWORD": parsed.password or "",
         "HOST": parsed.hostname or "localhost",
         "PORT": parsed.port or 3306,
-        "OPTIONS": {"charset": "utf8mb4"},
+        "OPTIONS": options,
     }
 
 
@@ -72,6 +90,7 @@ INSTALLED_APPS = [
     "django_filters",
     "cloudinary",
     "cloudinary_storage",
+    "skandan",
     "apps.accounts",
     "apps.assignments",
     "apps.attendance",
@@ -110,8 +129,6 @@ TEMPLATES = [
     }
 ]
 
-DATABASES = {"default": _database_config(_env("DATABASE_URL", default=""))}
-
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
     {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
@@ -130,6 +147,50 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = Path(_env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+DB_ENGINE = _env("DB_ENGINE", default="")
+DB_NAME = _env("DB_NAME", default="")
+DB_USER = _env("DB_USER", default="")
+DB_PASSWORD = _env("DB_PASSWORD", default="")
+DB_HOST = _env("DB_HOST", default="")
+DB_PORT = _env_int("DB_PORT", default=3306)
+DB_SSL_MODE = _env("DB_SSL_MODE", default="REQUIRED")
+DB_SSL_CA = _env("DB_SSL_CA", default="")
+DB_SSL_VERIFY_CERT = _env_bool("DB_SSL_VERIFY_CERT", default=True)
+
+use_env_db = (
+    not _is_placeholder(DB_NAME)
+    and not _is_placeholder(DB_USER)
+    and not _is_placeholder(DB_PASSWORD)
+    and not _is_placeholder(DB_HOST)
+)
+
+if use_env_db:
+    db_options = {"charset": "utf8mb4", "init_command": "SET sql_mode='STRICT_TRANS_TABLES'"}
+    if DB_SSL_MODE:
+        ssl_config = {"ssl-mode": DB_SSL_MODE}
+        if DB_SSL_CA:
+            ssl_config["ca"] = DB_SSL_CA
+        if not DB_SSL_VERIFY_CERT:
+            ssl_config["ssl-verify-server-cert"] = False
+        db_options["ssl"] = ssl_config
+    DATABASES = {
+        "default": {
+            "ENGINE": DB_ENGINE or "django.db.backends.mysql",
+            "NAME": DB_NAME,
+            "USER": DB_USER,
+            "PASSWORD": DB_PASSWORD,
+            "HOST": DB_HOST,
+            "PORT": DB_PORT,
+            "OPTIONS": db_options,
+        }
+    }
+    DB_CONFIG_SOURCE = "env"
+else:
+    DATABASES = {"default": _database_config(_env("DATABASE_URL", default=""))}
+    DB_CONFIG_SOURCE = "DATABASE_URL"
+
+logger.info("Database configuration source: %s", DB_CONFIG_SOURCE)
 
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env("CORS_ALLOWED_ORIGINS", default="").split(",") if origin.strip()]
 CORS_ALLOW_CREDENTIALS = True

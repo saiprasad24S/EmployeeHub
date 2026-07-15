@@ -36,12 +36,33 @@ export function EmployeePortal() {
   const canvasRef = useRef<HTMLCanvasElement>(null)
 
   const [currentTime, setCurrentTime] = useState(new Date())
-  const [profile, setProfile] = useState<EmployeeData | null>(null)
-  const [requiresFaceReg, setRequiresFaceReg] = useState(false)
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true)
-  const [authError, setAuthError] = useState<string | null>(null)
   const [attendanceError, setAttendanceError] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
+
+  const profileQuery = useQuery({
+    queryKey: ['employee-portal-profile'],
+    queryFn: async () => {
+      const token = await getToken()
+      if (!token) throw new Error('Missing token')
+      const res = await authedFetch('/api/auth/login', token, { method: 'POST' })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || 'Failed to fetch employee profile')
+      }
+      return res.json() as Promise<{
+        employee: EmployeeData
+        role: 'EMPLOYEE' | 'ADMIN'
+        requires_face_registration: boolean
+        active_session: boolean
+      }>
+    },
+    staleTime: 1000 * 60 * 2,
+    refetchOnWindowFocus: false,
+  })
+
+  const profile = profileQuery.data?.employee ?? null
+  const requiresFaceReg = profileQuery.data?.requires_face_registration ?? false
+  const sessionActive = Boolean(profileQuery.data?.active_session)
 
   // Camera capture state
   const [isCameraOpen, setIsCameraOpen] = useState(false)
@@ -53,10 +74,54 @@ export function EmployeePortal() {
   const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number; accuracy?: number } | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
-  // Session state (active tracking)
-  const [sessionActive, setSessionActive] = useState(() => {
-    return window.localStorage.getItem('employeehub-session-active') === 'true'
-  })
+  const updatePermissionState = async () => {
+    if (!('permissions' in navigator)) {
+      return
+    }
+
+    try {
+      const status = await navigator.permissions.query({ name: 'geolocation' })
+      if (status.state === 'granted') {
+        setLocationPermGranted(true)
+      } else if (status.state === 'denied') {
+        setLocationPermGranted(false)
+      } else {
+        setLocationPermGranted(null)
+      }
+      status.onchange = () => {
+        if (status.state === 'granted') {
+          setLocationPermGranted(true)
+        } else if (status.state === 'denied') {
+          setLocationPermGranted(false)
+        } else {
+          setLocationPermGranted(null)
+        }
+      }
+    } catch {
+      // Permissions API unsupported or inaccessible; rely on actual position checks.
+    }
+  }
+
+  const ensureLocationPermission = async () => {
+    if (!('geolocation' in navigator)) {
+      setLocationPermGranted(false)
+      return
+    }
+
+    await updatePermissionState()
+
+    try {
+      const pos = await requestCurrentPosition()
+      setLocationPermGranted(true)
+      setCurrentCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy ?? undefined })
+    } catch (err: any) {
+      if (err?.code === 1 || err?.message?.toLowerCase().includes('permission')) {
+        setLocationPermGranted(false)
+      } else {
+        setLocationPermGranted(null)
+      }
+    }
+  }
 
   // Clock tick
   useEffect(() => {
@@ -64,59 +129,9 @@ export function EmployeePortal() {
     return () => clearInterval(timer)
   }, [])
 
-  // Geolocation perm & tracking request immediately on load
   useEffect(() => {
-    if ('geolocation' in navigator) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setLocationPermGranted(true)
-          setCurrentCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-        },
-        () => {
-          setLocationPermGranted(false)
-        }
-      )
-    } else {
-      setLocationPermGranted(false)
-    }
+    void ensureLocationPermission()
   }, [])
-
-  // Fetch employee profile and registration status
-  useEffect(() => {
-    async function loadProfile() {
-      try {
-        const token = await getToken()
-        if (!token) {
-          setAuthError('Missing Clerk token')
-          setIsLoadingProfile(false)
-          return
-        }
-        const res = await authedFetch('/api/auth/login', token, { method: 'POST' })
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}))
-          setAuthError(errData.detail || 'Access denied. You are not registered as an employee.')
-          setIsLoadingProfile(false)
-          return
-        }
-        const data = await res.json()
-        if (data.role !== 'EMPLOYEE') {
-          setAuthError('Unauthorized role access.')
-          setIsLoadingProfile(false)
-          return
-        }
-        setProfile(data.employee)
-        setRequiresFaceReg(data.requires_face_registration)
-        const hasActiveSession = Boolean(data.active_session)
-        setSessionActive(hasActiveSession)
-        window.localStorage.setItem('employeehub-session-active', hasActiveSession ? 'true' : 'false')
-        setIsLoadingProfile(false)
-      } catch (err: any) {
-        setAuthError(err.message || 'Verification failed')
-        setIsLoadingProfile(false)
-      }
-    }
-    loadProfile()
-  }, [getToken])
 
   // Fetch active assignment
   const assignmentQuery = useQuery({
@@ -174,7 +189,7 @@ export function EmployeePortal() {
     }, 45000)
 
     return () => clearInterval(logInterval)
-  }, [sessionActive, profile, getToken, queryClient])
+  }, [profileQuery.data?.active_session, profile, getToken, queryClient])
 
   useEffect(() => {
     if (stream && videoRef.current) {
@@ -244,7 +259,7 @@ export function EmployeePortal() {
   }
 
   // Capture image snapshot
-  const capturePhoto = () => {
+  const capturePhoto = async () => {
     if (videoRef.current && canvasRef.current) {
       const video = videoRef.current
       const canvas = canvasRef.current
@@ -253,7 +268,15 @@ export function EmployeePortal() {
       const ctx = canvas.getContext('2d')
       if (ctx) {
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        const photoUrl = canvas.toDataURL('image/jpeg')
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'
+        ctx.fillRect(0, canvas.height - 120, canvas.width, 120)
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 22px Inter, sans-serif'
+        const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
+        const locationText = currentCoords ? `Location: ${currentCoords.latitude.toFixed(5)}, ${currentCoords.longitude.toFixed(5)}` : 'Location: unavailable'
+        ctx.fillText(`Captured: ${timestamp}`, 16, canvas.height - 70)
+        ctx.fillText(locationText, 16, canvas.height - 38)
+        const photoUrl = canvas.toDataURL('image/jpeg', 0.95)
         setTempPhoto(photoUrl)
       }
     }
@@ -322,11 +345,13 @@ export function EmployeePortal() {
             throw new Error(errData.detail || 'Registration failed')
           }
 
-          setRequiresFaceReg(false)
           // Save first captured photo as profile picture
           if (profile && updated.length > 0) {
-            setProfile({ ...profile, profile_photo: updated[0] })
-            // Also upload the first photo as the profile picture to backend
+            queryClient.setQueryData(['employee-portal-profile'], (oldData: any) => ({
+              ...oldData,
+              employee: { ...oldData.employee, profile_photo: updated[0] },
+              requires_face_registration: false,
+            }))
             const profileForm = new FormData()
             const profileBlob = await buildAnnotatedPhoto(updated[0])
             profileForm.append('profile_photo_file', profileBlob || await (await fetch(updated[0])).blob(), 'profile.jpg')
@@ -334,7 +359,7 @@ export function EmployeePortal() {
               method: 'POST',
               headers: { Authorization: `Bearer ${token}` },
               body: profileForm,
-            }).catch(() => {}) // silently fail if upload endpoint doesn't exist yet
+            }).catch(() => {})
           }
           alert('Face verification model profile successfully registered!')
           stopCamera()
@@ -404,17 +429,8 @@ export function EmployeePortal() {
 
         setCameraError(null)
         setAttendanceError(null)
-        if (cameraMode === 'checkin') {
-          setSessionActive(true)
-          window.localStorage.setItem('employeehub-session-active', 'true')
-          if (profile && !profile.profile_photo && tempPhoto) {
-            setProfile({ ...profile, profile_photo: tempPhoto })
-          }
-        } else {
-          setSessionActive(false)
-          window.localStorage.setItem('employeehub-session-active', 'false')
-        }
 
+        queryClient.invalidateQueries({ queryKey: ['employee-portal-profile'] })
         queryClient.invalidateQueries({ queryKey: ['my-assignment'] })
         queryClient.invalidateQueries({ queryKey: ['my-route', profile?.id] })
         stopCamera()
@@ -426,19 +442,18 @@ export function EmployeePortal() {
     }
   }
 
-  if (authError) {
+  if (profileQuery.isError) {
+    const errorMessage = profileQuery.error instanceof Error ? profileQuery.error.message : 'Verification failed.'
     return (
       <div className="unregistered-container">
         <div className="unregistered-card">
           <div className="unregistered-icon">⚠️</div>
           <h2>Access Restricted</h2>
-          <p style={{ margin: '1rem 0 2rem 0', lineHeight: 1.6 }}>{authError}</p>
+          <p style={{ margin: '1rem 0 2rem 0', lineHeight: 1.6 }}>{errorMessage}</p>
           <button
             className="btn-primary"
             style={{ background: 'var(--danger)' }}
             onClick={() => {
-              window.localStorage.setItem('employeehub-session-active', 'false')
-              setSessionActive(false)
               void signOut()
             }}
           >
@@ -449,7 +464,7 @@ export function EmployeePortal() {
     )
   }
 
-  if (isLoadingProfile) {
+  if (profileQuery.isLoading) {
     return (
       <div className="unregistered-container">
         <div className="glass-card route-loading">Verifying employee credentials...</div>
@@ -468,7 +483,6 @@ export function EmployeePortal() {
           />
           <div>
             <h2 style={{ fontSize: '1.25rem', color: 'var(--primary)' }}>Skandan Portal</h2>
-            <p style={{ fontSize: '0.75rem', color: 'var(--muted)', margin: 0 }}>Workforce Safety & Attendance</p>
           </div>
         </div>
         <div>
@@ -476,8 +490,6 @@ export function EmployeePortal() {
             className="ghost-button danger"
             style={{ padding: '0.6rem 1.2rem', borderRadius: '12px' }}
             onClick={() => {
-              window.localStorage.setItem('employeehub-session-active', 'false')
-              setSessionActive(false)
               void signOut()
             }}
           >
@@ -487,7 +499,7 @@ export function EmployeePortal() {
       </header>
 
       <main className="portal-content">
-        {(attendanceError || authError) && (
+        {attendanceError && (
           <div
             style={{
               background: 'rgba(239,68,68,0.1)',
@@ -498,7 +510,7 @@ export function EmployeePortal() {
               border: '1px solid rgba(239,68,68,0.2)',
             }}
           >
-            <strong>⚠️ {attendanceError || authError}</strong>
+            <strong>⚠️ {attendanceError}</strong>
           </div>
         )}
         {requiresFaceReg ? (
@@ -655,7 +667,17 @@ export function EmployeePortal() {
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   <div className="button-group-row">
-                    <button className="btn-secondary" onClick={() => setTempPhoto(null)} disabled={submitting}>
+                    <button
+                      className="btn-secondary"
+                      onClick={() => {
+                        setTempPhoto(null)
+                        setCameraError(null)
+                        if (videoRef.current) {
+                          void videoRef.current.play().catch(() => {})
+                        }
+                      }}
+                      disabled={submitting}
+                    >
                       Retake
                     </button>
                     <button className="btn-primary" onClick={acceptPhoto} disabled={submitting}>

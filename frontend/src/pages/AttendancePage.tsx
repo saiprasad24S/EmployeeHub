@@ -14,6 +14,10 @@ type AttendanceRecord = {
   session_login_time?: string | null
   session_logout_time?: string | null
   session_is_active?: boolean | null
+  presence_status?: string | null
+  presence_is_active?: boolean | null
+  presence_check_in_time?: string | null
+  presence_session_duration_seconds?: number | null
 }
 
 type EmployeeSummary = {
@@ -57,8 +61,6 @@ export function AttendancePage() {
   const employees = employeesQuery.data ?? []
   const attendance = attendanceQuery.data ?? []
 
-  const today = useMemo(() => new Date().toISOString().slice(0, 10), [])
-
   const formatTime = (value?: string | null) => {
     if (!value) return '—'
     const date = new Date(value)
@@ -66,39 +68,42 @@ export function AttendancePage() {
     return new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' }).format(date)
   }
 
-  const formatDuration = (login?: string | null, logout?: string | null) => {
-    if (!login || !logout) return null
-    const loginTime = new Date(login)
-    const logoutTime = new Date(logout)
-    if (Number.isNaN(loginTime.getTime()) || Number.isNaN(logoutTime.getTime())) return null
-    const diffMs = logoutTime.getTime() - loginTime.getTime()
-    if (diffMs <= 0) return null
-    const hours = Math.round(diffMs / (1000 * 60 * 60))
-    return `${hours}h`
+  const formatDurationFromSeconds = (seconds?: number | null) => {
+    if (!seconds || seconds <= 0) return null
+    const hours = Math.floor(seconds / 3600)
+    const minutes = Math.floor((seconds % 3600) / 60)
+    if (hours && minutes) return `${hours}h ${minutes}m`
+    if (hours) return `${hours}h`
+    if (minutes) return `${minutes}m`
+    return `${seconds}s`
+  }
+
+  const formatDateTime = (value?: string | null) => {
+    if (!value) return '—'
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return '—'
+    return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
   }
 
   const getEmployeeSessionSummary = (employeeId: string) => {
     const employeeRecords = attendance.filter((record) => record.employee_employee_id === employeeId)
     const latestRecord = employeeRecords.sort((first, second) => new Date(second.timestamp).getTime() - new Date(first.timestamp).getTime())[0]
-    const activeSession = latestRecord?.session_is_active === true
-    const todayCheckIn = employeeRecords.some((record) => record.attendance_type === 'CHECK_IN' && record.timestamp.startsWith(today))
-    const isPresent = activeSession || todayCheckIn
-    const loginTime = latestRecord?.session_login_time ?? null
-    const logoutTime = latestRecord?.session_logout_time ?? null
-    const duration = formatDuration(loginTime, logoutTime)
+    const isPresent = latestRecord?.presence_is_active === true
+    const loginTime = latestRecord?.presence_check_in_time ?? latestRecord?.session_login_time ?? null
+    const duration = formatDurationFromSeconds(latestRecord?.presence_session_duration_seconds ?? null)
 
     return {
       isPresent,
       loginTime,
-      logoutTime,
       duration,
       latestRecord,
+      status: latestRecord?.presence_status ?? (isPresent ? 'Present' : 'Absent'),
     }
   }
 
-  const presentEmployees = useMemo(() => employees.filter((employee) => getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees, today])
+  const presentEmployees = useMemo(() => employees.filter((employee) => getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees])
 
-  const absentEmployees = useMemo(() => employees.filter((employee) => !getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees, today])
+  const absentEmployees = useMemo(() => employees.filter((employee) => !getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees])
 
   const handleExport = async () => {
     if (!startDate || !endDate) {
@@ -149,7 +154,7 @@ export function AttendancePage() {
           <h4 style={{ marginBottom: '0.8rem' }}>Present</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
             {presentEmployees.length === 0 ? (
-              <p style={{ color: 'var(--muted)' }}>No employees are present today.</p>
+              <p style={{ color: 'var(--muted)' }}>No employees currently have an active session.</p>
             ) : presentEmployees.map((employee) => {
               const sessionSummary = getEmployeeSessionSummary(employee.employee_id)
               return (
@@ -160,9 +165,8 @@ export function AttendancePage() {
                     <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{employee.email}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{employee.employee_id}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
-                      {sessionSummary.loginTime ? `Login ${formatTime(sessionSummary.loginTime)}` : 'No login recorded'}
-                      {sessionSummary.logoutTime ? ` • Out ${formatTime(sessionSummary.logoutTime)}` : ''}
-                      {sessionSummary.duration ? ` (${sessionSummary.duration})` : ''}
+                      {sessionSummary.loginTime ? `Check-in ${formatTime(sessionSummary.loginTime)}` : 'No check-in recorded'}
+                      {sessionSummary.duration ? ` • ${sessionSummary.duration}` : ''}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', color: '#10B981', fontWeight: 700, fontSize: '0.82rem' }}>Present</div>
@@ -187,7 +191,8 @@ export function AttendancePage() {
                     <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{employee.email}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{employee.employee_id}</div>
                     <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
-                      {sessionSummary.logoutTime ? `Logout ${formatTime(sessionSummary.logoutTime)}${sessionSummary.duration ? ` (${sessionSummary.duration})` : ''}` : 'No active session'}
+                      {sessionSummary.loginTime ? `Last seen ${formatDateTime(sessionSummary.loginTime)}` : 'No active session'}
+                      {sessionSummary.duration ? ` • ${sessionSummary.duration}` : ''}
                     </div>
                   </div>
                   <div style={{ textAlign: 'right', color: '#EF4444', fontWeight: 700, fontSize: '0.82rem' }}>Absent</div>

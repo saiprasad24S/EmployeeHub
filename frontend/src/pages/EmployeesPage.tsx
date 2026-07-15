@@ -33,6 +33,10 @@ type AttendanceRecord = {
   address: string
   timestamp: string
   status: string
+  presence_status?: string | null
+  presence_is_active?: boolean | null
+  presence_check_in_time?: string | null
+  presence_session_duration_seconds?: number | null
 }
 
 type RoutePoint = {
@@ -56,7 +60,7 @@ const emptyEmployeeForm = {
   default_address: '',
   default_latitude: '',
   default_longitude: '',
-  default_radius: '100',
+  default_radius: '0.1',
   is_active: true,
 }
 
@@ -69,7 +73,7 @@ export function EmployeesPage() {
   const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null)
   const [defaultAddressDraft, setDefaultAddressDraft] = useState('')
   const [defaultAddressCoordinates, setDefaultAddressCoordinates] = useState<{ latitude?: number | null; longitude?: number | null }>({})
-  const [defaultRadiusDraft, setDefaultRadiusDraft] = useState<number | string>('100')
+  const [defaultRadiusDraft, setDefaultRadiusDraft] = useState<number | string>('0.1')
   const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
   const [employeeForm, setEmployeeForm] = useState(emptyEmployeeForm)
@@ -148,7 +152,7 @@ export function EmployeesPage() {
       setEditingEmployeeId(null)
       setDefaultAddressDraft('')
       setDefaultAddressCoordinates({})
-      setDefaultRadiusDraft('100')
+      setDefaultRadiusDraft('0.1')
     },
   })
 
@@ -222,12 +226,18 @@ export function EmployeesPage() {
       .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
   }
 
-  const getTodayTimes = (empId: string) => {
-    const today = new Date().toISOString().slice(0, 10)
-    const records = getEmployeeAttendance(empId).filter((a) => a.timestamp.startsWith(today))
-    const checkIn = records.find((r) => r.attendance_type === 'CHECK_IN')
-    const checkOut = records.find((r) => r.attendance_type === 'CHECK_OUT')
-    return { checkIn, checkOut }
+  const getPresenceSummary = (empId: string) => {
+    const records = getEmployeeAttendance(empId)
+    const latestRecord = records[0]
+    const active = latestRecord?.presence_is_active === true
+    const checkIn = latestRecord?.attendance_type === 'CHECK_IN' ? latestRecord : records.find((record) => record.attendance_type === 'CHECK_IN')
+    const checkOut = latestRecord?.attendance_type === 'CHECK_OUT' ? latestRecord : records.find((record) => record.attendance_type === 'CHECK_OUT')
+    return {
+      active,
+      status: active ? 'Present' : 'Absent',
+      checkIn,
+      checkOut,
+    }
   }
 
   const openAddressEditor = (employee: Employee) => {
@@ -237,7 +247,7 @@ export function EmployeesPage() {
       latitude: employee.default_latitude ? Number(employee.default_latitude) : null,
       longitude: employee.default_longitude ? Number(employee.default_longitude) : null,
     })
-    setDefaultRadiusDraft(employee.default_radius ?? '100')
+    setDefaultRadiusDraft(employee.default_radius ? String(Number(employee.default_radius) / 1000) : '0.1')
   }
 
   const saveAddress = (employee: Employee) => {
@@ -246,7 +256,7 @@ export function EmployeesPage() {
       address: defaultAddressDraft,
       latitude: defaultAddressCoordinates.latitude ?? null,
       longitude: defaultAddressCoordinates.longitude ?? null,
-      radius: Number(defaultRadiusDraft) || 100,
+      radius: Math.max(1, Number(defaultRadiusDraft) * 1000),
     })
   }
 
@@ -300,7 +310,7 @@ export function EmployeesPage() {
       default_address: employee.default_address || '',
       default_latitude: employee.default_latitude ? String(employee.default_latitude) : '',
       default_longitude: employee.default_longitude ? String(employee.default_longitude) : '',
-      default_radius: employee.default_radius ? String(employee.default_radius) : '100',
+      default_radius: employee.default_radius ? String(Number(employee.default_radius) / 1000) : '0.1',
       is_active: employee.is_active,
     })
     setEmployeeFormError(null)
@@ -328,7 +338,7 @@ export function EmployeesPage() {
       default_address: employeeForm.default_address.trim(),
       default_latitude: employeeForm.default_latitude ? Number(employeeForm.default_latitude) : null,
       default_longitude: employeeForm.default_longitude ? Number(employeeForm.default_longitude) : null,
-      default_radius: employeeForm.default_radius ? Number(employeeForm.default_radius) : 100,
+      default_radius: employeeForm.default_radius ? Number(employeeForm.default_radius) * 1000 : 100,
       is_active: employeeForm.is_active,
     }
 
@@ -368,14 +378,14 @@ export function EmployeesPage() {
                 <th>Phone</th>
                 <th>Department</th>
                 <th>Default Address</th>
-                <th>Today's Check-In</th>
-                <th>Today's Check-Out</th>
+                <th>Current Status</th>
+                <th>Session Details</th>
                 <th>Actions</th>
               </tr>
             </thead>
             <tbody>
               {filteredEmployees.map((employee) => {
-                const { checkIn, checkOut } = getTodayTimes(employee.employee_id)
+                const { active, checkIn, checkOut } = getPresenceSummary(employee.employee_id)
                 return (
                   <tr key={employee.employee_id}>
                     <td>
@@ -431,9 +441,11 @@ export function EmployeesPage() {
                             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
                               <input
                                 type="number"
+                                step="0.01"
+                                min="0.01"
                                 value={defaultRadiusDraft}
                                 onChange={(event) => setDefaultRadiusDraft(event.target.value)}
-                                placeholder="Radius (meters)"
+                                placeholder="Radius (km)"
                                 style={{ padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
                               />
                               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}>
@@ -464,35 +476,30 @@ export function EmployeesPage() {
                       )}
                     </td>
                     <td>
+                      <div>
+                        <span style={{ color: active ? '#10B981' : 'var(--muted)', fontWeight: 600, fontSize: '0.85rem' }}>
+                          {active ? '🟢 Present' : '🔴 Absent'}
+                        </span>
+                        <br />
+                        <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                          {checkIn ? `Check-in ${new Date(checkIn.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'No check-in yet'}
+                        </span>
+                      </div>
+                    </td>
+                    <td>
                       {checkIn ? (
                         <div>
-                          <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.85rem' }}>
-                            ✅ {new Date(checkIn.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <br />
                           <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
                             📍 {checkIn.address || `${Number(checkIn.latitude).toFixed(4)}, ${Number(checkIn.longitude).toFixed(4)}`}
                           </span>
+                          {checkOut ? (
+                            <><br /><span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Checkout {new Date(checkOut.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span></>
+                          ) : (
+                            <><br /><span style={{ fontSize: '0.75rem', color: '#10B981' }}>Active session in progress</span></>
+                          )}
                         </div>
                       ) : (
-                        <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>—</span>
-                      )}
-                    </td>
-                    <td>
-                      {checkOut ? (
-                        <div>
-                          <span style={{ color: '#EF4444', fontWeight: 600, fontSize: '0.85rem' }}>
-                            🔴 {new Date(checkOut.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                          </span>
-                          <br />
-                          <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                            📍 {checkOut.address || `${Number(checkOut.latitude).toFixed(4)}, ${Number(checkOut.longitude).toFixed(4)}`}
-                          </span>
-                        </div>
-                      ) : (
-                        <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>
-                          {checkIn ? '🟢 Still Active' : '—'}
-                        </span>
+                        <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>No session recorded</span>
                       )}
                     </td>
                     <td>
@@ -535,7 +542,7 @@ export function EmployeesPage() {
                   <input value={employeeForm.default_latitude} onChange={(event) => setEmployeeForm({ ...employeeForm, default_latitude: event.target.value })} placeholder="Default latitude" style={inputStyle} />
                   <input value={employeeForm.default_longitude} onChange={(event) => setEmployeeForm({ ...employeeForm, default_longitude: event.target.value })} placeholder="Default longitude" style={inputStyle} />
                 </div>
-                <input value={employeeForm.default_radius} onChange={(event) => setEmployeeForm({ ...employeeForm, default_radius: event.target.value })} placeholder="Default radius (meters)" style={inputStyle} />
+                <input value={employeeForm.default_radius} onChange={(event) => setEmployeeForm({ ...employeeForm, default_radius: event.target.value })} placeholder="Default radius (km)" style={inputStyle} />
                 <div>
                   <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.8rem', color: 'var(--muted)' }}>Profile photo</label>
                   <input type="file" accept="image/*" onChange={(event) => {

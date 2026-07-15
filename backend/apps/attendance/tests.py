@@ -11,7 +11,12 @@ from rest_framework.exceptions import ValidationError
 from apps.accounts.models import Employee
 from apps.assignments.models import Assignment
 from apps.attendance.models import Session
-from apps.attendance.services import annotate_image, generate_attendance_export, validate_geofence
+from apps.attendance.services import (
+    annotate_image,
+    generate_attendance_export,
+    get_employee_presence_summary,
+    validate_geofence,
+)
 
 
 class GeofenceTests(TestCase):
@@ -70,3 +75,23 @@ class GeofenceTests(TestCase):
         sheet = workbook.active
         self.assertGreater(sheet.max_row, 1)
         self.assertIn(sheet.cell(row=2, column=3).value, {'EMP001', 'EMP002'})
+
+    def test_get_employee_presence_summary_keeps_active_session_present_across_days(self):
+        employee = Employee.objects.create(
+            employee_id='EMP003',
+            name='Night Shift',
+            email='night@example.com',
+            phone='9988776655',
+        )
+        session = Session.objects.create(
+            employee=employee,
+            is_active=True,
+        )
+        session.login_time = timezone.make_aware(datetime(2024, 1, 2, 22, 30))
+        session.save(update_fields=['login_time'])
+
+        summary = get_employee_presence_summary(employee)
+
+        self.assertTrue(summary['is_present'])
+        self.assertEqual(summary['status'], 'Present')
+        self.assertEqual(summary['check_in_time'], timezone.make_aware(datetime(2024, 1, 2, 22, 30)))

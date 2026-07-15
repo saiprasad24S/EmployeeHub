@@ -97,7 +97,7 @@ export function DashboardPage() {
                 fontSize: '1rem',
               }}
             >
-              ⚠️ All employees are absent today. No present employee locations are available to display.
+              ⚠️ No employee currently has an active session. No live locations are available to display.
             </div>
           ) : locationsQuery.isLoading ? (
             <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
@@ -124,7 +124,7 @@ export function DashboardPage() {
             <li>Check-in is allowed only inside the scheduled assignment radius or default location.</li>
             <li>Selfies are verified against stored InsightFace embeddings.</li>
             <li>Location logs are restricted to authenticated admins and the owning employee.</li>
-            <li>GPS points are collected only during an active working session.</li>
+            <li>Presence is derived from the active session, so employees remain Present until they explicitly check out.</li>
           </ul>
         </div>
       </div>

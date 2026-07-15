@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { SearchProvider } from './context/SearchContext'
+import 'leaflet/dist/leaflet.css'
 import './styles/global.css'
 
 const queryClient = new QueryClient()

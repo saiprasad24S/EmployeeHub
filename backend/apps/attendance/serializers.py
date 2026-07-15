@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from apps.attendance.models import Attendance, Session
+from apps.attendance.services import get_employee_presence_summary
 
 
 class SessionSerializer(serializers.ModelSerializer):
@@ -17,6 +18,10 @@ class AttendanceSerializer(serializers.ModelSerializer):
     session_login_time = serializers.DateTimeField(source="session.login_time", read_only=True)
     session_logout_time = serializers.DateTimeField(source="session.logout_time", read_only=True)
     session_is_active = serializers.BooleanField(source="session.is_active", read_only=True)
+    presence_status = serializers.SerializerMethodField()
+    presence_is_active = serializers.SerializerMethodField()
+    presence_check_in_time = serializers.SerializerMethodField()
+    presence_session_duration_seconds = serializers.SerializerMethodField()
 
     class Meta:
         model = Attendance
@@ -33,6 +38,10 @@ class AttendanceSerializer(serializers.ModelSerializer):
             "session_login_time",
             "session_logout_time",
             "session_is_active",
+            "presence_status",
+            "presence_is_active",
+            "presence_check_in_time",
+            "presence_session_duration_seconds",
             "latitude",
             "longitude",
             "address",
@@ -52,3 +61,15 @@ class AttendanceSerializer(serializers.ModelSerializer):
                 return request.build_absolute_uri(obj.photo_url)
             return f"http://localhost:8000{obj.photo_url}"
         return obj.photo_url
+
+    def get_presence_status(self, obj: Attendance) -> str:
+        return get_employee_presence_summary(obj.employee)['status']
+
+    def get_presence_is_active(self, obj: Attendance) -> bool:
+        return get_employee_presence_summary(obj.employee)['is_present']
+
+    def get_presence_check_in_time(self, obj: Attendance):
+        return get_employee_presence_summary(obj.employee)['check_in_time']
+
+    def get_presence_session_duration_seconds(self, obj: Attendance) -> int:
+        return get_employee_presence_summary(obj.employee)['session_duration_seconds']
