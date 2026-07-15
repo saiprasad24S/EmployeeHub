@@ -10,11 +10,11 @@ from rest_framework.views import APIView
 from django.utils import timezone
 from apps.accounts.models import Employee
 from apps.attendance.models import Session, Attendance
-from apps.attendance.services import end_session, log_location, start_session
+from apps.attendance.services import end_session, get_employee_presence_summary, log_location, start_session
 from apps.common.permissions import IsAdminRole, IsEmployeeRole
 from apps.tracking.models import LocationLog
 from apps.tracking.serializers import LocationLogSerializer
-from apps.tracking.services import get_employee_route, get_latest_location, get_today_distance, get_travel_history
+from apps.tracking.services import get_active_session, get_employee_route, get_latest_location, get_today_distance, get_travel_history
 
 
 def _serialize_location(source: object | None) -> dict | None:
@@ -100,13 +100,19 @@ class EmployeeRouteView(APIView):
         employee = _resolve_employee(employee_id)
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
-        route = get_employee_route(employee)
+        active_session = get_active_session(employee)
+        route = get_employee_route(employee, active_session)
         last_known_location = _serialize_location(_get_latest_location_source(employee))
+        presence = get_employee_presence_summary(employee)
         return Response({
             "employee_id": employee.employee_id,
             "route": route,
-            "distance_covered_meters": get_today_distance(employee),
+            "distance_covered_meters": get_today_distance(employee, active_session),
             "last_known_location": last_known_location,
+            "presence_status": presence['status'],
+            "is_present": presence['is_present'],
+            "check_in_time": presence['check_in_time'],
+            "session_duration_seconds": presence['session_duration_seconds'],
         })
 
 
@@ -138,16 +144,22 @@ class AllPresentEmployeesLocationView(APIView):
             source = _get_latest_location_source(employee)
             if source is None:
                 continue
+            presence = get_employee_presence_summary(employee)
             results.append({
                 "id": employee.id,
                 "employee_id": employee.employee_id,
                 "name": employee.name,
                 "email": employee.email,
+                "phone": employee.phone,
                 "department": employee.department,
                 "default_address": employee.default_address,
                 "profile_photo": employee.profile_photo,
                 "latitude": float(getattr(source, "latitude")),
                 "longitude": float(getattr(source, "longitude")),
                 "timestamp": getattr(source, "timestamp", None),
+                "presence_status": presence['status'],
+                "is_present": presence['is_present'],
+                "check_in_time": presence['check_in_time'],
+                "session_duration_seconds": presence['session_duration_seconds'],
             })
         return Response(results)
