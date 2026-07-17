@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch, API_BASE_URL } from '../lib/api'
@@ -34,6 +34,7 @@ export function AttendancePage() {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [isExporting, setIsExporting] = useState(false)
+  const [, setTick] = useState(0)
 
   const employeesQuery = useQuery({
     queryKey: ['attendance-employees'],
@@ -90,7 +91,25 @@ export function AttendancePage() {
     const latestRecord = employeeRecords.sort((first, second) => new Date(second.timestamp).getTime() - new Date(first.timestamp).getTime())[0]
     const isPresent = latestRecord?.presence_is_active === true
     const loginTime = latestRecord?.presence_check_in_time ?? latestRecord?.session_login_time ?? null
-    const duration = formatDurationFromSeconds(latestRecord?.presence_session_duration_seconds ?? null)
+    // For active sessions, compute live duration on the client so it updates without a full refetch
+    let duration = null
+    if (latestRecord) {
+      if (latestRecord.presence_is_active && (latestRecord.presence_check_in_time || latestRecord.session_login_time)) {
+        const checkIn = latestRecord.presence_check_in_time ?? latestRecord.session_login_time
+        if (checkIn) {
+          try {
+            const seconds = Math.max(Math.floor((Date.now() - new Date(checkIn).getTime()) / 1000), 0)
+            duration = formatDurationFromSeconds(seconds)
+          } catch {
+            duration = formatDurationFromSeconds(latestRecord?.presence_session_duration_seconds ?? null)
+          }
+        } else {
+          duration = formatDurationFromSeconds(latestRecord?.presence_session_duration_seconds ?? null)
+        }
+      } else {
+        duration = formatDurationFromSeconds(latestRecord?.presence_session_duration_seconds ?? null)
+      }
+    }
 
     return {
       isPresent,
@@ -104,6 +123,12 @@ export function AttendancePage() {
   const presentEmployees = useMemo(() => employees.filter((employee) => getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees])
 
   const absentEmployees = useMemo(() => employees.filter((employee) => !getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees])
+
+  // Tick to re-render periodically so active session durations update in the UI
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30000)
+    return () => clearInterval(id)
+  }, [attendance])
 
   const handleExport = async () => {
     if (!startDate || !endDate) {

@@ -10,6 +10,7 @@ from django.core.exceptions import ValidationError
 from apps.accounts.authentication import ClerkJWTAuthentication
 from apps.accounts.models import Employee
 from apps.accounts.serializers import EmployeeCreateSerializer, EmployeeSerializer
+from apps.attendance.services import get_employee_presence_summary
 from apps.attendance.models import Session
 from apps.attendance.services import end_session, upload_profile_photo
 from apps.common.permissions import IsAdminRole
@@ -38,6 +39,7 @@ class AuthLoginView(APIView):
             if not employee:
                 return Response({"detail": "Employee profile not found."}, status=status.HTTP_404_NOT_FOUND)
             active_session = Session.objects.filter(employee=employee, is_active=True).exists()
+            presence_summary = get_employee_presence_summary(employee)
             return Response(
                 {
                     "role": "EMPLOYEE",
@@ -45,6 +47,14 @@ class AuthLoginView(APIView):
                     "employee": EmployeeSerializer(employee).data,
                     "requires_face_registration": not bool(employee.face_embedding),
                     "active_session": active_session,
+                    "session_summary": {
+                        "active_session": active_session,
+                        "check_in_time": presence_summary.get("check_in_time"),
+                        "check_out_time": presence_summary.get("check_out_time"),
+                        "session_duration_seconds": presence_summary.get("session_duration_seconds"),
+                        "is_present": presence_summary.get("is_present"),
+                        "status": presence_summary.get("status"),
+                    },
                 }
             )
         return Response({"detail": "Only registered employees and admins can access the dashboard."}, status=status.HTTP_403_FORBIDDEN)

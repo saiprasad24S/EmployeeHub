@@ -193,6 +193,11 @@ else:
 logger.info("Database configuration source: %s", DB_CONFIG_SOURCE)
 
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env("CORS_ALLOWED_ORIGINS", default="").split(",") if origin.strip()]
+CORS_ALLOWED_ORIGIN_REGEXES = [
+    r"^https?://localhost(:\d+)?$",
+    r"^https?://127\.0\.0\.1(:\d+)?$",
+    r"^https?://192\.168\.\d+\.\d+(:\d+)?$",
+]
 CORS_ALLOW_CREDENTIALS = True
 
 REST_FRAMEWORK = {
@@ -219,7 +224,7 @@ CLOUDINARY_FOLDER = _env("CLOUDINARY_FOLDER", default="skandan")
 CLOUDINARY_MAX_SIZE = _env_int("CLOUDINARY_MAX_SIZE", default=10 * 1024 * 1024)
 CLOUDINARY_ALLOWED_FORMATS = [fmt.strip() for fmt in _env("CLOUDINARY_ALLOWED_FORMATS", default="jpg,jpeg,png,webp").split(",") if fmt.strip()]
 
-DEFAULT_FILE_STORAGE = "django.core.files.storage.FileSystemStorage"
+DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
 
 CLERK_SECRET_KEY = _env("CLERK_SECRET_KEY", default="")
 CLERK_JWKS_URL = _env("CLERK_JWKS_URL", default="")

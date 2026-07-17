@@ -230,8 +230,10 @@ export function EmployeesPage() {
     const records = getEmployeeAttendance(empId)
     const latestRecord = records[0]
     const active = latestRecord?.presence_is_active === true
-    const checkIn = latestRecord?.attendance_type === 'CHECK_IN' ? latestRecord : records.find((record) => record.attendance_type === 'CHECK_IN')
-    const checkOut = latestRecord?.attendance_type === 'CHECK_OUT' ? latestRecord : records.find((record) => record.attendance_type === 'CHECK_OUT')
+    const latestCheckIn = records.find((record) => record.attendance_type === 'CHECK_IN')
+    const latestCheckOut = records.find((record) => record.attendance_type === 'CHECK_OUT')
+    const checkIn = latestRecord?.attendance_type === 'CHECK_IN' ? latestRecord : latestCheckIn
+    const checkOut = active ? undefined : latestCheckOut
     return {
       active,
       status: active ? 'Present' : 'Absent',

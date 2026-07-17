@@ -117,26 +117,24 @@ def _build_watermark(image: Image.Image, metadata: dict[str, Any]) -> Image.Imag
     font_size = max(18, int(min(width, height) / 40))
     font = _get_font(font_size)
 
+    name = metadata.get('employee_name') or 'Not Available'
+    employee_id = metadata.get('employee_id') or 'Not Available'
+    address = metadata.get('address') or 'Not Available'
+
+    if name.strip().lower() in {'unknown', 'unknown', 'n/a'}:
+        name = 'Not Available'
+    if employee_id.strip().lower() in {'unknown', 'n/a'}:
+        employee_id = 'Not Available'
+    if address.strip().lower() in {'unknown', 'unknown', 'n/a', 'address unavailable'}:
+        address = 'Not Available'
+
     lines = [
-        f"Employee: {metadata.get('employee_name', 'Unknown')}",
-        f"Employee ID: {metadata.get('employee_id', 'N/A')}",
+        f"Employee: {name}",
+        f"Employee ID: {employee_id}",
         f"Date: {metadata.get('date', datetime.now().strftime('%d-%b-%Y'))}",
         f"Time: {metadata.get('time', datetime.now().strftime('%I:%M:%S %p'))}",
-        "Location:",
-        metadata.get('address', 'Address unavailable') or 'Address unavailable',
-        f"Lat: {metadata.get('latitude', 'N/A')}",
-        f"Lng: {metadata.get('longitude', 'N/A')}",
+        f"Location: {address}",
     ]
-
-    optional_fields = []
-    if metadata.get("battery_percentage") is not None:
-        optional_fields.append(f"Battery: {metadata.get('battery_percentage')}%")
-    if metadata.get("network_type"):
-        optional_fields.append(f"Network: {metadata.get('network_type')}")
-    if metadata.get("device_name"):
-        optional_fields.append(f"Device: {metadata.get('device_name')}")
-    if optional_fields:
-        lines.extend(optional_fields)
 
     text_width = max([font.getbbox(line)[2] for line in lines]) if lines else 0
     text_height = sum([font.getbbox(line)[3] - font.getbbox(line)[1] for line in lines]) + (len(lines) - 1) * 4
@@ -147,8 +145,18 @@ def _build_watermark(image: Image.Image, metadata: dict[str, Any]) -> Image.Imag
 
     overlay = Image.new("RGBA", image.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(overlay)
-    draw.rounded_rectangle([x0, y0, x0 + box_width + box_padding, y0 + box_height + box_padding], radius=10, fill=(0, 0, 0, 180))
-    draw.text((x0 + padding, y0 + padding), "\n".join(lines), fill=(255, 255, 255, 255), font=font)
+    draw.rounded_rectangle(
+        [x0, y0, x0 + box_width, y0 + box_height],
+        radius=12,
+        fill=(0, 0, 0, int(255 * 0.7)),
+    )
+    draw.multiline_text(
+        (x0 + padding, y0 + padding),
+        "\n".join(lines),
+        fill=(255, 255, 255, 255),
+        font=font,
+        spacing=10,
+    )
     return Image.alpha_composite(image, overlay)
 
 

@@ -4,6 +4,15 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authedFetch } from '../lib/api'
 import { RouteMap } from '../components/RouteMap'
 
+type SessionSummary = {
+  active_session?: boolean
+  check_in_time?: string | null
+  check_out_time?: string | null
+  session_duration_seconds?: number | null
+  is_present?: boolean
+  status?: string
+}
+
 type EmployeeData = {
   id: number
   employee_id: string
@@ -17,6 +26,14 @@ type EmployeeData = {
   default_latitude?: number | string | null
   default_longitude?: number | string | null
   active_session?: boolean
+}
+
+type ProfileResponse = {
+  employee: EmployeeData
+  role: 'EMPLOYEE' | 'ADMIN'
+  requires_face_registration: boolean
+  active_session: boolean
+  session_summary?: SessionSummary
 }
 
 type AssignmentData = {
@@ -49,12 +66,7 @@ export function EmployeePortal() {
         const errData = await res.json().catch(() => ({}))
         throw new Error(errData.detail || 'Failed to fetch employee profile')
       }
-      return res.json() as Promise<{
-        employee: EmployeeData
-        role: 'EMPLOYEE' | 'ADMIN'
-        requires_face_registration: boolean
-        active_session: boolean
-      }>
+      return res.json() as Promise<ProfileResponse>
     },
     staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
@@ -62,7 +74,16 @@ export function EmployeePortal() {
 
   const profile = profileQuery.data?.employee ?? null
   const requiresFaceReg = profileQuery.data?.requires_face_registration ?? false
-  const sessionActive = Boolean(profileQuery.data?.active_session)
+  const sessionActive = Boolean(
+    profileQuery.data?.session_summary?.active_session ??
+    profileQuery.data?.active_session ??
+    profileQuery.data?.session_summary?.is_present,
+  )
+  const profileIsPresent =
+    profileQuery.data?.session_summary?.active_session ??
+    profileQuery.data?.active_session ??
+    profileQuery.data?.session_summary?.is_present ??
+    false
 
   // Camera capture state
   const [isCameraOpen, setIsCameraOpen] = useState(false)
@@ -70,6 +91,7 @@ export function EmployeePortal() {
   const [capturedPhotos, setCapturedPhotos] = useState<string[]>([]) // base64 strings
   const [tempPhoto, setTempPhoto] = useState<string | null>(null)
   const [stream, setStream] = useState<MediaStream | null>(null)
+  const [cameraReady, setCameraReady] = useState(false)
   const [locationPermGranted, setLocationPermGranted] = useState<boolean | null>(null)
   const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number; accuracy?: number } | null>(null)
   const [submitting, setSubmitting] = useState(false)
@@ -194,7 +216,9 @@ export function EmployeePortal() {
   useEffect(() => {
     if (stream && videoRef.current) {
       videoRef.current.srcObject = stream
+      videoRef.current.muted = true
       videoRef.current.play().catch(() => {})
+      setCameraReady(true)
     }
   }, [stream])
 
@@ -205,6 +229,7 @@ export function EmployeePortal() {
     setCameraError(null)
     setAttendanceError(null)
     setIsCameraOpen(true)
+    setCameraReady(false)
     try {
       const pos = await requestCurrentPosition()
       setLocationPermGranted(true)
@@ -254,6 +279,7 @@ export function EmployeePortal() {
       stream.getTracks().forEach((track) => track.stop())
       setStream(null)
     }
+    setCameraReady(false)
     setIsCameraOpen(false)
     setTempPhoto(null)
   }
@@ -267,52 +293,32 @@ export function EmployeePortal() {
       canvas.height = video.videoHeight
       const ctx = canvas.getContext('2d')
       if (ctx) {
-        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'
-        ctx.fillRect(0, canvas.height - 120, canvas.width, 120)
-        ctx.fillStyle = '#ffffff'
-        ctx.font = 'bold 22px Inter, sans-serif'
-        const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
-        const locationText = currentCoords ? `Location: ${currentCoords.latitude.toFixed(5)}, ${currentCoords.longitude.toFixed(5)}` : 'Location: unavailable'
-        ctx.fillText(`Captured: ${timestamp}`, 16, canvas.height - 70)
-        ctx.fillText(locationText, 16, canvas.height - 38)
-        const photoUrl = canvas.toDataURL('image/jpeg', 0.95)
-        setTempPhoto(photoUrl)
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+          const photoUrl = canvas.toDataURL('image/jpeg', 0.95)
+          setTempPhoto(photoUrl)
+        }
       }
     }
-  }
 
-  const buildAnnotatedPhoto = async (base64Image: string) => {
-    const img = new Image()
-    img.src = base64Image
-    await new Promise((resolve) => {
-      img.onload = resolve
-    })
+    const buildAnnotatedPhoto = async (base64Image: string) => {
+      const img = new Image()
+      img.src = base64Image
+      await new Promise((resolve) => {
+        img.onload = resolve
+      })
 
-    const canvas = document.createElement('canvas')
-    canvas.width = img.width || 1080
-    canvas.height = img.height || 1440
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return null
+      const canvas = document.createElement('canvas')
+      canvas.width = img.width || 1080
+      canvas.height = img.height || 1440
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return null
 
-    ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-    ctx.fillRect(0, canvas.height - 150, canvas.width, 150)
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
 
-    ctx.fillStyle = '#ffffff'
-    ctx.font = 'bold 28px Inter, sans-serif'
-    const timestamp = new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })
-    const locationText = currentCoords ? `Location: ${currentCoords.latitude.toFixed(5)}, ${currentCoords.longitude.toFixed(5)}` : 'Location: unavailable'
-    const lines = [`Captured: ${timestamp}`, locationText]
-    lines.forEach((line, index) => {
-      ctx.fillText(line, 24, canvas.height - 105 + index * 34)
-    })
-
-    return await new Promise<Blob | null>((resolve) => {
-      canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95)
-    })
-  }
-
+      return await new Promise<Blob | null>((resolve) => {
+        canvas.toBlob((blob) => resolve(blob), 'image/jpeg', 0.95)
+      })
+    }
   // Handle Photo Acceptance
   const acceptPhoto = async () => {
     if (!tempPhoto) return
@@ -405,7 +411,9 @@ export function EmployeePortal() {
         formData.append('longitude', String(latestCoords.longitude))
         formData.append('accuracy', String(latestCoords.accuracy ?? 0))
         formData.append('liveness_score', '1.0') // simulated high confidence from camera
-        formData.append('address', 'Location verified via portal')
+        // Include readable coordinates/address when available so backend metadata is useful
+        const addressPayload = assignmentQuery.data?.patient_address || profile?.default_address || 'Not Available'
+        formData.append('address', addressPayload)
 
         const endpoint = cameraMode === 'checkin' ? '/api/attendance/checkin' : '/api/attendance/checkout'
         const res = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}${endpoint}`, {
@@ -433,6 +441,7 @@ export function EmployeePortal() {
         queryClient.invalidateQueries({ queryKey: ['employee-portal-profile'] })
         queryClient.invalidateQueries({ queryKey: ['my-assignment'] })
         queryClient.invalidateQueries({ queryKey: ['my-route', profile?.id] })
+        await queryClient.refetchQueries({ queryKey: ['employee-portal-profile'], active: true, type: 'active' })
         stopCamera()
       } catch (e: any) {
         setCameraError(e.message || 'Attendance request failed.')
@@ -551,6 +560,33 @@ export function EmployeePortal() {
                 <span className="digital-clock">
                   {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
+                {/* Session summary (check-in/out and duration) */}
+                {profileQuery.data?.session_summary && (
+                  <div style={{ marginTop: '0.75rem', fontSize: '0.9rem', color: 'var(--muted)' }}>
+                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
+                      <strong style={{ color: 'var(--primary)', minWidth: '90px' }}>Session</strong>
+                      <div>
+                        <div>Check In: {profileQuery.data.session_summary.check_in_time ? new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(profileQuery.data.session_summary.check_in_time)) : '—'}</div>
+                        <div>Check Out: {profileIsPresent ? 'Working' : (profileQuery.data.session_summary.check_out_time ? new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(profileQuery.data.session_summary.check_out_time)) : '—')}</div>
+                        <div>Duration: {profileIsPresent ? (() => {
+                          const checkInTime = profileQuery.data.session_summary.check_in_time
+                          if (!checkInTime) {
+                            return profileQuery.data.session_summary.session_duration_seconds ? `${Math.floor(profileQuery.data.session_summary.session_duration_seconds / 3600)}h ${Math.floor((profileQuery.data.session_summary.session_duration_seconds % 3600) / 60)}m` : '—'
+                          }
+                          try {
+                            const inMs = new Date(checkInTime).getTime()
+                            const seconds = Math.max(Math.floor((Date.now() - inMs) / 1000), 0)
+                            const h = Math.floor(seconds / 3600)
+                            const m = Math.floor((seconds % 3600) / 60)
+                            return `${h ? h + 'h ' : ''}${m}m`
+                          } catch {
+                            return profileQuery.data.session_summary.session_duration_seconds ? `${Math.floor(profileQuery.data.session_summary.session_duration_seconds / 3600)}h ${Math.floor((profileQuery.data.session_summary.session_duration_seconds % 3600) / 60)}m` : '—'
+                          }
+                        })() : (profileQuery.data.session_summary.session_duration_seconds ? `${Math.floor(profileQuery.data.session_summary.session_duration_seconds / 3600)}h ${Math.floor((profileQuery.data.session_summary.session_duration_seconds % 3600) / 60)}m` : '—')}</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -669,11 +705,17 @@ export function EmployeePortal() {
                   <div className="button-group-row">
                     <button
                       className="btn-secondary"
-                      onClick={() => {
+                      onClick={async () => {
                         setTempPhoto(null)
                         setCameraError(null)
-                        if (videoRef.current) {
-                          void videoRef.current.play().catch(() => {})
+                        if (stream) {
+                          if (videoRef.current) {
+                            videoRef.current.srcObject = stream
+                            videoRef.current.muted = true
+                            await videoRef.current.play().catch(() => {})
+                          }
+                        } else {
+                          await startCamera(cameraMode)
                         }
                       }}
                       disabled={submitting}
