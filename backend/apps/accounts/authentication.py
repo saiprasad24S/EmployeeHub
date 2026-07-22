@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import time
 from typing import Any
+from uuid import uuid4
 
 import jwt
 import requests
@@ -83,21 +84,45 @@ def _fetch_clerk_user_email(user_id: str) -> str:
         )
         response.raise_for_status()
         data = response.json()
-        
+
         # Find primary email address
         primary_email_id = data.get("primary_email_address_id")
         email_addresses = data.get("email_addresses", [])
-        
+
         for email_data in email_addresses:
             if email_data.get("id") == primary_email_id:
                 return email_data.get("email_address")
-                
+
         if email_addresses:
             return email_addresses[0].get("email_address")
-            
+
         raise AuthenticationFailed("No email address associated with this Clerk account.")
     except requests.RequestException as exc:
         raise AuthenticationFailed(f"Failed to retrieve user profile from Clerk API: {exc}") from exc
+
+
+def _generate_employee_id_from_email(email: str) -> str:
+    base_id = email.split("@", 1)[0].upper().replace('.', '_').replace('+', '_')
+    return f"EMP-{base_id}"[:40]
+
+
+def _create_employee_from_claims(email: str, claims: dict[str, Any]) -> Employee:
+    name = (
+        claims.get("name")
+        or claims.get("given_name")
+        or claims.get("preferred_username")
+        or email.split("@", 1)[0]
+    )
+    employee_id = _generate_employee_id_from_email(email)
+    if Employee.objects.filter(employee_id=employee_id).exists():
+        employee_id = f"EMP-{uuid4().hex[:8]}"
+
+    return Employee.objects.create(
+        employee_id=employee_id,
+        name=name,
+        email=email,
+        is_active=True,
+    )
 
 
 class ClerkJWTAuthentication(BaseAuthentication):
@@ -134,19 +159,23 @@ class ClerkJWTAuthentication(BaseAuthentication):
 
         email = claims.get("email") or claims.get("email_address")
         if not email:
-            # Fall back to Clerk Backend API using the subject ID (User ID)
             user_id = claims.get("sub")
             if not user_id:
                 raise AuthenticationFailed("Clerk session is missing both email and user ID.")
             print(f"[AUTH] Email missing in token. Fetching from Clerk API for user ID: {user_id}")
             email = _fetch_clerk_user_email(user_id)
 
+        if not email:
+            raise AuthenticationFailed("Unable to determine email address from Clerk session.")
+
+        email = email.strip().lower()
         print(f"[AUTH] Extracted email: {email}")
 
         # Support both spellings as ADMIN to avoid typos
-        if email.lower() in ("skandanhomecare@gmail.com", "skandanhomecarre@gmail.com"):
+        if email in ("skandanhomecare@gmail.com", "skandanhomecarre@gmail.com"):
             admin, _ = Admin.objects.get_or_create(
-                email=email.lower(), defaults={"name": "Skandan Admin", "role": "SUPER_ADMIN"}
+                email=email,
+                defaults={"name": "Skandan Admin", "role": "SUPER_ADMIN"},
             )
             return AuthenticatedPrincipal(
                 email=email,
@@ -163,4 +192,12 @@ class ClerkJWTAuthentication(BaseAuthentication):
                 employee_id=employee.id,
                 clerk_subject=claims.get("sub"),
             )
-        raise AuthenticationFailed("You are not registered in the system.")
+
+        # If a Clerk user is not registered yet, create a lightweight employee record automatically.
+        employee = _create_employee_from_claims(email, claims)
+        return AuthenticatedPrincipal(
+            email=email,
+            role="EMPLOYEE",
+            employee_id=employee.id,
+            clerk_subject=claims.get("sub"),
+        )
