@@ -315,7 +315,8 @@ export function EmployeesPage() {
         {employeesQuery.isLoading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading workforce...</div>
         ) : (
-          <div className="table-wrap data-table-shell">
+          <>
+          <div className="emp-table-wrap table-wrap data-table-shell">
             <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
               <thead>
                 <tr style={{ textTransform: 'uppercase', fontSize: '0.75rem', color: 'var(--muted)', letterSpacing: '0.04em' }}>
@@ -491,6 +492,55 @@ export function EmployeesPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card List (shown instead of table on mobile) */}
+          <div className="emp-card-list" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+            {employees.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>No employees registered.</div>
+            ) : employees.map((employee) => {
+              const isPresent = employee.active_session || employee.session_login_time !== null
+              const loginTime = formatTimeStr(employee.session_login_time)
+              const logoutTime = formatTimeStr(employee.session_logout_time)
+              return (
+                <div key={employee.employee_id} style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: '14px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                    <img
+                      src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
+                      alt={employee.name}
+                      style={{ width: '46px', height: '46px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+                    />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{employee.name}</div>
+                      <div style={{ fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{employee.employee_id} · {employee.department || 'General'}</div>
+                    </div>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem', fontWeight: 600, fontSize: '0.78rem', color: isPresent ? '#10B981' : '#EF4444', flexShrink: 0 }}>
+                      <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isPresent ? '#10B981' : '#EF4444' }} />
+                      {isPresent ? 'Present' : 'Absent'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    📧 {employee.email}
+                  </div>
+                  {loginTime && <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>Check-in: {loginTime}{logoutTime ? ` · Out: ${logoutTime} (${formatDuration(employee.session_duration_seconds)})` : ''}</div>}
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button
+                      onClick={() => openEditForm(employee)}
+                      style={{ border: '1px solid var(--border)', background: 'var(--panel)', borderRadius: '10px', padding: '0.3rem 0.7rem', fontSize: '0.78rem', cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }}
+                    >
+                      ✏️ Edit
+                    </button>
+                    <button
+                      onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
+                      style={{ border: '1px solid var(--border)', background: 'var(--panel)', borderRadius: '10px', padding: '0.3rem 0.7rem', fontSize: '0.78rem', cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }}
+                    >
+                      📍 {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
+                    </button>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          </>
         )}
       </div>
 
@@ -513,7 +563,7 @@ export function EmployeesPage() {
             </button>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }} className="emp-route-grid">
             <div style={{ height: '350px', borderRadius: '14px', overflow: 'hidden' }}>
               {routeQuery.isLoading ? (
                 <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)' }}>
@@ -572,241 +622,79 @@ export function EmployeesPage() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+            <form onSubmit={handleSubmit} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {errorMsg && (
                 <div style={{ padding: '0.8rem', background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', borderRadius: '8px', fontSize: '0.85rem' }}>
                   ⚠️ {errorMsg}
                 </div>
               )}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Employee ID</label>
-                  <input
-                    type="text"
-                    value={empId}
-                    onChange={(e) => setEmpId(e.target.value)}
-                    placeholder="e.g. EMP005"
-                    disabled={!!editingEmployee}
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="text" value={empId} onChange={(e) => setEmpId(e.target.value)} placeholder="e.g. EMP005" disabled={!!editingEmployee} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Full Name</label>
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Priyan Bose"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="text" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Priyan Bose" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Email Address</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. priyan@gmail.com"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="e.g. priyan@gmail.com" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Phone Number</label>
-                  <input
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="e.g. +91 9876543210"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="e.g. +91 9876543210" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Department</label>
-                  <input
-                    type="text"
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    placeholder="e.g. Healthcare"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="text" value={department} onChange={(e) => setDepartment(e.target.value)} placeholder="e.g. Healthcare" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Designation</label>
-                  <input
-                    type="text"
-                    value={designation}
-                    onChange={(e) => setDesignation(e.target.value)}
-                    placeholder="e.g. Senior Nurse"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="text" value={designation} onChange={(e) => setDesignation(e.target.value)} placeholder="e.g. Senior Nurse" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
               </div>
 
-              <div className="stack" style={{ gap: '0.4rem' }}>
+              <div className="stack" style={{ gap: '0.35rem' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Default Address</label>
-                <textarea
-                  value={defaultAddress}
-                  onChange={(e) => setDefaultAddress(e.target.value)}
-                  placeholder="e.g. Madhapur, Hyderabad"
-                  rows={2}
-                  style={{
-                    padding: '0.6rem',
-                    borderRadius: '10px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--panel)',
-                    color: 'var(--text)',
-                    resize: 'vertical',
-                  }}
-                />
-                <button
-                  type="button"
-                  onClick={handleGeocode}
-                  disabled={isGeocoding}
-                  style={{
-                    alignSelf: 'flex-start',
-                    padding: '0.4rem 0.8rem',
-                    fontSize: '0.8rem',
-                    borderRadius: '8px',
-                    background: 'rgba(107, 47, 160, 0.08)',
-                    color: 'var(--primary)',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontWeight: 600,
-                    marginTop: '0.2rem'
-                  }}
-                >
+                <textarea value={defaultAddress} onChange={(e) => setDefaultAddress(e.target.value)} placeholder="e.g. Madhapur, Hyderabad" rows={2} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', resize: 'vertical', width: '100%' }} />
+                <button type="button" onClick={handleGeocode} disabled={isGeocoding} style={{ alignSelf: 'flex-start', padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(107, 47, 160, 0.08)', color: 'var(--primary)', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
                   {isGeocoding ? '🔄 Locating...' : '📍 Auto-detect Coordinates'}
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Latitude</label>
-                  <input
-                    type="number"
-                    step="0.0000001"
-                    value={latitude}
-                    onChange={(e) => setLatitude(e.target.value)}
-                    placeholder="e.g. 17.4483"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="number" step="0.0000001" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="e.g. 17.4483" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Longitude</label>
-                  <input
-                    type="number"
-                    step="0.0000001"
-                    value={longitude}
-                    onChange={(e) => setLongitude(e.target.value)}
-                    placeholder="e.g. 78.3915"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="number" step="0.0000001" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="e.g. 78.3915" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Geofence Radius (km)</label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    value={radius}
-                    onChange={(e) => setRadius(e.target.value)}
-                    placeholder="e.g. 0.1 or 1"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="number" step="0.1" value={radius} onChange={(e) => setRadius(e.target.value)} placeholder="e.g. 0.1 or 1" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
-                <div className="stack" style={{ gap: '0.4rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Profile Picture File</label>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      if (e.target.files && e.target.files.length > 0) {
-                        setProfilePhotoFile(e.target.files[0])
-                      }
-                    }}
-                    style={{
-                      padding: '0.5rem',
-                      fontSize: '0.85rem',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="file" accept="image/*" onChange={(e) => { if (e.target.files && e.target.files.length > 0) setProfilePhotoFile(e.target.files[0]) }} style={{ padding: '0.5rem', fontSize: '0.85rem', color: 'var(--text)', width: '100%' }} />
                 </div>
               </div>
 
               <div className="stack" style={{ gap: '0.4rem', flexDirection: 'row', alignItems: 'center' }}>
-                <input
-                  type="checkbox"
-                  id="isActiveCheck"
-                  checked={isActive}
-                  onChange={(e) => setIsActive(e.target.checked)}
-                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                />
-                <label htmlFor="isActiveCheck" style={{ fontSize: '0.9rem', cursor: 'pointer', userSelect: 'none' }}>
-                  Active Profile Status
-                </label>
+                <input type="checkbox" id="isActiveCheck" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} style={{ width: '18px', height: '18px', cursor: 'pointer' }} />
+                <label htmlFor="isActiveCheck" style={{ fontSize: '0.9rem', cursor: 'pointer', userSelect: 'none' }}>Active Profile Status</label>
               </div>
 
               <div className="button-group-row" style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

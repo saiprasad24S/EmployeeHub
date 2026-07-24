@@ -245,7 +245,7 @@ export function AssignmentsPage() {
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-card card-soft">
-        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
           <div>
             <span className="eyebrow">Scheduling</span>
             <h3>Patient Visit Assignments</h3>
@@ -259,7 +259,8 @@ export function AssignmentsPage() {
         {assignmentsQuery.isLoading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading assignments...</div>
         ) : (
-          <div className="table-wrap data-table-shell">
+          <>
+          <div className="assignment-table-wrap table-wrap data-table-shell">
             <table>
               <thead>
                 <tr>
@@ -330,6 +331,30 @@ export function AssignmentsPage() {
               </tbody>
             </table>
           </div>
+
+          {/* Mobile Card List */}
+          <div className="assignment-card-list" style={{ display: 'none', flexDirection: 'column', gap: '0.75rem', marginTop: '0.5rem' }}>
+            {assignments.length === 0 ? (
+              <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>No visit assignments scheduled.</div>
+            ) : assignments.map((assignment) => (
+              <div key={assignment.id} style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: '14px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5rem' }}>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.95rem', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{assignment.patient_name}</div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{assignment.patient_address}</div>
+                  </div>
+                  <span className={getStatusClass(assignment.status)} style={{ fontSize: '0.72rem', flexShrink: 0 }}>{assignment.status}</span>
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>👤 {assignment.employee_name} ({assignment.employee_employee_id})</div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>📅 {new Date(assignment.visit_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · 📍 {(assignment.radius / 1000).toFixed(2)} km radius</div>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button className="btn-secondary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.78rem' }} onClick={() => openEditForm(assignment)}>Edit</button>
+                  <button className="btn-secondary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.78rem', background: 'rgba(239,68,68,0.08)', color: 'var(--danger)' }} onClick={() => handleDelete(assignment.id)}>Delete</button>
+                </div>
+              </div>
+            ))}
+          </div>
+          </>
         )}
       </div>
 
@@ -438,75 +463,25 @@ export function AssignmentsPage() {
                 </button>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div className="stack" style={{ gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Latitude</label>
-                  <input
-                    type="number"
-                    step="0.0000001"
-                    value={latitude}
-                    onChange={(e) => setLatitude(e.target.value)}
-                    placeholder="e.g. 12.97159"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="number" step="0.0000001" value={latitude} onChange={(e) => setLatitude(e.target.value)} placeholder="e.g. 12.97159" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
                 <div className="stack" style={{ gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Longitude</label>
-                  <input
-                    type="number"
-                    step="0.0000001"
-                    value={longitude}
-                    onChange={(e) => setLongitude(e.target.value)}
-                    placeholder="e.g. 77.59456"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="number" step="0.0000001" value={longitude} onChange={(e) => setLongitude(e.target.value)} placeholder="e.g. 77.59456" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
               </div>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
                 <div className="stack" style={{ gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Geofence Radius (km)</label>
-                  <input
-                    type="number"
-                    step="0.001"
-                    value={radius}
-                    onChange={(e) => setRadius(e.target.value)}
-                    placeholder="e.g. 0.1"
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="number" step="0.001" value={radius} onChange={(e) => setRadius(e.target.value)} placeholder="e.g. 0.1" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
                 <div className="stack" style={{ gap: '0.4rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Visit Date</label>
-                  <input
-                    type="date"
-                    value={visitDate}
-                    onChange={(e) => setVisitDate(e.target.value)}
-                    style={{
-                      padding: '0.6rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--panel)',
-                      color: 'var(--text)',
-                    }}
-                  />
+                  <input type="date" value={visitDate} onChange={(e) => setVisitDate(e.target.value)} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
                 </div>
               </div>
 

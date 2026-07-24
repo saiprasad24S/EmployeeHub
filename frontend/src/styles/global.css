@@ -33,6 +33,7 @@
 
 * {
   box-sizing: border-box;
+  min-width: 0;
 }
 
 html,
@@ -40,6 +41,8 @@ body,
 #root {
   margin: 0;
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
   background:
     radial-gradient(circle at top left, rgba(107, 47, 160, 0.10), transparent 28%),
     radial-gradient(circle at top right, rgba(29, 182, 166, 0.10), transparent 26%),
@@ -210,7 +213,8 @@ h6 {
 .search-shell {
   display: grid;
   gap: 0.35rem;
-  min-width: 280px;
+  min-width: 0;
+  width: 100%;
 }
 
 .search-shell span {
@@ -238,7 +242,7 @@ h6 {
   align-items: center;
   justify-content: space-between;
   gap: 0.9rem;
-  min-width: 168px;
+  min-width: 0;
   padding: 0.65rem 0.8rem 0.65rem 1rem;
   border-radius: 999px;
   border: 1px solid var(--panel-border);
@@ -247,6 +251,7 @@ h6 {
   cursor: pointer;
   box-shadow: var(--shadow);
   transition: transform 0.3s ease, border-color 0.3s ease;
+  white-space: nowrap;
 }
 
 .theme-toggle:hover {
@@ -521,8 +526,9 @@ th {
 
 .assignment-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: 1rem;
   padding: 1rem 1.1rem;
 }
@@ -619,7 +625,9 @@ th {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1.25rem 2rem;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: clamp(0.75rem, 3vw, 1.25rem) clamp(1rem, 4vw, 2rem);
   background: var(--panel);
   border-bottom: 1px solid var(--panel-border);
   box-shadow: var(--shadow);
@@ -633,10 +641,11 @@ th {
 
 .portal-content {
   flex: 1;
-  padding: 2rem;
+  padding: clamp(1rem, 4vw, 2rem);
   max-width: 1200px;
   width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .portal-grid {
@@ -690,7 +699,7 @@ th {
 }
 
 .digital-clock {
-  font-size: 3rem;
+  font-size: clamp(2rem, 8vw, 3rem);
   font-weight: 800;
   color: var(--primary);
   font-family: 'Poppins', sans-serif;
@@ -952,19 +961,42 @@ th {
   grid-template-columns: 1fr 340px;
 }
 
-/* ============ Tablet Breakpoint (max-width: 960px) ============ */
+/* Route map grid on desktop */
+.emp-route-grid {
+  grid-template-columns: 1fr 1fr;
+}
+
+/* All form inputs fill their container */
+input,
+select,
+textarea {
+  width: 100%;
+}
+
+/* But icon buttons, file inputs, and checkboxes should not be full-width */
+input[type="checkbox"],
+input[type="radio"],
+input[type="file"] {
+  width: auto;
+}
+
+/* =========================================================
+   RESPONSIVE MEDIA QUERIES
+   Root cause fixes — no overflow-x:hidden masking
+   ========================================================= */
+
+/* ── Tablet & Mobile: ≤ 960px ── */
 @media (max-width: 960px) {
-  /* Hide desktop sidebar */
+  /* Shell layout */
   .desktop-only-sidebar {
     display: none !important;
   }
-
   .shell {
     grid-template-columns: 1fr !important;
-    grid-template-rows: 1fr !important;
+    grid-template-rows: auto 1fr !important;
   }
 
-  /* Show mobile header bar */
+  /* Mobile Header Bar */
   .mobile-header-bar {
     display: flex !important;
     justify-content: space-between;
@@ -976,199 +1008,230 @@ th {
     top: 0;
     z-index: 100;
     backdrop-filter: blur(18px);
+    width: 100%;
+    max-width: 100%;
   }
 
-  /* Show mobile bottom nav */
+  /* Mobile Bottom Navigation */
   .mobile-bottom-nav {
     display: flex !important;
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
+    width: 100%;
     z-index: 100;
     background: var(--panel);
     border-top: 1px solid var(--panel-border);
     backdrop-filter: blur(18px);
-    padding: 0.4rem 0.25rem 0.55rem 0.25rem;
+    padding: 0.4rem 0 0.55rem 0;
     justify-content: space-around;
     align-items: center;
     box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.06);
   }
-
   .mobile-nav-link {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 0.15rem;
-    padding: 0.3rem 0.35rem;
+    padding: 0.3rem 0.2rem;
     border-radius: 10px;
     color: var(--muted);
     text-decoration: none;
     transition: color 0.2s, background 0.2s;
-    min-width: 52px;
+    min-width: 0;
+    flex: 1;
+    max-width: 80px;
   }
-
   .mobile-nav-link.active {
     color: var(--primary);
     background: var(--accent-soft);
   }
-
-  .mobile-nav-icon {
-    font-size: 1.25rem;
-    line-height: 1;
-  }
-
+  .mobile-nav-icon { font-size: 1.25rem; line-height: 1; }
   .mobile-nav-label {
-    font-size: 0.62rem;
+    font-size: 0.6rem;
     font-weight: 600;
     letter-spacing: 0.01em;
     white-space: nowrap;
   }
 
-  /* Add bottom padding for content to account for bottom nav */
+  /* Content */
   .content {
+    padding: 1rem !important;
     padding-bottom: 80px !important;
+    min-width: 0 !important;
+  }
+  .topbar { display: none !important; }
+
+  /* Topbar actions */
+  .topbar-actions {
+    flex-wrap: wrap !important;
+    width: 100% !important;
+    gap: 0.5rem !important;
+  }
+  .search-shell {
+    width: 100% !important;
+    min-width: 0 !important;
   }
 
-  /* Hide desktop topbar */
-  .topbar {
-    display: none !important;
-  }
-
+  /* Metrics */
   .metrics-grid {
     grid-template-columns: repeat(2, 1fr) !important;
     gap: 0.75rem !important;
   }
 
-  .section-header {
-    flex-wrap: wrap !important;
-    gap: 0.75rem !important;
-  }
-
+  /* Layouts */
   .split-layout,
   .hero-split {
     grid-template-columns: 1fr !important;
   }
+  .hero-card { padding: 1.25rem !important; }
+  .glass-card { border-radius: 14px !important; }
+  .section-header { flex-wrap: wrap !important; gap: 0.75rem !important; }
 
-  .hero-card {
-    padding: 1.25rem !important;
-  }
-
-  .glass-card {
-    border-radius: 14px !important;
-  }
-
-  /* Collapse responsive layout classes on tablet */
+  /* Page-level responsive classes */
   .settings-grid-2col,
   .settings-grid-3col,
   .attendance-columns {
     grid-template-columns: 1fr !important;
   }
-
   .tracking-layout.has-sidebar {
     grid-template-columns: 1fr !important;
   }
-
-  /* Stack portal grid on tablet */
   .portal-grid {
     grid-template-columns: 1fr !important;
+    gap: 1.25rem !important;
   }
-
-  /* Tracking search: full width */
   .tracking-search-wrap {
     max-width: 100% !important;
+    width: 100% !important;
+  }
+
+  /* Tables → Card view on mobile */
+  .emp-table-wrap { display: none !important; }
+  .emp-card-list { display: flex !important; }
+  .assignment-table-wrap { display: none !important; }
+  .assignment-card-list { display: flex !important; }
+
+  /* Route map: stack on tablet */
+  .emp-route-grid {
+    grid-template-columns: 1fr !important;
   }
 }
 
-/* ============ Small Mobile Breakpoint (max-width: 600px) ============ */
+/* ── Small Mobile: ≤ 600px ── */
 @media (max-width: 600px) {
+  /* Content spacing */
   .content {
     padding: 0.75rem !important;
     padding-bottom: 80px !important;
   }
 
+  /* Metrics */
   .metrics-grid {
-    grid-template-columns: 1fr !important;
-    gap: 0.6rem !important;
+    grid-template-columns: 1fr 1fr !important;
+    gap: 0.5rem !important;
   }
+  .metric-card {
+    min-height: 84px !important;
+    padding: 0.85rem !important;
+  }
+  .metric-card strong { font-size: 1.3rem !important; }
 
+  /* Cards */
+  .glass-card,
+  .hero-card {
+    padding: 0.9rem !important;
+    border-radius: 12px !important;
+  }
+  .glass-card.card-soft { padding: 0.9rem !important; }
+
+  /* Tables */
   .table-wrap {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
     width: 100% !important;
+    max-width: calc(100vw - 1.5rem) !important;
     display: block !important;
   }
+  .table-wrap table { min-width: 480px !important; }
 
-  .table-wrap table {
-    min-width: 560px !important;
-  }
-
+  /* Camera Modal */
   .camera-modal {
-    width: 96vw !important;
+    width: calc(100vw - 1rem) !important;
     max-width: 100% !important;
     margin: 0 auto !important;
-    padding: 0.75rem !important;
+    padding: 0 !important;
     border-radius: 14px !important;
+    max-height: 92dvh !important;
+    overflow-y: auto !important;
   }
-
-  .portal-layout {
-    padding: 0.75rem !important;
-  }
-
-  .portal-header {
+  .camera-header { padding: 1rem !important; }
+  .camera-footer {
+    padding: 1rem !important;
     flex-direction: column !important;
-    align-items: flex-start !important;
     gap: 0.5rem !important;
   }
 
+  /* Portal */
+  .portal-layout { padding: 0 !important; }
+  .portal-content { padding: 0.75rem !important; }
+  .portal-header {
+    padding: 0.75rem 1rem !important;
+    flex-wrap: wrap !important;
+    gap: 0.5rem !important;
+  }
+
+  /* Buttons */
   .button-group-row {
     flex-direction: column !important;
     gap: 0.5rem !important;
   }
+  .button-group-row button { width: 100% !important; }
+  .btn-primary, .btn-secondary { padding: 0.75rem 1rem !important; }
 
-  .button-group-row button {
-    width: 100% !important;
+  /* Typography */
+  .hero-copy h3 { font-size: 1.05rem !important; }
+  .hero-pills { flex-wrap: wrap !important; gap: 0.4rem !important; }
+  h3, h4, h5 { word-break: break-word; overflow-wrap: break-word; }
+  td, th, p, span, label, li, a {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    min-width: 0;
   }
 
-  .hero-copy h3 {
-    font-size: 1.1rem !important;
-  }
+  /* Mobile Nav */
+  .mobile-nav-link { min-width: 0 !important; }
+  .mobile-nav-label { font-size: 0.56rem; }
+  .mobile-nav-icon { font-size: 1.1rem; }
 
-  .hero-pills {
-    flex-wrap: wrap !important;
-    gap: 0.4rem !important;
-  }
+  /* iOS auto-zoom prevention */
+  input, select, textarea { font-size: 16px !important; }
 
-  .glass-card.card-soft {
-    padding: 1rem !important;
-  }
+  /* Images */
+  img { max-width: 100% !important; height: auto; }
 
-  .mobile-nav-label {
-    font-size: 0.58rem;
-  }
+  /* Maps */
+  .map-view { height: 240px !important; }
 
-  .mobile-nav-icon {
-    font-size: 1.15rem;
-  }
-
-  .mobile-nav-link {
-    min-width: 46px;
-  }
-
-  /* Prevent iOS auto-zoom on inputs */
-  input,
-  select,
-  textarea {
-    font-size: 16px !important;
-  }
-
-  /* Attendance section header stacks on mobile */
-  .attendance-columns .glass-card {
-    padding: 1rem !important;
-  }
-
-  /* Settings card full-width on mobile */
+  /* Attendance and Settings cards */
+  .attendance-columns .glass-card,
   .settings-section .glass-card {
-    padding: 1rem !important;
+    padding: 0.9rem !important;
   }
 }
+
+/* ── Very Small: ≤ 375px ── */
+@media (max-width: 375px) {
+  .metrics-grid { grid-template-columns: 1fr !important; }
+  .content {
+    padding: 0.5rem !important;
+    padding-bottom: 80px !important;
+  }
+  .glass-card, .hero-card { padding: 0.75rem !important; }
+  .mobile-nav-label { font-size: 0.5rem; }
+  .digital-clock { font-size: clamp(1.5rem, 6.5vw, 2rem) !important; }
+  .mobile-nav-link { padding: 0.25rem 0.1rem !important; }
+}
+
+
