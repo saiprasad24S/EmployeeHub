@@ -22,21 +22,44 @@ def get_latest_location(employee: Employee) -> LocationLog | None:
 
 
 def get_employee_route(employee: Employee, session: Session | None = None) -> list[dict]:
-    active_session = session or get_active_session(employee)
-    if not active_session:
-        return []
-    logs = LocationLog.objects.filter(employee=employee, session=active_session).order_by("timestamp")
-    return [
-        {
-            "latitude": float(log.latitude),
-            "longitude": float(log.longitude),
-            "timestamp": log.timestamp,
-            "accuracy": log.accuracy,
-            "speed": log.speed,
-            "battery_percentage": log.battery_percentage,
-        }
-        for log in logs
-    ]
+    from apps.attendance.models import Attendance
+    
+    target_session = session or get_active_session(employee)
+    if not target_session:
+        target_session = Session.objects.filter(employee=employee, login_time__date=timezone.localdate()).order_by("-login_time").first()
+    
+    points = []
+    
+    # Check for attendance records (check-in/check-out)
+    attendances = Attendance.objects.filter(
+        employee=employee,
+        created_at__date=timezone.localdate()
+    ).order_by("created_at")
+    
+    for att in attendances:
+        if att.latitude is not None and att.longitude is not None:
+            points.append({
+                "latitude": float(att.latitude),
+                "longitude": float(att.longitude),
+                "timestamp": att.created_at,
+                "type": att.attendance_type,
+            })
+            
+    if target_session:
+        logs = LocationLog.objects.filter(employee=employee, session=target_session).order_by("timestamp")
+        for log in logs:
+            points.append({
+                "latitude": float(log.latitude),
+                "longitude": float(log.longitude),
+                "timestamp": log.timestamp,
+                "accuracy": log.accuracy,
+                "speed": log.speed,
+                "battery_percentage": log.battery_percentage,
+            })
+            
+    # Sort points by timestamp
+    points.sort(key=lambda p: p["timestamp"])
+    return points
 
 
 def get_today_distance(employee: Employee, session: Session | None = None, target_date: date | None = None) -> float:

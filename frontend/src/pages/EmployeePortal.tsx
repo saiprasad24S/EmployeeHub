@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import * as faceapi from 'face-api.js'
 import { SignOutButton, useAuth } from '@clerk/clerk-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -244,6 +244,39 @@ export function EmployeePortal() {
     },
   })
   const routePoints = routeQuery.data?.route ?? []
+
+  // Fetch attendance history
+  const attendanceHistoryQuery = useQuery({
+    queryKey: ['my-attendance-history', profile?.id],
+    enabled: !!profile,
+    queryFn: async () => {
+      const token = await getToken()
+      if (!token) throw new Error('No token')
+      const res = await authedFetch('/api/attendance/', token)
+      if (!res.ok) return []
+      const data = await res.json()
+      return (data.results ?? data ?? []) as Array<{ created_at: string; attendance_type: string }>
+    },
+  })
+
+  const historyDays = useMemo(() => {
+    const records = attendanceHistoryQuery.data ?? []
+    const presentDates = new Set(records.map((r) => new Date(r.created_at).toDateString()))
+
+    const days = []
+    for (let i = 0; i < 14; i++) {
+      const d = new Date()
+      d.setDate(d.getDate() - i)
+      const dateStr = d.toDateString()
+      const isPresent = presentDates.has(dateStr) || (i === 0 && (sessionActive || profile?.active_session))
+      days.push({
+        date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
+        weekday: d.toLocaleDateString('en-IN', { weekday: 'short' }),
+        isPresent,
+      })
+    }
+    return days
+  }, [attendanceHistoryQuery.data, profile, sessionActive])
 
   // Background tracker: fires coordinate posts every 45s when session is active
   useEffect(() => {
@@ -682,9 +715,45 @@ export function EmployeePortal() {
                     </div>
                   </div>
                 )}
-              </div>
-
             </div>
+
+            {/* Employee Daily Attendance Log History */}
+            <div className="glass-card card-soft" style={{ marginTop: '1.5rem', padding: '1.5rem' }}>
+              <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                📅 My Attendance Log
+              </h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(115px, 1fr))', gap: '0.75rem' }}>
+                {historyDays.map((day, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      background: 'var(--panel)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '12px',
+                      padding: '0.65rem',
+                      textAlign: 'center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.2rem',
+                    }}
+                  >
+                    <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 600 }}>{day.weekday}</span>
+                    <strong style={{ fontSize: '0.8rem' }}>{day.date}</strong>
+                    <span
+                      style={{
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        color: day.isPresent ? '#10B981' : '#EF4444',
+                        marginTop: '0.2rem',
+                      }}
+                    >
+                      {day.isPresent ? '🟢 Present' : '🔴 Absent'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
         </div>
       </main>
 

@@ -67,12 +67,13 @@ class CheckInView(APIView):
                     return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
                 if str(request.data.get("face_match", "")).lower() not in {"1", "true", "yes", "on"}:
                     return Response({"detail": "Face match not confirmed on the client."}, status=status.HTTP_400_BAD_REQUEST)
-                validate_liveness(selfie, request.data.get("liveness_score"))
+                location_text = request.data.get("address") or request.data.get("location") or f"Lat: {latitude:.4f}, Lon: {longitude:.4f}"
                 upload_result = upload_selfie(
                     selfie,
                     folder="attendance",
+                    employee=employee,
                     timestamp=request.data.get("timestamp") or None,
-                    location=request.data.get("location") or None,
+                    location=location_text,
                 )
                 photo_url = upload_result["url"]
                 photo_public_id = upload_result["public_id"]
@@ -130,18 +131,16 @@ class CheckOutView(APIView):
                     return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
                 if str(request.data.get("face_match", "")).lower() not in {"1", "true", "yes", "on"}:
                     return Response({"detail": "Face match not confirmed on the client."}, status=status.HTTP_400_BAD_REQUEST)
-                validate_liveness(selfie, request.data.get("liveness_score"))
+                latitude = float(request.data["latitude"])
+                longitude = float(request.data["longitude"])
+                location_text = request.data.get("address") or request.data.get("location") or f"Lat: {latitude:.4f}, Lon: {longitude:.4f}"
                 upload_result = upload_selfie(
                     selfie,
                     folder="attendance",
+                    employee=employee,
                     timestamp=request.data.get("timestamp") or None,
-                    location=request.data.get("location") or None,
+                    location=location_text,
                 )
-                photo_url = upload_result["url"]
-                photo_public_id = upload_result["public_id"]
-
-                latitude = float(request.data["latitude"])
-                longitude = float(request.data["longitude"])
                 attendance = record_attendance(
                     employee=employee,
                     assignment=get_active_assignment(employee),
