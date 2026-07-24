@@ -4,12 +4,12 @@ import { SignOutButton, UserButton } from '@clerk/clerk-react'
 import { useSearch } from '../context/SearchContext'
 
 const navItems = [
-  { label: 'Dashboard', to: '/' },
-  { label: 'Employees', to: '/employees' },
-  { label: 'Attendance', to: '/attendance' },
-  { label: 'Assignments', to: '/assignments' },
-  { label: 'Live Tracking', to: '/tracking' },
-  { label: 'Settings', to: '/settings' },
+  { label: 'Dashboard', icon: '📊', to: '/' },
+  { label: 'Employees', icon: '👥', to: '/employees' },
+  { label: 'Attendance', icon: '📅', to: '/attendance' },
+  { label: 'Assignments', icon: '📋', to: '/assignments' },
+  { label: 'Live Tracking', icon: '📍', to: '/tracking' },
+  { label: 'Settings', icon: '⚙️', to: '/settings' },
 ]
 
 export function AppShell({ children }: PropsWithChildren) {
@@ -40,7 +40,8 @@ export function AppShell({ children }: PropsWithChildren) {
 
   return (
     <div className="shell">
-      <aside className="sidebar">
+      {/* Desktop Sidebar */}
+      <aside className="sidebar desktop-only-sidebar">
         <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <img
             src="https://skandanhomecarre.com/wp-content/uploads/2025/06/cropped-SKANDA-fav-192x192.png"
@@ -57,7 +58,7 @@ export function AppShell({ children }: PropsWithChildren) {
         <nav>
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              {item.label}
+              <span style={{ marginRight: '0.5rem' }}>{item.icon}</span> {item.label}
             </NavLink>
           ))}
         </nav>
@@ -70,7 +71,44 @@ export function AppShell({ children }: PropsWithChildren) {
           </SignOutButton>
         </div>
       </aside>
+
+      {/* Main Content Viewport */}
       <main className="content">
+        {/* Mobile Header Bar */}
+        <div className="mobile-header-bar">
+          <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <img
+              src="https://skandanhomecarre.com/wp-content/uploads/2025/06/cropped-SKANDA-fav-192x192.png"
+              alt="Skandan"
+              style={{ width: '32px', height: '32px', objectFit: 'contain' }}
+            />
+            <span style={{ fontWeight: 800, fontSize: '1rem', color: 'var(--text)' }}>Skandan</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+            <button
+              className="theme-toggle-icon-btn"
+              type="button"
+              onClick={() => setIsDarkMode((value) => !value)}
+              aria-label="Toggle Theme"
+              style={{
+                background: 'var(--panel)',
+                border: '1px solid var(--border)',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'grid',
+                placeItems: 'center',
+                cursor: 'pointer',
+                fontSize: '1rem'
+              }}
+            >
+              {isDarkMode ? '🌙' : '☀️'}
+            </button>
+            <UserButton afterSignOutUrl="/sign-in" />
+          </div>
+        </div>
+
+        {/* Desktop Topbar */}
         <header className="topbar">
           <div className="topbar-copy">
             <span className="eyebrow">Employee Management System</span>
@@ -107,8 +145,19 @@ export function AppShell({ children }: PropsWithChildren) {
             <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </header>
+
         {children}
       </main>
+
+      {/* Fixed Mobile Bottom Navigation Bar */}
+      <nav className="mobile-bottom-nav">
+        {navItems.map((item) => (
+          <NavLink key={item.to} to={item.to} end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
+            <span className="mobile-nav-icon">{item.icon}</span>
+            <span className="mobile-nav-label">{item.label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

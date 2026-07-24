@@ -13,7 +13,7 @@ export function SettingsPage() {
   }
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
+    <section className="settings-section">
       <div className="glass-card card-soft" style={{ padding: '2rem' }}>
         <div className="section-header" style={{ marginBottom: '1.5rem' }}>
           <div>
@@ -36,7 +36,7 @@ export function SettingsPage() {
               📍 Geofencing & Attendance Controls
             </h4>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
+            <div className="settings-grid-2col">
               <div className="stack" style={{ gap: '0.5rem' }}>
                 <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Default Geofence Radius (km)</label>
                 <input
@@ -99,7 +99,7 @@ export function SettingsPage() {
             <h4 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               ☁️ Cloudinary Media Cloud Storage
             </h4>
-            <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <div className="settings-grid-3col">
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block' }}>STORAGE ENGINE</span>
                 <strong style={{ fontSize: '0.9rem' }}>django-cloudinary-storage</strong>
@@ -120,7 +120,7 @@ export function SettingsPage() {
             <h4 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
               🗄️ Database & Environment Specs
             </h4>
-            <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+            <div className="settings-grid-3col">
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block' }}>DATABASE ENGINE</span>
                 <strong style={{ fontSize: '0.9rem' }}>MySQL (Aiven Cloud Services)</strong>

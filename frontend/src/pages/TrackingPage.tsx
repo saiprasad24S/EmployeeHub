@@ -155,7 +155,7 @@ export function TrackingPage() {
         </div>
 
         {/* Search input field */}
-        <div style={{ position: 'relative', marginTop: '1rem', marginBottom: '0.5rem', maxWidth: '420px' }}>
+        <div className="tracking-search-wrap" style={{ position: 'relative', marginTop: '1rem', marginBottom: '0.5rem', maxWidth: '420px' }}>
           <input
             type="text"
             placeholder="Search employee by ID, name, email..."
@@ -218,7 +218,7 @@ export function TrackingPage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: selectedEmployee ? '1fr 340px' : '1fr', gap: '1.5rem' }}>
+      <div className={`tracking-layout ${selectedEmployee ? 'has-sidebar' : ''}`}>
         {/* Map view */}
         <div className="glass-card card-soft" style={{ padding: '1rem', minHeight: '420px', display: 'flex', flexDirection: 'column' }}>
           {selectedEmployee ? (

@@ -117,7 +117,7 @@ export function AttendancePage() {
         {employeesQuery.isLoading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading attendance details...</div>
         ) : (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
+          <div className="attendance-columns">
             {/* Column 1: Present Employees */}
             <div className="glass-card card-soft" style={{ padding: '1.25rem', background: 'var(--panel)', borderRadius: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
