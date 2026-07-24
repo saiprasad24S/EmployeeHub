@@ -36,7 +36,7 @@ export function AttendancePage() {
       const data = await response.json()
       return (data.results ?? []) as Employee[]
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   })
 
   const employees = employeesQuery.data ?? []
@@ -49,27 +49,18 @@ export function AttendancePage() {
     return `${m}m`
   }
 
-  const getTodaySessionDetails = (employee: Employee) => {
-    if (!employee.session_login_time) return null
-    const loginDate = new Date(employee.session_login_time)
-    const logoutDate = employee.session_logout_time ? new Date(employee.session_logout_time) : null
-    const todayStr = new Date().toDateString()
-
-    const isLoginToday = loginDate.toDateString() === todayStr
-    const isLogoutToday = logoutDate ? logoutDate.toDateString() === todayStr : false
-    const isActive = employee.active_session
-
-    if (isActive || isLoginToday || isLogoutToday) {
-      return {
-        loginDate,
-        logoutDate,
-        isActive,
-        isLoginToday,
-        isLogoutToday,
-      }
+  const formatTimeStr = (isoString: string | null) => {
+    if (!isoString) return ''
+    try {
+      return new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
+    } catch {
+      return ''
     }
-    return null
   }
+
+  // Filter present and absent employees
+  const presentEmployees = employees.filter((e) => e.active_session || e.session_login_time !== null)
+  const absentEmployees = employees.filter((e) => !e.active_session && e.session_login_time === null)
 
   const triggerExportDownload = async () => {
     if (!startDate || !endDate) {
@@ -117,7 +108,6 @@ export function AttendancePage() {
           <div>
             <span className="eyebrow">Attendance Board</span>
             <h3>Today's Attendance Status</h3>
-            <p>Monitors check-ins, check-outs, and active night-shift sessions for all registered employees.</p>
           </div>
           <button className="btn-primary" onClick={() => setIsDownloadModalOpen(true)}>
             📥 Download Report
@@ -127,90 +117,108 @@ export function AttendancePage() {
         {employeesQuery.isLoading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading attendance details...</div>
         ) : (
-          <div className="table-wrap data-table-shell">
-            <table>
-              <thead>
-                <tr>
-                  <th>Photo</th>
-                  <th>Employee ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Department</th>
-                  <th>Designation</th>
-                  <th>Today's Check-In</th>
-                  <th>Today's Check-Out</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {employees.length === 0 ? (
-                  <tr>
-                    <td colSpan={9} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>
-                      No employees registered.
-                    </td>
-                  </tr>
-                ) : (
-                  employees.map((employee) => {
-                    const session = getTodaySessionDetails(employee)
-                    return (
-                      <tr key={employee.employee_id}>
-                        <td>
-                          <img
-                            src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
-                            alt={employee.name}
-                            style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
-                          />
-                        </td>
-                        <td>{employee.employee_id}</td>
-                        <td style={{ fontWeight: 600 }}>{employee.name}</td>
-                        <td>{employee.email}</td>
-                        <td>{employee.department}</td>
-                        <td>{employee.designation}</td>
-                        <td>
-                          {session ? (
-                            <div>
-                              <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.85rem' }}>
-                                ✅ {session.isLoginToday ? '' : 'Yesterday '}{session.loginDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </div>
-                          ) : (
-                            <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>—</span>
-                          )}
-                        </td>
-                        <td>
-                          {session ? (
-                            session.isActive ? (
-                              <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.85rem' }}>
-                                🟢 Still Active
-                              </span>
-                            ) : session.logoutDate ? (
-                              <div>
-                                <span style={{ color: '#EF4444', fontWeight: 600, fontSize: '0.85rem' }}>
-                                  🔴 {session.logoutDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                                </span>
-                                <br />
-                                <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                                  ({formatDuration(employee.session_duration_seconds)})
-                                </span>
-                              </div>
-                            ) : (
-                              <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>—</span>
-                            )
-                          ) : (
-                            <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>—</span>
-                          )}
-                        </td>
-                        <td>
-                          <span className={`status-pill ${session && session.isActive ? 'active' : 'inactive'}`}>
-                            {session && session.isActive ? 'Present' : 'Absent'}
-                          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
+            {/* Column 1: Present Employees */}
+            <div className="glass-card card-soft" style={{ padding: '1.25rem', background: 'var(--panel)', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+                <h4 style={{ margin: 0, color: '#10B981', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10B981' }} />
+                  Present Employees ({presentEmployees.length})
+                </h4>
+              </div>
+              <div className="table-wrap data-table-shell">
+                <table style={{ width: '100%' }}>
+                  <thead>
+                    <tr style={{ fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      <th>Photo</th>
+                      <th>Emp ID</th>
+                      <th>Name</th>
+                      <th>Check-In</th>
+                      <th>Session</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {presentEmployees.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: '1.5rem' }}>
+                          No employees present today.
                         </td>
                       </tr>
-                    )
-                  })
-                )}
-              </tbody>
-            </table>
+                    ) : (
+                      presentEmployees.map((emp) => (
+                        <tr key={emp.employee_id}>
+                          <td>
+                            <img
+                              src={emp.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(emp.name) + '&background=6B2FA0&color=fff'}
+                              alt={emp.name}
+                              style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                          </td>
+                          <td style={{ fontWeight: 600, fontSize: '0.85rem' }}>{emp.employee_id}</td>
+                          <td style={{ fontWeight: 600, fontSize: '0.85rem' }}>{emp.name}</td>
+                          <td style={{ fontSize: '0.8rem', color: '#10B981', fontWeight: 600 }}>
+                            {formatTimeStr(emp.session_login_time)}
+                          </td>
+                          <td style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                            {emp.active_session ? '🟢 Still Active' : formatDuration(emp.session_duration_seconds)}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Column 2: Absent Employees */}
+            <div className="glass-card card-soft" style={{ padding: '1.25rem', background: 'var(--panel)', borderRadius: '16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem', paddingBottom: '0.75rem', borderBottom: '1px solid var(--border)' }}>
+                <h4 style={{ margin: 0, color: '#EF4444', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }} />
+                  Absent Employees ({absentEmployees.length})
+                </h4>
+              </div>
+              <div className="table-wrap data-table-shell">
+                <table style={{ width: '100%' }}>
+                  <thead>
+                    <tr style={{ fontSize: '0.75rem', color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      <th>Photo</th>
+                      <th>Emp ID</th>
+                      <th>Name</th>
+                      <th>Department</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {absentEmployees.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} style={{ textAlign: 'center', color: 'var(--muted)', padding: '1.5rem' }}>
+                          No employees absent today.
+                        </td>
+                      </tr>
+                    ) : (
+                      absentEmployees.map((emp) => (
+                        <tr key={emp.employee_id}>
+                          <td>
+                            <img
+                              src={emp.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(emp.name) + '&background=6B2FA0&color=fff'}
+                              alt={emp.name}
+                              style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
+                            />
+                          </td>
+                          <td style={{ fontWeight: 600, fontSize: '0.85rem' }}>{emp.employee_id}</td>
+                          <td style={{ fontWeight: 600, fontSize: '0.85rem' }}>{emp.name}</td>
+                          <td style={{ fontSize: '0.85rem' }}>{emp.department || '—'}</td>
+                          <td style={{ fontSize: '0.8rem', color: '#EF4444', fontWeight: 600 }}>
+                            Absent
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
       </div>

@@ -483,10 +483,10 @@ export function EmployeePortal() {
 
         const match = await verifyFaceMatch(tempPhoto, profile.profile_photo)
         if (!match.matched) {
-          throw new Error('Face did not match the registered profile photo. Please try again.')
+          throw new Error('face not matched')
         }
         setFaceMatchConfirmed(true)
-        setFaceMatchMessage(`Face match confirmed (distance ${match.distance.toFixed(3)})`)
+        setFaceMatchMessage('success')
 
         const annotatedBlob = await buildAnnotatedPhoto(tempPhoto)
         const formData = new FormData()

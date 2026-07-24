@@ -19,6 +19,11 @@ type Employee = {
   default_latitude: number | string | null
   default_longitude: number | string | null
   default_radius: number
+  session_login_time: string | null
+  session_logout_time: string | null
+  session_duration_seconds: number
+  active_session: boolean
+  presence_status: string
 }
 
 type RoutePoint = {
@@ -29,7 +34,7 @@ type RoutePoint = {
 export function EmployeesPage() {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
-  
+
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
@@ -47,7 +52,7 @@ export function EmployeesPage() {
   const [radius, setRadius] = useState('100')
   const [isActive, setIsActive] = useState(true)
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null)
-  
+
   const [isGeocoding, setIsGeocoding] = useState(false)
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
@@ -61,6 +66,7 @@ export function EmployeesPage() {
       const data = await response.json()
       return (data.results ?? []) as Employee[]
     },
+    refetchInterval: 30000,
   })
 
   const routeQuery = useQuery({
@@ -82,11 +88,10 @@ export function EmployeesPage() {
     mutationFn: async (payload: { formData: FormData; id?: number }) => {
       const token = await getToken()
       if (!token) throw new Error('No auth token')
-      
+
       const url = payload.id ? `/api/employees/${payload.id}/` : '/api/employees/'
       const method = payload.id ? 'PUT' : 'POST'
-      
-      // We must make a direct fetch to support FormData uploads with Clerk auth
+
       const res = await fetch(`${API_BASE_URL}${url}`, {
         method,
         headers: {
@@ -230,99 +235,216 @@ export function EmployeesPage() {
     }
   }
 
+  const formatTimeStr = (isoString: string | null) => {
+    if (!isoString) return ''
+    try {
+      return new Date(isoString).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }).toLowerCase()
+    } catch {
+      return ''
+    }
+  }
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-      <div className="glass-card card-soft">
-        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div>
-            <span className="eyebrow">Workforce roster</span>
-            <h3>Registered Employees</h3>
-            <p>Manage employee profiles, default geofences, and check live tracks.</p>
-          </div>
-          <button className="btn-primary" onClick={openCreateForm}>
-            ➕ Register New Employee
-          </button>
+      <div className="glass-card card-soft" style={{ padding: '2rem' }}>
+        <div style={{ marginBottom: '1.5rem' }}>
+          <span className="eyebrow" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', fontSize: '0.75rem' }}>
+            EMPLOYEES
+          </span>
+          <h3 style={{ fontSize: '1.5rem', fontWeight: 700, margin: '0.2rem 0' }}>Workforce Overview</h3>
+          <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: 0 }}>
+            All employees with their attendance status, login/logout times, and location tracking.
+          </p>
         </div>
+
+        {/* Purple Banner Button across top of table */}
+        <button
+          onClick={openCreateForm}
+          style={{
+            width: '100%',
+            padding: '0.9rem',
+            background: '#6B2FA0',
+            color: '#ffffff',
+            border: 'none',
+            borderRadius: '14px',
+            fontSize: '1rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            marginBottom: '1.5rem',
+            boxShadow: '0 4px 14px rgba(107, 47, 160, 0.25)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem',
+            transition: 'transform 0.2s ease',
+          }}
+        >
+          + Create Employee
+        </button>
 
         {employeesQuery.isLoading ? (
           <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading workforce...</div>
         ) : (
           <div className="table-wrap data-table-shell">
-            <table>
+            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 0.5rem' }}>
               <thead>
-                <tr>
-                  <th>Photo</th>
-                  <th>Employee ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Phone</th>
-                  <th>Department</th>
-                  <th>Designation</th>
-                  <th>Default Address</th>
-                  <th>Geofence Radius</th>
-                  <th>Status</th>
-                  <th>Actions</th>
+                <tr style={{ textTransform: 'uppercase', fontSize: '0.75rem', color: 'var(--muted)', letterSpacing: '0.04em' }}>
+                  <th style={{ textAlign: 'center' }}>PHOTO</th>
+                  <th>EMPLOYEE ID</th>
+                  <th>NAME</th>
+                  <th>EMAIL</th>
+                  <th>PHONE</th>
+                  <th>DEPARTMENT</th>
+                  <th style={{ textAlign: 'center' }}>DEFAULT ADDRESS</th>
+                  <th>CURRENT STATUS</th>
+                  <th>SESSION DETAILS</th>
+                  <th style={{ textAlign: 'center' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
                 {employees.length === 0 ? (
                   <tr>
-                    <td colSpan={11} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>
-                      No employees registered. Click "Register New Employee" to add one.
+                    <td colSpan={10} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>
+                      No employees registered. Click "+ Create Employee" above to add one.
                     </td>
                   </tr>
                 ) : (
-                  employees.map((employee) => (
-                    <tr key={employee.employee_id}>
-                      <td>
-                        <img
-                          src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
-                          alt={employee.name}
-                          style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
-                        />
-                      </td>
-                      <td>{employee.employee_id}</td>
-                      <td style={{ fontWeight: 600 }}>{employee.name}</td>
-                      <td>{employee.email}</td>
-                      <td>{employee.phone || '—'}</td>
-                      <td>{employee.department || '—'}</td>
-                      <td>{employee.designation || '—'}</td>
-                      <td style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={employee.default_address}>
-                        {employee.default_address || '—'}
-                      </td>
-                      <td>{employee.default_radius ? `${employee.default_radius} m` : '100 m'}</td>
-                      <td>
-                        <span className={`status-pill ${employee.is_active ? 'active' : 'inactive'}`}>
-                          {employee.is_active ? 'Active' : 'Inactive'}
-                        </span>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                  employees.map((employee) => {
+                    const isPresent = employee.active_session || employee.session_login_time !== null
+                    const loginTime = formatTimeStr(employee.session_login_time)
+                    const logoutTime = formatTimeStr(employee.session_logout_time)
+
+                    return (
+                      <tr key={employee.employee_id} style={{ background: 'var(--panel)', borderRadius: '12px' }}>
+                        {/* PHOTO */}
+                        <td style={{ textAlign: 'center', verticalAlign: 'middle', padding: '0.75rem' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+                            <img
+                              src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
+                              alt={employee.name}
+                              style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }}
+                            />
+                            <button
+                              onClick={() => openEditForm(employee)}
+                              style={{
+                                border: '1px solid var(--border)',
+                                background: 'var(--panel)',
+                                borderRadius: '12px',
+                                padding: '0.15rem 0.5rem',
+                                fontSize: '0.7rem',
+                                cursor: 'pointer',
+                                color: 'var(--text)'
+                              }}
+                            >
+                              Edit
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* EMPLOYEE ID */}
+                        <td style={{ fontWeight: 600, fontSize: '0.9rem' }}>{employee.employee_id}</td>
+
+                        {/* NAME */}
+                        <td style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>{employee.name}</td>
+
+                        {/* EMAIL */}
+                        <td style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>{employee.email}</td>
+
+                        {/* PHONE */}
+                        <td style={{ fontSize: '0.85rem' }}>{employee.phone || '—'}</td>
+
+                        {/* DEPARTMENT */}
+                        <td style={{ fontSize: '0.85rem' }}>{employee.department || '—'}</td>
+
+                        {/* DEFAULT ADDRESS */}
+                        <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
+                            <span style={{ fontSize: '0.85rem', color: 'var(--muted)', maxWidth: '140px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={employee.default_address}>
+                              {employee.default_address || '—'}
+                            </span>
+                            <button
+                              onClick={() => openEditForm(employee)}
+                              style={{
+                                border: '1px solid var(--border)',
+                                background: 'var(--panel)',
+                                borderRadius: '12px',
+                                padding: '0.2rem 0.6rem',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                color: 'var(--text)'
+                              }}
+                            >
+                              Edit Address
+                            </button>
+                          </div>
+                        </td>
+
+                        {/* CURRENT STATUS */}
+                        <td style={{ verticalAlign: 'middle' }}>
+                          {isPresent ? (
+                            <div>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#10B981', fontWeight: 600, fontSize: '0.85rem' }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }} />
+                                Present
+                              </span>
+                              {loginTime && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
+                                  Check-in {loginTime}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#EF4444', fontWeight: 600, fontSize: '0.85rem' }}>
+                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} />
+                              Absent
+                            </span>
+                          )}
+                        </td>
+
+                        {/* SESSION DETAILS */}
+                        <td style={{ verticalAlign: 'middle', fontSize: '0.75rem', color: 'var(--muted)' }}>
+                          {isPresent ? (
+                            <div>
+                              <div>📍 Location verified via portal</div>
+                              <div>
+                                {employee.active_session
+                                  ? 'Active working session'
+                                  : logoutTime
+                                  ? `Checkout ${logoutTime}`
+                                  : ''}
+                              </div>
+                            </div>
+                          ) : (
+                            '—'
+                          )}
+                        </td>
+
+                        {/* ACTIONS */}
+                        <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
                           <button
-                            className="btn-secondary"
-                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
-                            onClick={() => openEditForm(employee)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="btn-secondary"
-                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
                             onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
+                            style={{
+                              border: '1px solid var(--border)',
+                              background: 'var(--panel)',
+                              borderRadius: '20px',
+                              padding: '0.4rem 0.9rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              color: 'var(--text)',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                            }}
                           >
-                            {selectedEmployee?.id === employee.id ? 'Hide track' : '📍 Track'}
+                            📍 {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
                           </button>
-                          <button
-                            className="btn-secondary"
-                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)' }}
-                            onClick={() => handleDelete(employee.id)}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
+                        </td>
+                      </tr>
+                    )
+                  })
                 )}
               </tbody>
             </table>
@@ -493,7 +615,7 @@ export function EmployeesPage() {
                     type="text"
                     value={department}
                     onChange={(e) => setDepartment(e.target.value)}
-                    placeholder="e.g. Nursing"
+                    placeholder="e.g. Healthcare"
                     style={{
                       padding: '0.6rem',
                       borderRadius: '10px',
@@ -526,7 +648,7 @@ export function EmployeesPage() {
                 <textarea
                   value={defaultAddress}
                   onChange={(e) => setDefaultAddress(e.target.value)}
-                  placeholder="e.g. 10th Main, Koramangala, Bengaluru"
+                  placeholder="e.g. Madhapur, Hyderabad"
                   rows={2}
                   style={{
                     padding: '0.6rem',
@@ -566,7 +688,7 @@ export function EmployeesPage() {
                     step="0.0000001"
                     value={latitude}
                     onChange={(e) => setLatitude(e.target.value)}
-                    placeholder="e.g. 12.9348"
+                    placeholder="e.g. 17.4483"
                     style={{
                       padding: '0.6rem',
                       borderRadius: '10px',
@@ -583,7 +705,7 @@ export function EmployeesPage() {
                     step="0.0000001"
                     value={longitude}
                     onChange={(e) => setLongitude(e.target.value)}
-                    placeholder="e.g. 77.6189"
+                    placeholder="e.g. 78.3915"
                     style={{
                       padding: '0.6rem',
                       borderRadius: '10px',
