@@ -693,9 +693,6 @@ export function EmployeePortal() {
                         <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.25rem' }}>
                           📍 {assignmentQuery.data.patient_address}
                         </p>
-                        <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, marginTop: '0.5rem' }}>
-                          Geofence Boundary: {(assignmentQuery.data.radius / 1000).toFixed(2)} km
-                        </p>
                       </div>
                     )}
 

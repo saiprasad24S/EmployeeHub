@@ -901,60 +901,110 @@ th {
 }
 
 @media (max-width: 960px) {
-  .shell,
-  .auth-panel,
-  .split-layout,
-  .hero-split {
-    grid-template-columns: 1fr;
+  .shell {
+    grid-template-columns: 1fr !important;
   }
 
   .sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--panel-border);
+    border-right: 0 !important;
+    border-bottom: 1px solid var(--panel-border) !important;
+    padding: 1rem !important;
+    gap: 0.75rem !important;
   }
 
   .sidebar::after {
-    display: none;
+    display: none !important;
+  }
+
+  .sidebar-nav {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    gap: 0.4rem !important;
+  }
+
+  .sidebar-link {
+    padding: 0.45rem 0.75rem !important;
+    font-size: 0.85rem !important;
+    border-radius: 10px !important;
   }
 
   .topbar {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.75rem;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+    padding: 1rem !important;
   }
 
   .topbar-actions {
-    width: 100%;
-    flex-wrap: wrap;
+    width: 100% !important;
+    flex-wrap: wrap !important;
   }
 
   .search-shell {
-    min-width: 100%;
+    min-width: 100% !important;
+  }
+
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem !important;
+  }
+
+  .section-header {
+    flex-wrap: wrap !important;
+    gap: 0.75rem !important;
+  }
+
+  .split-layout,
+  .hero-split {
+    grid-template-columns: 1fr !important;
   }
 }
 
-@media (max-width: 768px) {
+@media (max-width: 600px) {
   .content {
-    padding: 1rem !important;
+    padding: 0.75rem !important;
   }
+
+  .metrics-grid {
+    grid-template-columns: 1fr !important;
+  }
+
   .table-wrap {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch;
-    width: 100%;
+    width: 100% !important;
+    display: block !important;
   }
+
   .table-wrap table {
-    min-width: 600px;
+    min-width: 580px !important;
   }
+
   .camera-modal {
-    width: 95% !important;
+    width: 94vw !important;
     max-width: 100% !important;
-    margin: 0 auto;
+    margin: 0 auto !important;
+    padding: 1rem !important;
+    border-radius: 16px !important;
   }
+
   .portal-layout {
     padding: 0.75rem !important;
   }
+
   .portal-header {
-    flex-direction: row;
-    justify-content: space-between;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 0.75rem !important;
+  }
+
+  .button-group-row {
+    flex-direction: column !important;
+    gap: 0.5rem !important;
+  }
+
+  .button-group-row button {
+    width: 100% !important;
   }
 }
