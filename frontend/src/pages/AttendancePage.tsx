@@ -34,7 +34,7 @@ export function AttendancePage() {
       const response = await authedFetch('/api/employees/', token)
       if (!response.ok) throw new Error('Unable to load employees')
       const data = await response.json()
-      return (data.results ?? []) as Employee[]
+      return (Array.isArray(data) ? data : (data.results ?? [])) as Employee[]
     },
     refetchInterval: 30000,
   })
