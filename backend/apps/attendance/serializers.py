@@ -55,12 +55,7 @@ class AttendanceSerializer(serializers.ModelSerializer):
     def get_photo_url(self, obj: Attendance) -> str:
         if not obj.photo_url:
             return ""
-        if obj.photo_url.startswith("/"):
-            request = self.context.get("request")
-            if request:
-                return request.build_absolute_uri(obj.photo_url)
-            return f"http://localhost:8000{obj.photo_url}"
-        return obj.photo_url
+        return obj.photo_url if obj.photo_url.startswith("http") else ""
 
     def get_presence_status(self, obj: Attendance) -> str:
         return get_employee_presence_summary(obj.employee)['status']

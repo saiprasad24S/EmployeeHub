@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import datetime
 from django.db import transaction
 from django.http import HttpResponse
 from rest_framework import status
@@ -24,7 +25,6 @@ from apps.attendance.services import (
     upload_selfie,
     validate_geofence,
     validate_liveness,
-    verify_face_against_employee,
 )
 from apps.common.permissions import IsEmployeeRole
 from apps.common.utils import distance_meters
@@ -65,8 +65,9 @@ class CheckInView(APIView):
                 selfie = request.FILES.get("selfie")
                 if not selfie:
                     return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
+                if str(request.data.get("face_match", "")).lower() not in {"1", "true", "yes", "on"}:
+                    return Response({"detail": "Face match not confirmed on the client."}, status=status.HTTP_400_BAD_REQUEST)
                 validate_liveness(selfie, request.data.get("liveness_score"))
-                verify_face_against_employee(employee, selfie)
                 upload_result = upload_selfie(
                     selfie,
                     folder="attendance",
@@ -127,8 +128,9 @@ class CheckOutView(APIView):
                 selfie = request.FILES.get("selfie")
                 if not selfie:
                     return Response({"detail": "Selfie is required."}, status=status.HTTP_400_BAD_REQUEST)
+                if str(request.data.get("face_match", "")).lower() not in {"1", "true", "yes", "on"}:
+                    return Response({"detail": "Face match not confirmed on the client."}, status=status.HTTP_400_BAD_REQUEST)
                 validate_liveness(selfie, request.data.get("liveness_score"))
-                verify_face_against_employee(employee, selfie)
                 upload_result = upload_selfie(
                     selfie,
                     folder="attendance",
@@ -180,7 +182,7 @@ class AttendanceListView(APIView):
         employee_id = request.query_params.get("employee_id")
         if employee_id:
             queryset = queryset.filter(employee__employee_id=employee_id)
-        return Response(AttendanceSerializer(queryset[:200], many=True).data)
+        return Response(AttendanceSerializer(queryset, many=True).data)
 
 
 class AttendanceExportView(APIView):

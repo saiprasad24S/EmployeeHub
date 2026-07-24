@@ -14,9 +14,9 @@ from apps.attendance.services import get_employee_presence_summary
 from apps.attendance.models import Session
 from apps.attendance.services import end_session, upload_profile_photo
 from apps.common.permissions import IsAdminRole
-from apps.vision.services import FaceRecognitionService
+from apps.vision.services import FaceService
 
-face_service = FaceRecognitionService()
+vision_service = FaceService()
 
 
 class AuthLoginView(APIView):
@@ -45,7 +45,7 @@ class AuthLoginView(APIView):
                     "role": "EMPLOYEE",
                     "email": principal.email,
                     "employee": EmployeeSerializer(employee).data,
-                    "requires_face_registration": not bool(employee.face_embedding),
+                    "requires_face_registration": not bool(employee.face_embedding or employee.profile_photo),
                     "active_session": active_session,
                     "session_summary": {
                         "active_session": active_session,
@@ -94,9 +94,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             photo_file = request.FILES["profile_photo_file"]
             photo_file.seek(0)
             try:
-                employee.face_embedding = face_service.generate_embedding(photo_file)
+                vision_service.register_face(employee, photo_file)
             except Exception:
-                employee.face_embedding = None
+                pass
             photo_file.seek(0)
             upload_result = upload_profile_photo(
                 photo_file,
@@ -105,7 +105,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             )
             employee.profile_photo = upload_result["url"]
             employee.profile_photo_public_id = upload_result["public_id"]
-            employee.save(update_fields=["profile_photo", "profile_photo_public_id", "face_embedding"])
+            employee.save(update_fields=["profile_photo", "profile_photo_public_id"])
         return Response(EmployeeSerializer(employee, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -118,9 +118,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             photo_file = request.FILES["profile_photo_file"]
             photo_file.seek(0)
             try:
-                employee.face_embedding = face_service.generate_embedding(photo_file)
+                vision_service.register_face(employee, photo_file)
             except Exception:
-                employee.face_embedding = None
+                pass
             photo_file.seek(0)
             upload_result = upload_profile_photo(
                 photo_file,
@@ -129,7 +129,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             )
             employee.profile_photo = upload_result["url"]
             employee.profile_photo_public_id = upload_result["public_id"]
-            employee.save(update_fields=["profile_photo", "profile_photo_public_id", "face_embedding"])
+            employee.save(update_fields=["profile_photo", "profile_photo_public_id"])
         return Response(EmployeeSerializer(employee, context={"request": request}).data)
 
 

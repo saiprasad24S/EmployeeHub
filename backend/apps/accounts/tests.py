@@ -22,3 +22,15 @@ class AccountSerializerTests(TestCase):
         )
         serializer = EmployeeSerializer(employee)
         self.assertTrue(serializer.data["is_face_registered"])
+
+    def test_employee_serializer_treats_admin_uploaded_profile_photo_as_registered(self):
+        employee = Employee.objects.create(
+            employee_id="EMP002",
+            name="PhotoOnly",
+            email="photo@example.com",
+            department="Field",
+            designation="Nurse",
+            profile_photo="https://res.cloudinary.com/demo/sample.jpg",
+        )
+        serializer = EmployeeSerializer(employee)
+        self.assertTrue(serializer.data["is_face_registered"])

@@ -31,6 +31,19 @@ def _serialize_location(source: object | None) -> dict | None:
 
 
 def _get_latest_location_source(employee: Employee) -> object | None:
+    active_session = get_active_session(employee)
+    if active_session is not None:
+        log = LocationLog.objects.filter(employee=employee, session=active_session).order_by("-timestamp").first()
+        if log is not None:
+            return log
+        attendance = (
+            Attendance.objects.filter(employee=employee, session=active_session)
+            .order_by("-timestamp")
+            .first()
+        )
+        if attendance is not None:
+            return attendance
+
     log = get_latest_location(employee)
     if log is not None:
         return log

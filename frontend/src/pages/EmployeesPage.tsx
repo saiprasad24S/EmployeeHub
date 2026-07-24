@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
-import { authedFetch } from '../lib/api'
+import { authedFetch, API_BASE_URL } from '../lib/api'
 import { RouteMap } from '../components/RouteMap'
-import { useSearch } from '../context/SearchContext'
 
 type Employee = {
   id: number
@@ -14,29 +13,12 @@ type Employee = {
   department: string
   designation: string
   profile_photo: string
-  default_address: string
-  default_latitude?: string | number | null
-  default_longitude?: string | number | null
-  default_radius?: number | string | null
   is_active: boolean
   is_face_registered: boolean
-}
-
-type AttendanceRecord = {
-  id: number
-  employee_employee_id: string
-  employee_name: string
-  attendance_type: string
-  photo_url: string
-  latitude: string
-  longitude: string
-  address: string
-  timestamp: string
-  status: string
-  presence_status?: string | null
-  presence_is_active?: boolean | null
-  presence_check_in_time?: string | null
-  presence_session_duration_seconds?: number | null
+  default_address: string
+  default_latitude: number | string | null
+  default_longitude: number | string | null
+  default_radius: number
 }
 
 type RoutePoint = {
@@ -44,42 +26,30 @@ type RoutePoint = {
   longitude: number
 }
 
-type RouteData = {
-  route: RoutePoint[]
-  distance_covered_meters: number
-  last_known_location?: { latitude: number; longitude: number; timestamp?: string; accuracy?: number } | null
-}
-
-const emptyEmployeeForm = {
-  employee_id: '',
-  name: '',
-  email: '',
-  phone: '',
-  department: '',
-  designation: '',
-  default_address: '',
-  default_latitude: '',
-  default_longitude: '',
-  default_radius: '0.1',
-  is_active: true,
-}
-
 export function EmployeesPage() {
   const { getToken } = useAuth()
-  const { searchQuery } = useSearch()
   const queryClient = useQueryClient()
+  
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
-  const [lightboxPhoto, setLightboxPhoto] = useState<string | null>(null)
-  const [editingEmployeeId, setEditingEmployeeId] = useState<number | null>(null)
-  const [defaultAddressDraft, setDefaultAddressDraft] = useState('')
-  const [defaultAddressCoordinates, setDefaultAddressCoordinates] = useState<{ latitude?: number | null; longitude?: number | null }>({})
-  const [defaultRadiusDraft, setDefaultRadiusDraft] = useState<number | string>('0.1')
-  const [isEmployeeModalOpen, setIsEmployeeModalOpen] = useState(false)
+  const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
-  const [employeeForm, setEmployeeForm] = useState(emptyEmployeeForm)
-  const [employeeFormError, setEmployeeFormError] = useState<string | null>(null)
+
+  // Form states
+  const [empId, setEmpId] = useState('')
+  const [name, setName] = useState('')
+  const [email, setEmail] = useState('')
+  const [phone, setPhone] = useState('')
+  const [department, setDepartment] = useState('')
+  const [designation, setDesignation] = useState('')
+  const [defaultAddress, setDefaultAddress] = useState('')
+  const [latitude, setLatitude] = useState('')
+  const [longitude, setLongitude] = useState('')
+  const [radius, setRadius] = useState('100')
+  const [isActive, setIsActive] = useState(true)
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null)
-  const [profilePhotoPreview, setProfilePhotoPreview] = useState<string | null>(null)
+  
+  const [isGeocoding, setIsGeocoding] = useState(false)
+  const [errorMsg, setErrorMsg] = useState<string | null>(null)
 
   const employeesQuery = useQuery({
     queryKey: ['employees'],
@@ -88,18 +58,8 @@ export function EmployeesPage() {
       if (!token) throw new Error('Missing token')
       const response = await authedFetch('/api/employees/', token)
       if (!response.ok) throw new Error('Unable to load employees')
-      return response.json() as Promise<{ results?: Employee[] }>
-    },
-  })
-
-  const attendanceQuery = useQuery({
-    queryKey: ['attendance-all'],
-    queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing token')
-      const response = await authedFetch('/api/attendance/', token)
-      if (!response.ok) throw new Error('Unable to load attendance')
-      return response.json() as Promise<AttendanceRecord[]>
+      const data = await response.json()
+      return (data.results ?? []) as Employee[]
     },
   })
 
@@ -110,468 +70,267 @@ export function EmployeesPage() {
       const token = await getToken()
       if (!token || !selectedEmployee) throw new Error('No token')
       const response = await authedFetch(`/api/location/employee/route/${selectedEmployee.id}`, token)
-      if (!response.ok) return { route: [] as RoutePoint[], distance_covered_meters: 0, last_known_location: null } as RouteData
-      return response.json() as Promise<RouteData>
+      if (!response.ok) return { route: [] as RoutePoint[], distance_covered_meters: 0 }
+      return response.json() as Promise<{ route: RoutePoint[]; distance_covered_meters: number }>
     },
   })
 
-  const attendance = attendanceQuery.data ?? []
-  const filteredEmployees = useMemo(() => {
-    const employees = employeesQuery.data?.results ?? []
-    const q = searchQuery.trim().toLowerCase()
-    if (!q) return employees
-    return employees.filter((employee) => {
-      return [employee.employee_id, employee.name, employee.email, employee.phone, employee.department, employee.default_address]
-        .some((value) => (value ?? '').toLowerCase().includes(q))
-    })
-  }, [employeesQuery.data?.results, searchQuery])
-  const employees = employeesQuery.data?.results ?? []
+  const employees = employeesQuery.data ?? []
 
-  const updateEmployeeAddress = useMutation({
-    mutationFn: async ({ employeeId, address, latitude, longitude, radius }: { employeeId: number; address: string; latitude?: number | null; longitude?: number | null; radius?: number }) => {
+  // Create/Update Mutation
+  const saveMutation = useMutation({
+    mutationFn: async (payload: { formData: FormData; id?: number }) => {
       const token = await getToken()
-      if (!token) throw new Error('Missing token')
-      const response = await authedFetch(`/api/employees/${employeeId}/`, token, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          default_address: address,
-          default_latitude: latitude ?? null,
-          default_longitude: longitude ?? null,
-          default_radius: radius ?? 100,
-        }),
+      if (!token) throw new Error('No auth token')
+      
+      const url = payload.id ? `/api/employees/${payload.id}/` : '/api/employees/'
+      const method = payload.id ? 'PUT' : 'POST'
+      
+      // We must make a direct fetch to support FormData uploads with Clerk auth
+      const res = await fetch(`${API_BASE_URL}${url}`, {
+        method,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+        body: payload.formData,
       })
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.detail || 'Failed to update default address')
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || JSON.stringify(errData) || 'Failed to save employee')
       }
-      return response.json()
+      return res.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] })
-      setEditingEmployeeId(null)
-      setDefaultAddressDraft('')
-      setDefaultAddressCoordinates({})
-      setDefaultRadiusDraft('0.1')
+      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
+      closeForm()
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.message || 'Operation failed')
     },
   })
 
-  const createEmployeeMutation = useMutation({
-    mutationFn: async ({ payload, file }: { payload: Record<string, unknown>; file?: File | null }) => {
+  // Delete Mutation
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
       const token = await getToken()
-      if (!token) throw new Error('Missing token')
-      const formData = new FormData()
-      Object.entries(payload).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          formData.append(key, value === true || value === false ? String(value) : String(value))
-        }
+      if (!token) throw new Error('No auth token')
+      const res = await authedFetch(`/api/employees/${id}/`, token, {
+        method: 'DELETE',
       })
-      if (file) {
-        formData.append('profile_photo_file', file)
-      }
-      const response = await authedFetch('/api/employees/', token, {
-        method: 'POST',
-        body: formData,
-      })
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.detail || 'Failed to create employee')
-      }
-      return response.json()
+      if (!res.ok) throw new Error('Failed to delete employee')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] })
-      closeEmployeeModal()
-    },
-    onError: (error: any) => {
-      setEmployeeFormError(error.message || 'Unable to create employee')
     },
   })
 
-  const updateEmployeeMutation = useMutation({
-    mutationFn: async ({ employeeId, payload, file }: { employeeId: number; payload: Record<string, unknown>; file?: File | null }) => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing token')
-      const formData = new FormData()
-      Object.entries(payload).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          formData.append(key, value === true || value === false ? String(value) : String(value))
-        }
-      })
-      if (file) {
-        formData.append('profile_photo_file', file)
-      }
-      const response = await authedFetch(`/api/employees/${employeeId}/`, token, {
-        method: 'PATCH',
-        body: formData,
-      })
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.detail || 'Failed to update employee')
-      }
-      return response.json()
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['employees'] })
-      closeEmployeeModal()
-    },
-    onError: (error: any) => {
-      setEmployeeFormError(error.message || 'Unable to update employee')
-    },
-  })
-
-  const getEmployeeAttendance = (empId: string) => {
-    return attendance
-      .filter((a) => a.employee_employee_id === empId)
-      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-  }
-
-  const getPresenceSummary = (empId: string) => {
-    const records = getEmployeeAttendance(empId)
-    const latestRecord = records[0]
-    const active = latestRecord?.presence_is_active === true
-    const latestCheckIn = records.find((record) => record.attendance_type === 'CHECK_IN')
-    const latestCheckOut = records.find((record) => record.attendance_type === 'CHECK_OUT')
-    const checkIn = latestRecord?.attendance_type === 'CHECK_IN' ? latestRecord : latestCheckIn
-    const checkOut = active ? undefined : latestCheckOut
-    return {
-      active,
-      status: active ? 'Present' : 'Absent',
-      checkIn,
-      checkOut,
-    }
-  }
-
-  const openAddressEditor = (employee: Employee) => {
-    setEditingEmployeeId(employee.id)
-    setDefaultAddressDraft(employee.default_address || '')
-    setDefaultAddressCoordinates({
-      latitude: employee.default_latitude ? Number(employee.default_latitude) : null,
-      longitude: employee.default_longitude ? Number(employee.default_longitude) : null,
-    })
-    setDefaultRadiusDraft(employee.default_radius ? String(Number(employee.default_radius) / 1000) : '0.1')
-  }
-
-  const saveAddress = (employee: Employee) => {
-    updateEmployeeAddress.mutate({
-      employeeId: employee.id,
-      address: defaultAddressDraft,
-      latitude: defaultAddressCoordinates.latitude ?? null,
-      longitude: defaultAddressCoordinates.longitude ?? null,
-      radius: Math.max(1, Number(defaultRadiusDraft) * 1000),
-    })
-  }
-
-  useEffect(() => {
-    const addressToGeocode = editingEmployee ? employeeForm.default_address : defaultAddressDraft
-    if (!addressToGeocode?.trim()) {
-      return
-    }
-    const timer = window.setTimeout(async () => {
-      try {
-        const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(addressToGeocode)}`)
-        const data = (await response.json()) as Array<{ lat: string; lon: string }>
-        if (data[0]) {
-          const latitude = Number(data[0].lat)
-          const longitude = Number(data[0].lon)
-          setDefaultAddressCoordinates({ latitude, longitude })
-          if (editingEmployee) {
-            setEmployeeForm((current) => ({
-              ...current,
-              default_latitude: String(latitude),
-              default_longitude: String(longitude),
-            }))
-          }
-        }
-      } catch {
-        // Ignore geocoding failures and keep the typed address as-is.
-      }
-    }, 700)
-
-    return () => window.clearTimeout(timer)
-  }, [defaultAddressDraft, editingEmployee, employeeForm.default_address])
-
-  const openCreateEmployeeModal = () => {
+  const openCreateForm = () => {
     setEditingEmployee(null)
-    setEmployeeForm({ ...emptyEmployeeForm })
-    setEmployeeFormError(null)
+    setEmpId('')
+    setName('')
+    setEmail('')
+    setPhone('')
+    setDepartment('')
+    setDesignation('')
+    setDefaultAddress('')
+    setLatitude('')
+    setLongitude('')
+    setRadius('100')
+    setIsActive(true)
     setProfilePhotoFile(null)
-    setProfilePhotoPreview(null)
-    setIsEmployeeModalOpen(true)
+    setErrorMsg(null)
+    setIsFormOpen(true)
   }
 
-  const openEditEmployeeModal = (employee: Employee) => {
+  const openEditForm = (employee: Employee) => {
     setEditingEmployee(employee)
-    setEmployeeForm({
-      employee_id: employee.employee_id,
-      name: employee.name,
-      email: employee.email,
-      phone: employee.phone || '',
-      department: employee.department || '',
-      designation: employee.designation || '',
-      default_address: employee.default_address || '',
-      default_latitude: employee.default_latitude ? String(employee.default_latitude) : '',
-      default_longitude: employee.default_longitude ? String(employee.default_longitude) : '',
-      default_radius: employee.default_radius ? String(Number(employee.default_radius) / 1000) : '0.1',
-      is_active: employee.is_active,
-    })
-    setEmployeeFormError(null)
-    setIsEmployeeModalOpen(true)
-  }
-
-  const closeEmployeeModal = () => {
-    setIsEmployeeModalOpen(false)
-    setEditingEmployee(null)
-    setEmployeeForm({ ...emptyEmployeeForm })
-    setEmployeeFormError(null)
+    setEmpId(employee.employee_id)
+    setName(employee.name)
+    setEmail(employee.email)
+    setPhone(employee.phone || '')
+    setDepartment(employee.department || '')
+    setDesignation(employee.designation || '')
+    setDefaultAddress(employee.default_address || '')
+    setLatitude(employee.default_latitude ? String(employee.default_latitude) : '')
+    setLongitude(employee.default_longitude ? String(employee.default_longitude) : '')
+    setRadius(String(employee.default_radius ?? 100))
+    setIsActive(employee.is_active)
     setProfilePhotoFile(null)
-    setProfilePhotoPreview(null)
+    setErrorMsg(null)
+    setIsFormOpen(true)
   }
 
-  const handleEmployeeSubmit = (event: React.FormEvent) => {
-    event.preventDefault()
-    const payload = {
-      employee_id: employeeForm.employee_id.trim(),
-      name: employeeForm.name.trim(),
-      email: employeeForm.email.trim(),
-      phone: employeeForm.phone.trim(),
-      department: employeeForm.department.trim(),
-      designation: employeeForm.designation.trim(),
-      default_address: employeeForm.default_address.trim(),
-      default_latitude: employeeForm.default_latitude ? Number(employeeForm.default_latitude) : null,
-      default_longitude: employeeForm.default_longitude ? Number(employeeForm.default_longitude) : null,
-      default_radius: employeeForm.default_radius ? Number(employeeForm.default_radius) * 1000 : 100,
-      is_active: employeeForm.is_active,
-    }
+  const closeForm = () => {
+    setIsFormOpen(false)
+    setEditingEmployee(null)
+    setProfilePhotoFile(null)
+    setErrorMsg(null)
+  }
 
-    if (!payload.employee_id || !payload.name || !payload.email) {
-      setEmployeeFormError('Employee ID, name, and email are required.')
+  const handleGeocode = async () => {
+    if (!defaultAddress.trim()) {
+      setErrorMsg('Please enter an address first to auto-detect coordinates.')
+      return
+    }
+    setIsGeocoding(true)
+    setErrorMsg(null)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(defaultAddress)}&limit=1`
+      )
+      if (!res.ok) throw new Error('Geocoding service unavailable.')
+      const data = await res.json()
+      if (data && data.length > 0) {
+        setLatitude(parseFloat(data[0].lat).toFixed(7))
+        setLongitude(parseFloat(data[0].lon).toFixed(7))
+      } else {
+        setErrorMsg('Could not find coordinates for this address. Please enter them manually.')
+      }
+    } catch (err: any) {
+      setErrorMsg(err.message || 'Failed to auto-detect coordinates.')
+    } finally {
+      setIsGeocoding(false)
+    }
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    setErrorMsg(null)
+
+    if (!empId || !name || !email) {
+      setErrorMsg('Employee ID, Name, and Email are required.')
       return
     }
 
-    if (editingEmployee) {
-      updateEmployeeMutation.mutate({ employeeId: editingEmployee.id, payload, file: profilePhotoFile })
-    } else {
-      createEmployeeMutation.mutate({ payload, file: profilePhotoFile })
+    const formData = new FormData()
+    formData.append('employee_id', empId)
+    formData.append('name', name)
+    formData.append('email', email)
+    formData.append('phone', phone)
+    formData.append('department', department)
+    formData.append('designation', designation)
+    formData.append('default_address', defaultAddress)
+    if (latitude) formData.append('default_latitude', latitude)
+    if (longitude) formData.append('default_longitude', longitude)
+    formData.append('default_radius', radius)
+    formData.append('is_active', String(isActive))
+
+    if (profilePhotoFile) {
+      formData.append('profile_photo_file', profilePhotoFile)
+    }
+
+    saveMutation.mutate({ formData, id: editingEmployee?.id })
+  }
+
+  const handleDelete = (id: number) => {
+    if (confirm('Are you sure you want to delete this employee profile?')) {
+      deleteMutation.mutate(id)
     }
   }
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-card card-soft">
-        <div className="section-header">
+        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
-            <span className="eyebrow">Employees</span>
-            <h3>Workforce Overview</h3>
-            <p>All employees with their attendance status, login/logout times, and location tracking.</p>
+            <span className="eyebrow">Workforce roster</span>
+            <h3>Registered Employees</h3>
+            <p>Manage employee profiles, default geofences, and check live tracks.</p>
           </div>
-          <button className="btn-primary" onClick={openCreateEmployeeModal} style={{ padding: '0.5rem 0.9rem' }}>
-            + Create Employee
+          <button className="btn-primary" onClick={openCreateForm}>
+            ➕ Register New Employee
           </button>
         </div>
-        <div className="table-wrap data-table-shell">
-          <table>
-            <thead>
-              <tr>
-                <th>Photo</th>
-                <th>Employee ID</th>
-                <th>Name</th>
-                <th>Email</th>
-                <th>Phone</th>
-                <th>Department</th>
-                <th>Default Address</th>
-                <th>Current Status</th>
-                <th>Session Details</th>
-                <th>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEmployees.map((employee) => {
-                const { active, checkIn, checkOut } = getPresenceSummary(employee.employee_id)
-                return (
-                  <tr key={employee.employee_id}>
-                    <td>
-                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: '0.35rem' }}>
-                        <img
-                          src={employee.profile_photo || (checkIn?.photo_url) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
-                          alt={employee.name}
-                          style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => setLightboxPhoto(employee.profile_photo || (checkIn?.photo_url) || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff')}
-                        />
-                        <button className="btn-secondary" style={{ padding: '0.2rem 0.45rem', fontSize: '0.7rem' }} onClick={() => openEditEmployeeModal(employee)}>
-                          Edit
-                        </button>
-                      </div>
-                    </td>
-                    <td>{employee.employee_id}</td>
-                    <td style={{ fontWeight: 600 }}>{employee.name}</td>
-                    <td>{employee.email}</td>
-                    <td>{employee.phone || '—'}</td>
-                    <td>{employee.department}</td>
-                    <td style={{ maxWidth: '220px', color: 'var(--muted)' }}>
-                      {editingEmployeeId === employee.id ? (
-                        <div style={{ display: 'flex', gap: '0.4rem', flexDirection: 'column' }}>
-                          <textarea
-                            value={defaultAddressDraft}
-                            onChange={(event) => setDefaultAddressDraft(event.target.value)}
-                            rows={2}
-                            style={{ minWidth: '220px', padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
-                          />
-                          <div style={{ display: 'grid', gap: '0.65rem' }}>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                              <input
-                                type="number"
-                                value={defaultAddressCoordinates.latitude ?? ''}
-                                onChange={(event) => setDefaultAddressCoordinates((current) => ({
-                                  ...current,
-                                  latitude: event.target.value ? Number(event.target.value) : null,
-                                }))}
-                                placeholder="Latitude"
-                                style={{ padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
-                              />
-                              <input
-                                type="number"
-                                value={defaultAddressCoordinates.longitude ?? ''}
-                                onChange={(event) => setDefaultAddressCoordinates((current) => ({
-                                  ...current,
-                                  longitude: event.target.value ? Number(event.target.value) : null,
-                                }))}
-                                placeholder="Longitude"
-                                style={{ padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
-                              />
-                            </div>
-                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0.01"
-                                value={defaultRadiusDraft}
-                                onChange={(event) => setDefaultRadiusDraft(event.target.value)}
-                                placeholder="Radius (km)"
-                                style={{ padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}
-                              />
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.45rem', borderRadius: '10px', border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--text)' }}>
-                                <span style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
-                                  {defaultAddressCoordinates.latitude && defaultAddressCoordinates.longitude
-                                    ? `Coords: ${defaultAddressCoordinates.latitude.toFixed(5)}, ${defaultAddressCoordinates.longitude.toFixed(5)}`
-                                    : 'Coordinates will auto-update when address is valid.'}
-                                </span>
-                              </div>
-                            </div>
-                            <div style={{ display: 'flex', gap: '0.4rem' }}>
-                              <button className="btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }} onClick={() => saveAddress(employee)}>
-                                Save
-                              </button>
-                              <button className="btn-secondary" style={{ padding: '0.35rem 0.6rem', fontSize: '0.75rem' }} onClick={() => setEditingEmployeeId(null)}>
-                                Cancel
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ) : (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
-                          <span>{employee.default_address || '—'}</span>
-                          <button className="btn-secondary" style={{ padding: '0.25rem 0.5rem', fontSize: '0.75rem', width: 'fit-content' }} onClick={() => openAddressEditor(employee)}>
-                            Edit Address
-                          </button>
-                        </div>
-                      )}
-                    </td>
-                    <td>
-                      <div>
-                        <span style={{ color: active ? '#10B981' : 'var(--muted)', fontWeight: 600, fontSize: '0.85rem' }}>
-                          {active ? '🟢 Present' : '🔴 Absent'}
-                        </span>
-                        <br />
-                        <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                          {checkIn ? `Check-in ${new Date(checkIn.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}` : 'No check-in yet'}
-                        </span>
-                      </div>
-                    </td>
-                    <td>
-                      {checkIn ? (
-                        <div>
-                          <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                            📍 {checkIn.address || `${Number(checkIn.latitude).toFixed(4)}, ${Number(checkIn.longitude).toFixed(4)}`}
-                          </span>
-                          {checkOut ? (
-                            <><br /><span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Checkout {new Date(checkOut.timestamp).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</span></>
-                          ) : (
-                            <><br /><span style={{ fontSize: '0.75rem', color: '#10B981' }}>Active session in progress</span></>
-                          )}
-                        </div>
-                      ) : (
-                        <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>No session recorded</span>
-                      )}
-                    </td>
-                    <td>
-                      <button
-                        className="btn-secondary"
-                        style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                        onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
-                      >
-                        {selectedEmployee?.id === employee.id ? 'Hide Map' : '📍 Track'}
-                      </button>
+
+        {employeesQuery.isLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading workforce...</div>
+        ) : (
+          <div className="table-wrap data-table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>Photo</th>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Phone</th>
+                  <th>Department</th>
+                  <th>Designation</th>
+                  <th>Default Address</th>
+                  <th>Geofence Radius</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>
+                      No employees registered. Click "Register New Employee" to add one.
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                ) : (
+                  employees.map((employee) => (
+                    <tr key={employee.employee_id}>
+                      <td>
+                        <img
+                          src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
+                          alt={employee.name}
+                          style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+                        />
+                      </td>
+                      <td>{employee.employee_id}</td>
+                      <td style={{ fontWeight: 600 }}>{employee.name}</td>
+                      <td>{employee.email}</td>
+                      <td>{employee.phone || '—'}</td>
+                      <td>{employee.department || '—'}</td>
+                      <td>{employee.designation || '—'}</td>
+                      <td style={{ maxWidth: '180px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={employee.default_address}>
+                        {employee.default_address || '—'}
+                      </td>
+                      <td>{employee.default_radius ? `${employee.default_radius} m` : '100 m'}</td>
+                      <td>
+                        <span className={`status-pill ${employee.is_active ? 'active' : 'inactive'}`}>
+                          {employee.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.4rem' }}>
+                          <button
+                            className="btn-secondary"
+                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
+                            onClick={() => openEditForm(employee)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="btn-secondary"
+                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem' }}
+                            onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
+                          >
+                            {selectedEmployee?.id === employee.id ? 'Hide track' : '📍 Track'}
+                          </button>
+                          <button
+                            className="btn-secondary"
+                            style={{ padding: '0.4rem 0.6rem', fontSize: '0.75rem', background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)' }}
+                            onClick={() => handleDelete(employee.id)}
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      {isEmployeeModalOpen && (
-        <div className="camera-modal-backdrop" onClick={closeEmployeeModal}>
-          <div className="camera-modal" style={{ maxWidth: '520px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }} onClick={(event) => event.stopPropagation()}>
-            <div className="camera-header">
-              <h3 style={{ fontSize: '1.1rem' }}>{editingEmployee ? 'Edit employee' : 'Create employee'}</h3>
-              <button onClick={closeEmployeeModal} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--muted)' }}>
-                &times;
-              </button>
-            </div>
-            <form onSubmit={handleEmployeeSubmit} style={{ padding: '1rem 1.2rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
-              {employeeFormError && <div style={{ padding: '0.7rem', background: 'rgba(239,68,68,0.08)', color: 'var(--danger)', borderRadius: '8px' }}>{employeeFormError}</div>}
-              <div style={{ display: 'grid', gap: '0.7rem' }}>
-                <input value={employeeForm.employee_id} onChange={(event) => setEmployeeForm({ ...employeeForm, employee_id: event.target.value })} placeholder="Employee ID" style={inputStyle} />
-                <input value={employeeForm.name} onChange={(event) => setEmployeeForm({ ...employeeForm, name: event.target.value })} placeholder="Name" style={inputStyle} />
-                <input value={employeeForm.email} onChange={(event) => setEmployeeForm({ ...employeeForm, email: event.target.value })} placeholder="Email" type="email" style={inputStyle} />
-                <input value={employeeForm.phone} onChange={(event) => setEmployeeForm({ ...employeeForm, phone: event.target.value })} placeholder="Phone" style={inputStyle} />
-                <input value={employeeForm.department} onChange={(event) => setEmployeeForm({ ...employeeForm, department: event.target.value })} placeholder="Department" style={inputStyle} />
-                <input value={employeeForm.designation} onChange={(event) => setEmployeeForm({ ...employeeForm, designation: event.target.value })} placeholder="Designation" style={inputStyle} />
-                <textarea value={employeeForm.default_address} onChange={(event) => setEmployeeForm({ ...employeeForm, default_address: event.target.value })} placeholder="Default address" rows={2} style={{ ...inputStyle, resize: 'vertical' }} />
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.7rem' }}>
-                  <input value={employeeForm.default_latitude} onChange={(event) => setEmployeeForm({ ...employeeForm, default_latitude: event.target.value })} placeholder="Default latitude" style={inputStyle} />
-                  <input value={employeeForm.default_longitude} onChange={(event) => setEmployeeForm({ ...employeeForm, default_longitude: event.target.value })} placeholder="Default longitude" style={inputStyle} />
-                </div>
-                <input value={employeeForm.default_radius} onChange={(event) => setEmployeeForm({ ...employeeForm, default_radius: event.target.value })} placeholder="Default radius (km)" style={inputStyle} />
-                <div>
-                  <label style={{ display: 'block', marginBottom: '0.35rem', fontSize: '0.8rem', color: 'var(--muted)' }}>Profile photo</label>
-                  <input type="file" accept="image/*" onChange={(event) => {
-                    const file = event.target.files?.[0] ?? null
-                    setProfilePhotoFile(file)
-                    if (file) {
-                      setProfilePhotoPreview(URL.createObjectURL(file))
-                    } else {
-                      setProfilePhotoPreview(editingEmployee?.profile_photo || null)
-                    }
-                  }} />
-                  {(profilePhotoPreview || editingEmployee?.profile_photo) && (
-                    <img src={profilePhotoPreview || editingEmployee?.profile_photo || ''} alt="Profile preview" style={{ width: '64px', height: '64px', borderRadius: '50%', objectFit: 'cover', marginTop: '0.6rem' }} />
-                  )}
-                </div>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.6rem', marginTop: '0.4rem' }}>
-                <button type="button" className="btn-secondary" onClick={closeEmployeeModal}>Cancel</button>
-                <button type="submit" className="btn-primary" disabled={createEmployeeMutation.isPending || updateEmployeeMutation.isPending}>
-                  {createEmployeeMutation.isPending || updateEmployeeMutation.isPending ? 'Saving…' : editingEmployee ? 'Save changes' : 'Create employee'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
+      {/* Selected Employee Route History */}
       {selectedEmployee && (
         <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
           <div className="section-header">
@@ -581,7 +340,11 @@ export function EmployeesPage() {
                 {selectedEmployee.name} ({selectedEmployee.employee_id}) — Today's Route
               </h4>
             </div>
-            <button className="ghost-button" onClick={() => setSelectedEmployee(null)} style={{ padding: '0.4rem 0.8rem' }}>
+            <button
+              className="ghost-button"
+              onClick={() => setSelectedEmployee(null)}
+              style={{ padding: '0.4rem 0.8rem', width: 'auto' }}
+            >
               ✕ Close
             </button>
           </div>
@@ -589,88 +352,310 @@ export function EmployeesPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }}>
             <div style={{ height: '350px', borderRadius: '14px', overflow: 'hidden' }}>
               {routeQuery.isLoading ? (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
-                  Loading route...
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)' }}>
+                  Loading track...
                 </div>
               ) : (
-                <RouteMap points={routeQuery.data?.route || []} lastKnownLocation={routeQuery.data?.last_known_location} />
+                <RouteMap points={routeQuery.data?.route || []} />
               )}
             </div>
 
-            <div style={{ maxHeight: '350px', overflowY: 'auto' }}>
-              <h5 style={{ marginBottom: '0.75rem', color: 'var(--text)' }}>Attendance History</h5>
-              {getEmployeeAttendance(selectedEmployee.employee_id).length === 0 ? (
-                <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>No attendance records found.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                  {getEmployeeAttendance(selectedEmployee.employee_id).slice(0, 20).map((record) => (
-                    <div
-                      key={record.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.75rem',
-                        padding: '0.6rem 0.8rem',
-                        background: record.attendance_type === 'CHECK_IN' ? 'rgba(16,185,129,0.06)' : 'rgba(239,68,68,0.06)',
-                        borderRadius: '10px',
-                        borderLeft: `3px solid ${record.attendance_type === 'CHECK_IN' ? '#10B981' : '#EF4444'}`,
-                      }}
-                    >
-                      {record.photo_url && (
-                        <img
-                          src={record.photo_url}
-                          alt="attendance"
-                          style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer' }}
-                          onClick={() => setLightboxPhoto(record.photo_url)}
-                        />
-                      )}
-                      <div style={{ flex: 1 }}>
-                        <span style={{ fontWeight: 600, fontSize: '0.85rem', color: record.attendance_type === 'CHECK_IN' ? '#10B981' : '#EF4444' }}>
-                          {record.attendance_type === 'CHECK_IN' ? '✅ Check In' : '🔴 Check Out'}
-                        </span>
-                        <br />
-                        <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                          {new Date(record.timestamp).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+            <div style={{ padding: '0.5rem', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+              <div style={{ background: 'var(--accent-soft)', padding: '1rem', borderRadius: '12px' }}>
+                <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)' }}>Geofence Configuration</h5>
+                <p style={{ margin: '0.2rem 0', fontSize: '0.875rem' }}>
+                  <strong>Default Address:</strong> {selectedEmployee.default_address || 'Not set'}
+                </p>
+                <p style={{ margin: '0.2rem 0', fontSize: '0.875rem' }}>
+                  <strong>Coordinates:</strong> {selectedEmployee.default_latitude ? `${selectedEmployee.default_latitude}, ${selectedEmployee.default_longitude}` : 'Not set'}
+                </p>
+                <p style={{ margin: '0.2rem 0', fontSize: '0.875rem' }}>
+                  <strong>Radius:</strong> {selectedEmployee.default_radius} meters
+                </p>
+              </div>
+
+              {routeQuery.data && routeQuery.data.distance_covered_meters > 0 && (
+                <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '1rem', borderRadius: '12px', color: '#10B981' }}>
+                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>
+                    📏 Distance Traveled Today: {(routeQuery.data.distance_covered_meters / 1000).toFixed(2)} km
+                  </p>
                 </div>
               )}
             </div>
           </div>
-
-          {routeQuery.data && routeQuery.data.distance_covered_meters > 0 && (
-            <div style={{ marginTop: '1rem', padding: '0.8rem', background: 'rgba(107,47,160,0.06)', borderRadius: '10px' }}>
-              <p style={{ fontSize: '0.85rem', color: 'var(--primary)', fontWeight: 600, margin: 0 }}>
-                📏 Total Distance Covered Today: {(routeQuery.data.distance_covered_meters / 1000).toFixed(2)} km
-              </p>
-            </div>
-          )}
         </div>
       )}
 
-      {lightboxPhoto && (
-        <div className="camera-modal-backdrop" onClick={() => setLightboxPhoto(null)}>
-          <div className="camera-modal" style={{ maxWidth: '640px', width: 'min(94vw, 640px)' }} onClick={(event) => event.stopPropagation()}>
+      {/* Roster Edit/Create Modal */}
+      {isFormOpen && (
+        <div className="camera-modal-backdrop">
+          <div className="camera-modal" style={{ maxWidth: '520px', width: '100%', height: 'auto', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="camera-header">
-              <h3 style={{ fontSize: '1.1rem' }}>Employee Photo</h3>
-              <button onClick={() => setLightboxPhoto(null)} style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--muted)' }}>
+              <h3 style={{ fontSize: '1.25rem' }}>
+                {editingEmployee ? '✏️ Edit Employee Profile' : '👤 Register New Employee'}
+              </h3>
+              <button
+                onClick={closeForm}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: 'var(--muted)',
+                }}
+              >
                 &times;
               </button>
             </div>
-            <img src={lightboxPhoto} alt="Employee preview" style={{ width: '100%', maxHeight: '74vh', objectFit: 'contain', background: '#000' }} />
+
+            <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {errorMsg && (
+                <div style={{ padding: '0.8rem', background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', borderRadius: '8px', fontSize: '0.85rem' }}>
+                  ⚠️ {errorMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Employee ID</label>
+                  <input
+                    type="text"
+                    value={empId}
+                    onChange={(e) => setEmpId(e.target.value)}
+                    placeholder="e.g. EMP005"
+                    disabled={!!editingEmployee}
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Full Name</label>
+                  <input
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="e.g. Priyan Bose"
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Email Address</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="e.g. priyan@gmail.com"
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Phone Number</label>
+                  <input
+                    type="tel"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="e.g. +91 9876543210"
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Department</label>
+                  <input
+                    type="text"
+                    value={department}
+                    onChange={(e) => setDepartment(e.target.value)}
+                    placeholder="e.g. Nursing"
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Designation</label>
+                  <input
+                    type="text"
+                    value={designation}
+                    onChange={(e) => setDesignation(e.target.value)}
+                    placeholder="e.g. Senior Nurse"
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="stack" style={{ gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Default Address</label>
+                <textarea
+                  value={defaultAddress}
+                  onChange={(e) => setDefaultAddress(e.target.value)}
+                  placeholder="e.g. 10th Main, Koramangala, Bengaluru"
+                  rows={2}
+                  style={{
+                    padding: '0.6rem',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--panel)',
+                    color: 'var(--text)',
+                    resize: 'vertical',
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleGeocode}
+                  disabled={isGeocoding}
+                  style={{
+                    alignSelf: 'flex-start',
+                    padding: '0.4rem 0.8rem',
+                    fontSize: '0.8rem',
+                    borderRadius: '8px',
+                    background: 'rgba(107, 47, 160, 0.08)',
+                    color: 'var(--primary)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    marginTop: '0.2rem'
+                  }}
+                >
+                  {isGeocoding ? '🔄 Locating...' : '📍 Auto-detect Coordinates'}
+                </button>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Latitude</label>
+                  <input
+                    type="number"
+                    step="0.0000001"
+                    value={latitude}
+                    onChange={(e) => setLatitude(e.target.value)}
+                    placeholder="e.g. 12.9348"
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Longitude</label>
+                  <input
+                    type="number"
+                    step="0.0000001"
+                    value={longitude}
+                    onChange={(e) => setLongitude(e.target.value)}
+                    placeholder="e.g. 77.6189"
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Geofence Radius (meters)</label>
+                  <input
+                    type="number"
+                    value={radius}
+                    onChange={(e) => setRadius(e.target.value)}
+                    placeholder="e.g. 100"
+                    style={{
+                      padding: '0.6rem',
+                      borderRadius: '10px',
+                      border: '1px solid var(--border)',
+                      background: 'var(--panel)',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+                <div className="stack" style={{ gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Profile Picture File</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files.length > 0) {
+                        setProfilePhotoFile(e.target.files[0])
+                      }
+                    }}
+                    style={{
+                      padding: '0.5rem',
+                      fontSize: '0.85rem',
+                      color: 'var(--text)',
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div className="stack" style={{ gap: '0.4rem', flexDirection: 'row', alignItems: 'center' }}>
+                <input
+                  type="checkbox"
+                  id="isActiveCheck"
+                  checked={isActive}
+                  onChange={(e) => setIsActive(e.target.checked)}
+                  style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                />
+                <label htmlFor="isActiveCheck" style={{ fontSize: '0.9rem', cursor: 'pointer', userSelect: 'none' }}>
+                  Active Profile Status
+                </label>
+              </div>
+
+              <div className="button-group-row" style={{ marginTop: '1rem' }}>
+                <button type="button" className="btn-secondary" onClick={closeForm} disabled={saveMutation.isPending}>
+                  Cancel
+                </button>
+                <button type="submit" className="btn-primary" disabled={saveMutation.isPending}>
+                  {saveMutation.isPending ? 'Saving...' : 'Save Profile'}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
     </section>
   )
-}
-
-const inputStyle: React.CSSProperties = {
-  padding: '0.6rem 0.7rem',
-  borderRadius: '10px',
-  border: '1px solid var(--panel-border)',
-  background: 'var(--panel)',
-  color: 'var(--text)',
 }

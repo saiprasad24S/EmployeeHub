@@ -8,7 +8,7 @@ const navItems = [
   { label: 'Employees', to: '/employees' },
   { label: 'Attendance', to: '/attendance' },
   { label: 'Assignments', to: '/assignments' },
-  { label: 'Live Tracking', to: '/tracking/EMP001' },
+  { label: 'Live Tracking', to: '/tracking' },
   { label: 'Settings', to: '/settings' },
 ]
 
@@ -17,7 +17,6 @@ export function AppShell({ children }: PropsWithChildren) {
   const location = useLocation()
   const { searchQuery, setSearchQuery } = useSearch()
   const currentDate = useMemo(() => new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date()), [])
-  const isDashboardRoute = location.pathname === '/'
   const [isDarkMode, setIsDarkMode] = useState(() => {
     const savedTheme = window.localStorage.getItem('employeehub-theme')
     if (savedTheme) return savedTheme === 'dark'
@@ -79,9 +78,9 @@ export function AppShell({ children }: PropsWithChildren) {
               <span>Search</span>
               <input
                 type="search"
-                placeholder="Search by email, emp ID, or location"
+                placeholder="Search mail, ID, location..."
                 value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </label>
             <button
@@ -99,6 +98,9 @@ export function AppShell({ children }: PropsWithChildren) {
                 <span className="theme-toggle-knob" />
               </span>
             </button>
+            <button className="icon-button" type="button" aria-label="Notifications">
+              3
+            </button>
             <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </header>
@@ -107,3 +109,4 @@ export function AppShell({ children }: PropsWithChildren) {
     </div>
   )
 }
+

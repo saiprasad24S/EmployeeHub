@@ -21,6 +21,7 @@ def _load_env_file(path: Path) -> None:
 
 
 _load_env_file(BASE_DIR / ".env")
+_load_env_file(BASE_DIR.parent / ".env")
 
 
 def _env(name: str, default: str = "") -> str:
@@ -44,12 +45,10 @@ def _is_placeholder(value: str) -> bool:
 
 
 def _database_config(url: str) -> dict:
-    if not url or url.startswith("sqlite:///"):
-        sqlite_path = BASE_DIR / "db.sqlite3"
-        return {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": str(sqlite_path),
-        }
+    if not url:
+        raise ValueError("DATABASE_URL is not configured. Set a MySQL/Aiven DATABASE_URL or populate DB_* settings.")
+    if url.startswith("sqlite:///"):
+        raise ValueError("SQLite is not supported for this project. Configure MySQL/Aiven instead.")
     parsed = urlparse(url)
     if parsed.scheme != "mysql":
         raise ValueError("DATABASE_URL must use mysql://")
@@ -166,6 +165,9 @@ use_env_db = (
 )
 
 if use_env_db:
+    normalized_db_engine = (DB_ENGINE or "django.db.backends.mysql").strip().lower()
+    if normalized_db_engine == "mysql":
+        normalized_db_engine = "django.db.backends.mysql"
     db_options = {"charset": "utf8mb4", "init_command": "SET sql_mode='STRICT_TRANS_TABLES'"}
     if DB_SSL_MODE:
         ssl_config = {"ssl-mode": DB_SSL_MODE}
@@ -176,7 +178,7 @@ if use_env_db:
         db_options["ssl"] = ssl_config
     DATABASES = {
         "default": {
-            "ENGINE": DB_ENGINE or "django.db.backends.mysql",
+            "ENGINE": normalized_db_engine,
             "NAME": DB_NAME,
             "USER": DB_USER,
             "PASSWORD": DB_PASSWORD,
@@ -225,6 +227,9 @@ CLOUDINARY_MAX_SIZE = _env_int("CLOUDINARY_MAX_SIZE", default=10 * 1024 * 1024)
 CLOUDINARY_ALLOWED_FORMATS = [fmt.strip() for fmt in _env("CLOUDINARY_ALLOWED_FORMATS", default="jpg,jpeg,png,webp").split(",") if fmt.strip()]
 
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
+AZURE_FACE_ENDPOINT = _env("AZURE_FACE_ENDPOINT", default="")
+AZURE_FACE_KEY = _env("AZURE_FACE_KEY", default="")
+AZURE_FACE_PERSON_GROUP_ID = _env("AZURE_FACE_PERSON_GROUP_ID", default="employeehub-face-group")
 
 CLERK_SECRET_KEY = _env("CLERK_SECRET_KEY", default="")
 CLERK_JWKS_URL = _env("CLERK_JWKS_URL", default="")

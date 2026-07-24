@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
+import * as faceapi from 'face-api.js'
 import { SignOutButton, useAuth } from '@clerk/clerk-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authedFetch } from '../lib/api'
-import { RouteMap } from '../components/RouteMap'
 
 type SessionSummary = {
   active_session?: boolean
@@ -18,6 +18,7 @@ type EmployeeData = {
   employee_id: string
   name: string
   email: string
+  phone?: string
   department: string
   designation: string
   profile_photo: string
@@ -73,18 +74,11 @@ export function EmployeePortal() {
   })
 
   const profile = profileQuery.data?.employee ?? null
-  const requiresFaceReg = profileQuery.data?.requires_face_registration ?? false
   const sessionActive = Boolean(
     profileQuery.data?.session_summary?.active_session ??
     profileQuery.data?.active_session ??
     profileQuery.data?.session_summary?.is_present,
   )
-  const profileIsPresent =
-    profileQuery.data?.session_summary?.active_session ??
-    profileQuery.data?.active_session ??
-    profileQuery.data?.session_summary?.is_present ??
-    false
-
   // Camera capture state
   const [isCameraOpen, setIsCameraOpen] = useState(false)
   const [cameraMode, setCameraMode] = useState<'register' | 'checkin' | 'checkout'>('checkin')
@@ -95,6 +89,72 @@ export function EmployeePortal() {
   const [locationPermGranted, setLocationPermGranted] = useState<boolean | null>(null)
   const [currentCoords, setCurrentCoords] = useState<{ latitude: number; longitude: number; accuracy?: number } | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [faceMatchConfirmed, setFaceMatchConfirmed] = useState(false)
+  const [faceMatchMessage, setFaceMatchMessage] = useState<string | null>(null)
+  const [modelsLoaded, setModelsLoaded] = useState(false)
+
+  const FACE_API_MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models'
+
+  const getErrorMessage = (payload: unknown, fallback: string): string => {
+    if (!payload) return fallback
+    if (typeof payload === 'string') return payload
+    if (typeof payload === 'object' && payload !== null) {
+      const record = payload as Record<string, unknown>
+      if ('detail' in record && typeof record.detail === 'string') {
+        return record.detail
+      }
+      if ('error' in record && typeof record.error === 'string') {
+        return record.error
+      }
+      if (Array.isArray(payload)) {
+        return payload.map((item) => getErrorMessage(item, '')).filter(Boolean).join('; ') || fallback
+      }
+      return JSON.stringify(payload)
+    }
+    return fallback
+  }
+
+  const loadFaceApiModels = async () => {
+    if (modelsLoaded) return
+    try {
+      await Promise.all([
+        faceapi.nets.ssdMobilenetv1.loadFromUri(FACE_API_MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(FACE_API_MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(FACE_API_MODEL_URL),
+      ])
+      setModelsLoaded(true)
+    } catch (error) {
+      console.error('Face API model load failed', error)
+      setCameraError('Failed to load face recognition models. Please refresh the page.')
+    }
+  }
+
+  const computeFaceDescriptor = async (imageSource: string) => {
+    const image = await faceapi.fetchImage(imageSource)
+    const detection = await faceapi
+      .detectSingleFace(image)
+      .withFaceLandmarks()
+      .withFaceDescriptor()
+    if (!detection) {
+      throw new Error('No face detected in the selected image.')
+    }
+    return detection.descriptor
+  }
+
+  const verifyFaceMatch = async (capturedDataUrl: string, referenceImageUrl: string) => {
+    if (!modelsLoaded) {
+      throw new Error('Face recognition models are not loaded yet.')
+    }
+
+    const [capturedDescriptor, referenceDescriptor] = await Promise.all([
+      computeFaceDescriptor(capturedDataUrl),
+      computeFaceDescriptor(referenceImageUrl),
+    ])
+
+    const distance = faceapi.euclideanDistance(capturedDescriptor, referenceDescriptor)
+    const threshold = 0.55
+    return { matched: distance < threshold, distance }
+  }
 
   const updatePermissionState = async () => {
     if (!('permissions' in navigator)) {
@@ -183,6 +243,7 @@ export function EmployeePortal() {
       return res.json() as Promise<{ route: Array<{ latitude: number; longitude: number }> }>
     },
   })
+  const routePoints = routeQuery.data?.route ?? []
 
   // Background tracker: fires coordinate posts every 45s when session is active
   useEffect(() => {
@@ -228,6 +289,8 @@ export function EmployeePortal() {
     setTempPhoto(null)
     setCameraError(null)
     setAttendanceError(null)
+    setFaceMatchConfirmed(false)
+    setFaceMatchMessage(null)
     setIsCameraOpen(true)
     setCameraReady(false)
     try {
@@ -251,6 +314,9 @@ export function EmployeePortal() {
       setStream(mediaStream)
       if (videoRef.current) {
         videoRef.current.srcObject = mediaStream
+      }
+      if (!modelsLoaded) {
+        await loadFaceApiModels()
       }
     } catch (err: any) {
       setCameraError('Could not access camera. Please check permissions and browser settings.')
@@ -293,14 +359,16 @@ export function EmployeePortal() {
       canvas.height = video.videoHeight
       const ctx = canvas.getContext('2d')
       if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
-          const photoUrl = canvas.toDataURL('image/jpeg', 0.95)
-          setTempPhoto(photoUrl)
-        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+        const photoUrl = canvas.toDataURL('image/jpeg', 0.95)
+        setTempPhoto(photoUrl)
+        setFaceMatchConfirmed(false)
+        setFaceMatchMessage(null)
       }
     }
+  }
 
-    const buildAnnotatedPhoto = async (base64Image: string) => {
+  const buildAnnotatedPhoto = async (base64Image: string) => {
       const img = new Image()
       img.src = base64Image
       await new Promise((resolve) => {
@@ -348,7 +416,7 @@ export function EmployeePortal() {
 
           if (!res.ok) {
             const errData = await res.json().catch(() => ({}))
-            throw new Error(errData.detail || 'Registration failed')
+            throw new Error(getErrorMessage(errData, 'Registration failed'))
           }
 
           // Save first captured photo as profile picture
@@ -367,10 +435,11 @@ export function EmployeePortal() {
               body: profileForm,
             }).catch(() => {})
           }
-          alert('Face verification model profile successfully registered!')
+          setFaceMatchConfirmed(true)
+          setFaceMatchMessage('Face verification profile successfully registered!')
           stopCamera()
         } catch (e: any) {
-          alert(`Error: ${e.message}`)
+          setAttendanceError(e.message || 'Face registration failed.')
         } finally {
           setSubmitting(false)
           setCapturedPhotos([])
@@ -404,6 +473,21 @@ export function EmployeePortal() {
           return
         }
 
+        if (!profile?.profile_photo) {
+          throw new Error('No registered profile photo available for face verification.')
+        }
+
+        if (!modelsLoaded) {
+          await loadFaceApiModels()
+        }
+
+        const match = await verifyFaceMatch(tempPhoto, profile.profile_photo)
+        if (!match.matched) {
+          throw new Error('Face did not match the registered profile photo. Please try again.')
+        }
+        setFaceMatchConfirmed(true)
+        setFaceMatchMessage(`Face match confirmed (distance ${match.distance.toFixed(3)})`)
+
         const annotatedBlob = await buildAnnotatedPhoto(tempPhoto)
         const formData = new FormData()
         formData.append('selfie', annotatedBlob || await (await fetch(tempPhoto)).blob(), 'selfie.jpg')
@@ -411,39 +495,25 @@ export function EmployeePortal() {
         formData.append('longitude', String(latestCoords.longitude))
         formData.append('accuracy', String(latestCoords.accuracy ?? 0))
         formData.append('liveness_score', '1.0') // simulated high confidence from camera
-        // Include readable coordinates/address when available so backend metadata is useful
-        const addressPayload = assignmentQuery.data?.patient_address || profile?.default_address || 'Not Available'
-        formData.append('address', addressPayload)
+        formData.append('face_match', 'true')
 
+        // Fetch API request to check in or out
         const endpoint = cameraMode === 'checkin' ? '/api/attendance/checkin' : '/api/attendance/checkout'
-        const res = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}${endpoint}`, {
+        const res = await authedFetch(endpoint, token, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
           body: formData,
         })
-
-        const responseText = await res.text().catch(() => '')
-        let resData: any = {}
-        if (responseText) {
-          try {
-            resData = JSON.parse(responseText)
-          } catch {
-            resData = { detail: responseText }
-          }
-        }
         if (!res.ok) {
-          throw new Error(resData.detail || resData.error || responseText || 'Attendance request failed')
+          const errData = await res.json().catch(() => ({}))
+          throw new Error(getErrorMessage(errData, 'Attendance request failed.'))
         }
 
-        setCameraError(null)
-        setAttendanceError(null)
-
-        queryClient.invalidateQueries({ queryKey: ['employee-portal-profile'] })
         queryClient.invalidateQueries({ queryKey: ['my-assignment'] })
         queryClient.invalidateQueries({ queryKey: ['my-route', profile?.id] })
-        await queryClient.refetchQueries({ queryKey: ['employee-portal-profile'], active: true, type: 'active' })
+        await queryClient.refetchQueries({ queryKey: ['employee-portal-profile'], type: 'active' })
         stopCamera()
       } catch (e: any) {
+        setAttendanceError(e.message || 'Attendance request failed.')
         setCameraError(e.message || 'Attendance request failed.')
       } finally {
         setSubmitting(false)
@@ -522,75 +592,39 @@ export function EmployeePortal() {
             <strong>⚠️ {attendanceError}</strong>
           </div>
         )}
-        {requiresFaceReg ? (
-          <div className="glass-card card-soft registration-card">
-            <span className="eyebrow">Biometric Enrollment</span>
-            <h3>Register Face Recognition Profile</h3>
-            <p style={{ margin: '1rem 0 2rem 0', color: 'var(--muted)' }}>
-              To ensure secure attendance logs, we need to create your face analysis profile. Please prepare to take 3 selfies.
-            </p>
-            <button className="btn-primary" onClick={() => startCamera('register')}>
-              Start Face Registration
-            </button>
-          </div>
-        ) : (
-          <div className="portal-grid">
-            {/* Profile and clock */}
-            <div className="stack">
-              {profile && (
-                <div className="glass-card card-soft employee-card">
-                  <div className="employee-avatar-wrapper">
-                    <img
-                      src={profile.profile_photo || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'}
-                      alt={profile.name}
-                      className="employee-avatar"
-                    />
-                  </div>
-                  <h3>{profile.name}</h3>
-                  <p style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '0.2rem' }}>{profile.designation}</p>
-                  <p style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>{profile.department} Department</p>
-                  <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.4rem' }}>{profile.email}</p>
+        <div className="portal-grid">
+          {/* Profile and clock */}
+          <div className="stack">
+            {profile && (
+              <div className="glass-card card-soft employee-card">
+                <div className="employee-avatar-wrapper">
+                  <img
+                    src={profile.profile_photo || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'}
+                    alt={profile.name}
+                    className="employee-avatar"
+                  />
                 </div>
-              )}
-
-              <div className="glass-card card-soft clock-card">
-                <span className="date-display">
-                  {currentTime.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                </span>
-                <span className="digital-clock">
-                  {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                </span>
-                {/* Session summary (check-in/out and duration) */}
-                {profileQuery.data?.session_summary && (
-                  <div style={{ marginTop: '0.75rem', fontSize: '0.9rem', color: 'var(--muted)' }}>
-                    <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-                      <strong style={{ color: 'var(--primary)', minWidth: '90px' }}>Session</strong>
-                      <div>
-                        <div>Check In: {profileQuery.data.session_summary.check_in_time ? new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(profileQuery.data.session_summary.check_in_time)) : '—'}</div>
-                        <div>Check Out: {profileIsPresent ? 'Working' : (profileQuery.data.session_summary.check_out_time ? new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' }).format(new Date(profileQuery.data.session_summary.check_out_time)) : '—')}</div>
-                        <div>Duration: {profileIsPresent ? (() => {
-                          const checkInTime = profileQuery.data.session_summary.check_in_time
-                          if (!checkInTime) {
-                            return profileQuery.data.session_summary.session_duration_seconds ? `${Math.floor(profileQuery.data.session_summary.session_duration_seconds / 3600)}h ${Math.floor((profileQuery.data.session_summary.session_duration_seconds % 3600) / 60)}m` : '—'
-                          }
-                          try {
-                            const inMs = new Date(checkInTime).getTime()
-                            const seconds = Math.max(Math.floor((Date.now() - inMs) / 1000), 0)
-                            const h = Math.floor(seconds / 3600)
-                            const m = Math.floor((seconds % 3600) / 60)
-                            return `${h ? h + 'h ' : ''}${m}m`
-                          } catch {
-                            return profileQuery.data.session_summary.session_duration_seconds ? `${Math.floor(profileQuery.data.session_summary.session_duration_seconds / 3600)}h ${Math.floor((profileQuery.data.session_summary.session_duration_seconds % 3600) / 60)}m` : '—'
-                          }
-                        })() : (profileQuery.data.session_summary.session_duration_seconds ? `${Math.floor(profileQuery.data.session_summary.session_duration_seconds / 3600)}h ${Math.floor((profileQuery.data.session_summary.session_duration_seconds % 3600) / 60)}m` : '—')}</div>
-                      </div>
-                    </div>
-                  </div>
+                <h3>{profile.name}</h3>
+                <p style={{ fontWeight: 600, color: 'var(--primary)', marginTop: '0.2rem' }}>{profile.designation || 'Employee'}</p>
+                <p style={{ fontSize: '0.875rem', color: 'var(--muted)' }}>{profile.department || 'General'} Department</p>
+                <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.4rem' }}>{profile.email}</p>
+                {profile.phone && (
+                  <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.25rem' }}>{profile.phone}</p>
                 )}
               </div>
-            </div>
+            )}
 
-            {/* Attendance actions */}
+            <div className="glass-card card-soft clock-card">
+              <span className="date-display">
+                {currentTime.toLocaleDateString('en-IN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              </span>
+              <span className="digital-clock">
+                {currentTime.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
+            </div>
+          </div>
+
+          {/* Attendance actions */}
             <div className="stack">
               <div className="glass-card card-soft stack" style={{ padding: '1.75rem' }}>
                 <span className="eyebrow">Attendance</span>
@@ -609,7 +643,6 @@ export function EmployeePortal() {
                         </p>
                       </div>
                     )}
-
 
                     {locationPermGranted === false && (
                       <div
@@ -647,13 +680,12 @@ export function EmployeePortal() {
                         </button>
                       )}
                     </div>
-                    {/* Location tracking banner removed per request */}
                   </div>
                 )}
               </div>
+
             </div>
-          </div>
-        )}
+        </div>
       </main>
 
       {/* Camera Capture Modal */}
@@ -683,13 +715,16 @@ export function EmployeePortal() {
             </div>
 
             <div className="camera-viewport">
-              {!tempPhoto ? (
-                <>
-                  <video ref={videoRef} autoPlay playsInline className="camera-video" />
-                  <div className="camera-overlay-indicator" />
-                </>
-              ) : (
-                <img src={tempPhoto} alt="Snapshot" className="camera-snapshot" />
+              <video
+                ref={videoRef}
+                autoPlay
+                playsInline
+                className="camera-video"
+                style={{ display: !tempPhoto ? 'block' : 'none', width: '100%', height: '100%', objectFit: 'cover' }}
+              />
+              {!tempPhoto && <div className="camera-overlay-indicator" />}
+              {tempPhoto && (
+                <img src={tempPhoto} alt="Snapshot" className="camera-snapshot" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               )}
             </div>
 
@@ -726,6 +761,11 @@ export function EmployeePortal() {
                       {submitting ? 'Verifying...' : 'Submit'}
                     </button>
                   </div>
+                  {faceMatchMessage && (
+                    <div style={{ color: 'var(--success)', fontSize: '0.95rem', textAlign: 'center' }}>
+                      {faceMatchMessage}
+                    </div>
+                  )}
                   {cameraError && (
                     <div style={{ color: 'var(--danger)', fontSize: '0.9rem', textAlign: 'center' }}>
                       {cameraError}

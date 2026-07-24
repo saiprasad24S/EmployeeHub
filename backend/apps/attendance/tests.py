@@ -7,16 +7,19 @@ from django.utils import timezone
 from openpyxl import load_workbook
 from PIL import Image
 from rest_framework.exceptions import ValidationError
+from rest_framework.test import APIRequestFactory, force_authenticate
 
 from apps.accounts.models import Employee
 from apps.assignments.models import Assignment
-from apps.attendance.models import Session
+from apps.attendance.models import Attendance, Session
 from apps.attendance.services import (
     annotate_image,
     generate_attendance_export,
     get_employee_presence_summary,
     validate_geofence,
 )
+from apps.attendance.views import AttendanceListView
+from apps.common.utils import AuthenticatedPrincipal
 
 
 class GeofenceTests(TestCase):
@@ -95,3 +98,33 @@ class GeofenceTests(TestCase):
         self.assertTrue(summary['is_present'])
         self.assertEqual(summary['status'], 'Present')
         self.assertEqual(summary['check_in_time'], timezone.make_aware(datetime(2024, 1, 2, 22, 30)))
+
+    def test_attendance_list_returns_all_records_without_truncation(self):
+        employee = Employee.objects.create(
+            employee_id='EMP007',
+            name='Pagination Test',
+            email='pagination@example.com',
+            phone='1234567890',
+            department='Field',
+            designation='Nurse',
+        )
+        session = Session.objects.create(employee=employee, is_active=True)
+        for i in range(205):
+            Attendance.objects.create(
+                employee=employee,
+                session=session,
+                attendance_type=Attendance.AttendanceType.CHECK_IN if i % 2 == 0 else Attendance.AttendanceType.CHECK_OUT,
+                latitude=12.9716,
+                longitude=77.5946,
+                address=f'Test record {i}',
+                status=Attendance.Status.APPROVED,
+            )
+
+        factory = APIRequestFactory()
+        request = factory.get('/api/attendance/')
+        force_authenticate(request, user=AuthenticatedPrincipal(email='admin@example.com', role='ADMIN'))
+
+        response = AttendanceListView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 205)

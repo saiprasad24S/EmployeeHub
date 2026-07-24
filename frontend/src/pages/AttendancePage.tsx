@@ -1,232 +1,292 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
-import { authedFetch, API_BASE_URL } from '../lib/api'
+import { authedFetch } from '../lib/api'
 
-type AttendanceRecord = {
-  employee_employee_id: string
-  employee_name: string
-  attendance_type: string
-  photo_url: string
-  address: string
-  timestamp: string
-  status: string
-  session_login_time?: string | null
-  session_logout_time?: string | null
-  session_is_active?: boolean | null
-  presence_status?: string | null
-  presence_is_active?: boolean | null
-  presence_check_in_time?: string | null
-  presence_session_duration_seconds?: number | null
-}
-
-type EmployeeSummary = {
+type Employee = {
   id: number
   employee_id: string
   name: string
   email: string
+  department: string
+  designation: string
   profile_photo: string
-  default_address: string
+  is_active: boolean
+  session_login_time: string | null
+  session_logout_time: string | null
+  session_duration_seconds: number
+  active_session: boolean
+  presence_status: string
 }
 
 export function AttendancePage() {
   const { getToken } = useAuth()
-  const [startDate, setStartDate] = useState('')
-  const [endDate, setEndDate] = useState('')
-  const [isExporting, setIsExporting] = useState(false)
-  const [, setTick] = useState(0)
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false)
+  const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10))
+  const [endDate, setEndDate] = useState(new Date().toISOString().slice(0, 10))
+  const [isDownloading, setIsDownloading] = useState(false)
 
   const employeesQuery = useQuery({
-    queryKey: ['attendance-employees'],
+    queryKey: ['employees-attendance'],
     queryFn: async () => {
       const token = await getToken()
       if (!token) throw new Error('Missing token')
       const response = await authedFetch('/api/employees/', token)
       if (!response.ok) throw new Error('Unable to load employees')
       const data = await response.json()
-      return (data.results ?? []) as EmployeeSummary[]
+      return (data.results ?? []) as Employee[]
     },
-  })
-
-  const attendanceQuery = useQuery({
-    queryKey: ['attendance-page'],
-    queryFn: async () => {
-      const token = await getToken()
-      if (!token) throw new Error('Missing token')
-      const response = await authedFetch('/api/attendance/', token)
-      if (!response.ok) throw new Error('Unable to load attendance')
-      return response.json() as Promise<AttendanceRecord[]>
-    },
+    refetchInterval: 30000, // Refresh every 30 seconds
   })
 
   const employees = employeesQuery.data ?? []
-  const attendance = attendanceQuery.data ?? []
 
-  const formatTime = (value?: string | null) => {
-    if (!value) return '—'
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return '—'
-    return new Intl.DateTimeFormat('en-IN', { hour: 'numeric', minute: '2-digit' }).format(date)
+  const formatDuration = (seconds: number | undefined) => {
+    if (!seconds) return '0m'
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    if (h > 0) return `${h}h ${m}m`
+    return `${m}m`
   }
 
-  const formatDurationFromSeconds = (seconds?: number | null) => {
-    if (!seconds || seconds <= 0) return null
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    if (hours && minutes) return `${hours}h ${minutes}m`
-    if (hours) return `${hours}h`
-    if (minutes) return `${minutes}m`
-    return `${seconds}s`
-  }
+  const getTodaySessionDetails = (employee: Employee) => {
+    if (!employee.session_login_time) return null
+    const loginDate = new Date(employee.session_login_time)
+    const logoutDate = employee.session_logout_time ? new Date(employee.session_logout_time) : null
+    const todayStr = new Date().toDateString()
 
-  const formatDateTime = (value?: string | null) => {
-    if (!value) return '—'
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return '—'
-    return new Intl.DateTimeFormat('en-IN', { dateStyle: 'medium', timeStyle: 'short' }).format(date)
-  }
+    const isLoginToday = loginDate.toDateString() === todayStr
+    const isLogoutToday = logoutDate ? logoutDate.toDateString() === todayStr : false
+    const isActive = employee.active_session
 
-  const getEmployeeSessionSummary = (employeeId: string) => {
-    const employeeRecords = attendance.filter((record) => record.employee_employee_id === employeeId)
-    const latestRecord = employeeRecords.sort((first, second) => new Date(second.timestamp).getTime() - new Date(first.timestamp).getTime())[0]
-    const isPresent = latestRecord?.presence_is_active === true
-    const loginTime = latestRecord?.presence_check_in_time ?? latestRecord?.session_login_time ?? null
-    // For active sessions, compute live duration on the client so it updates without a full refetch
-    let duration = null
-    if (latestRecord) {
-      if (latestRecord.presence_is_active && (latestRecord.presence_check_in_time || latestRecord.session_login_time)) {
-        const checkIn = latestRecord.presence_check_in_time ?? latestRecord.session_login_time
-        if (checkIn) {
-          try {
-            const seconds = Math.max(Math.floor((Date.now() - new Date(checkIn).getTime()) / 1000), 0)
-            duration = formatDurationFromSeconds(seconds)
-          } catch {
-            duration = formatDurationFromSeconds(latestRecord?.presence_session_duration_seconds ?? null)
-          }
-        } else {
-          duration = formatDurationFromSeconds(latestRecord?.presence_session_duration_seconds ?? null)
-        }
-      } else {
-        duration = formatDurationFromSeconds(latestRecord?.presence_session_duration_seconds ?? null)
+    if (isActive || isLoginToday || isLogoutToday) {
+      return {
+        loginDate,
+        logoutDate,
+        isActive,
+        isLoginToday,
+        isLogoutToday,
       }
     }
-
-    return {
-      isPresent,
-      loginTime,
-      duration,
-      latestRecord,
-      status: latestRecord?.presence_status ?? (isPresent ? 'Present' : 'Absent'),
-    }
+    return null
   }
 
-  const presentEmployees = useMemo(() => employees.filter((employee) => getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees])
-
-  const absentEmployees = useMemo(() => employees.filter((employee) => !getEmployeeSessionSummary(employee.employee_id).isPresent), [attendance, employees])
-
-  // Tick to re-render periodically so active session durations update in the UI
-  useEffect(() => {
-    const id = setInterval(() => setTick((t) => t + 1), 30000)
-    return () => clearInterval(id)
-  }, [attendance])
-
-  const handleExport = async () => {
+  const triggerExportDownload = async () => {
     if (!startDate || !endDate) {
-      alert('Please choose a start and end date.')
+      alert('Please select both start and end dates.')
       return
     }
-    setIsExporting(true)
+    setIsDownloading(true)
     try {
       const token = await getToken()
-      if (!token) throw new Error('Missing token')
-      const response = await fetch(`${API_BASE_URL}/api/attendance/export?start_date=${startDate}&end_date=${endDate}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-      if (!response.ok) throw new Error('Unable to download attendance report')
+      if (!token) throw new Error('No authentication token')
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api/attendance/export?start_date=${startDate}&end_date=${endDate}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      )
+      if (!response.ok) {
+        const errData = await response.json().catch(() => ({}))
+        throw new Error(errData.detail || 'Export failed')
+      }
       const blob = await response.blob()
       const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      link.download = `attendance_${startDate}_${endDate}.xlsx`
-      link.click()
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `attendance_${startDate}_to_${endDate}.xlsx`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
       window.URL.revokeObjectURL(url)
-    } catch (error: any) {
-      alert(error.message || 'Export failed')
+      setIsDownloadModalOpen(false)
+    } catch (err: any) {
+      alert(err.message || 'Failed to download attendance report')
     } finally {
-      setIsExporting(false)
+      setIsDownloading(false)
     }
   }
 
   return (
-    <section className="glass-card card-soft" style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-      <div className="section-header">
-        <div>
-          <span className="eyebrow">Attendance</span>
-          <h3>Present and absent workforce</h3>
-          <p>Review employee status at a glance with a scrollable roster for present and absent staff.</p>
-        </div>
-        <div className="glass-card" style={{ padding: '0.75rem', display: 'flex', gap: '0.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
-          <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
-          <input type="date" value={endDate} onChange={(event) => setEndDate(event.target.value)} />
-          <button className="btn-primary" onClick={handleExport} disabled={isExporting} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-            {isExporting ? 'Downloading…' : 'Download Excel'}
+    <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+      <div className="glass-card card-soft">
+        <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <span className="eyebrow">Attendance Board</span>
+            <h3>Today's Attendance Status</h3>
+            <p>Monitors check-ins, check-outs, and active night-shift sessions for all registered employees.</p>
+          </div>
+          <button className="btn-primary" onClick={() => setIsDownloadModalOpen(true)}>
+            📥 Download Report
           </button>
         </div>
+
+        {employeesQuery.isLoading ? (
+          <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>Loading attendance details...</div>
+        ) : (
+          <div className="table-wrap data-table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>Photo</th>
+                  <th>Employee ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Department</th>
+                  <th>Designation</th>
+                  <th>Today's Check-In</th>
+                  <th>Today's Check-Out</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {employees.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} style={{ textAlign: 'center', color: 'var(--muted)', padding: '2rem' }}>
+                      No employees registered.
+                    </td>
+                  </tr>
+                ) : (
+                  employees.map((employee) => {
+                    const session = getTodaySessionDetails(employee)
+                    return (
+                      <tr key={employee.employee_id}>
+                        <td>
+                          <img
+                            src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
+                            alt={employee.name}
+                            style={{ width: '40px', height: '40px', borderRadius: '50%', objectFit: 'cover' }}
+                          />
+                        </td>
+                        <td>{employee.employee_id}</td>
+                        <td style={{ fontWeight: 600 }}>{employee.name}</td>
+                        <td>{employee.email}</td>
+                        <td>{employee.department}</td>
+                        <td>{employee.designation}</td>
+                        <td>
+                          {session ? (
+                            <div>
+                              <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.85rem' }}>
+                                ✅ {session.isLoginToday ? '' : 'Yesterday '}{session.loginDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            </div>
+                          ) : (
+                            <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          {session ? (
+                            session.isActive ? (
+                              <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.85rem' }}>
+                                🟢 Still Active
+                              </span>
+                            ) : session.logoutDate ? (
+                              <div>
+                                <span style={{ color: '#EF4444', fontWeight: 600, fontSize: '0.85rem' }}>
+                                  🔴 {session.logoutDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                                </span>
+                                <br />
+                                <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
+                                  ({formatDuration(employee.session_duration_seconds)})
+                                </span>
+                              </div>
+                            ) : (
+                              <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>—</span>
+                            )
+                          ) : (
+                            <span style={{ color: 'var(--muted)', fontSize: '0.85rem' }}>—</span>
+                          )}
+                        </td>
+                        <td>
+                          <span className={`status-pill ${session && session.isActive ? 'active' : 'inactive'}`}>
+                            {session && session.isActive ? 'Present' : 'Absent'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
-      <div style={{ display: 'grid', gap: '1rem', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
-        <div className="glass-card" style={{ padding: '1rem', maxHeight: '460px', overflowY: 'auto' }}>
-          <h4 style={{ marginBottom: '0.8rem' }}>Present</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {presentEmployees.length === 0 ? (
-              <p style={{ color: 'var(--muted)' }}>No employees currently have an active session.</p>
-            ) : presentEmployees.map((employee) => {
-              const sessionSummary = getEmployeeSessionSummary(employee.employee_id)
-              return (
-                <div key={employee.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem', border: '1px solid var(--panel-border)', borderRadius: '12px', background: 'rgba(34,197,94,0.06)' }}>
-                  <img src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'} alt={employee.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700 }}>{employee.name}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{employee.email}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{employee.employee_id}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
-                      {sessionSummary.loginTime ? `Check-in ${formatTime(sessionSummary.loginTime)}` : 'No check-in recorded'}
-                      {sessionSummary.duration ? ` • ${sessionSummary.duration}` : ''}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', color: '#10B981', fontWeight: 700, fontSize: '0.82rem' }}>Present</div>
-                </div>
-              )
-            })}
+      {/* Date Range Modal */}
+      {isDownloadModalOpen && (
+        <div className="camera-modal-backdrop">
+          <div className="camera-modal" style={{ maxWidth: '400px', width: '100%', height: 'auto' }}>
+            <div className="camera-header">
+              <h3 style={{ fontSize: '1.25rem' }}>📅 Export Attendance Report</h3>
+              <button
+                onClick={() => setIsDownloadModalOpen(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: 'var(--muted)',
+                }}
+              >
+                &times;
+              </button>
+            </div>
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <div className="stack" style={{ gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>From Date</label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => setStartDate(e.target.value)}
+                  style={{
+                    padding: '0.6rem',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--panel)',
+                    color: 'var(--text)',
+                  }}
+                />
+              </div>
+              <div className="stack" style={{ gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>To Date</label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  style={{
+                    padding: '0.6rem',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--panel)',
+                    color: 'var(--text)',
+                  }}
+                />
+              </div>
+              <div className="button-group-row" style={{ marginTop: '1rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => setIsDownloadModalOpen(false)}
+                  disabled={isDownloading}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={triggerExportDownload}
+                  disabled={isDownloading}
+                >
+                  {isDownloading ? 'Downloading...' : 'Download Excel'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
-
-        <div className="glass-card" style={{ padding: '1rem', maxHeight: '460px', overflowY: 'auto' }}>
-          <h4 style={{ marginBottom: '0.8rem' }}>Absent</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-            {absentEmployees.length === 0 ? (
-              <p style={{ color: 'var(--muted)' }}>All employees are present today.</p>
-            ) : absentEmployees.map((employee) => {
-              const sessionSummary = getEmployeeSessionSummary(employee.employee_id)
-              return (
-                <div key={employee.id} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.7rem', border: '1px solid var(--panel-border)', borderRadius: '12px', background: 'rgba(239,68,68,0.06)' }}>
-                  <img src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'} alt={employee.name} style={{ width: '44px', height: '44px', borderRadius: '50%', objectFit: 'cover' }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontWeight: 700 }}>{employee.name}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>{employee.email}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{employee.employee_id}</div>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
-                      {sessionSummary.loginTime ? `Last seen ${formatDateTime(sessionSummary.loginTime)}` : 'No active session'}
-                      {sessionSummary.duration ? ` • ${sessionSummary.duration}` : ''}
-                    </div>
-                  </div>
-                  <div style={{ textAlign: 'right', color: '#EF4444', fontWeight: 700, fontSize: '0.82rem' }}>Absent</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      </div>
+      )}
     </section>
   )
 }

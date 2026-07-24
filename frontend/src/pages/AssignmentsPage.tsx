@@ -249,6 +249,7 @@ export function AssignmentsPage() {
           <div>
             <span className="eyebrow">Scheduling</span>
             <h3>Patient Visit Assignments</h3>
+            <p>Manage and assign visits, coordinates, and geofences for employees.</p>
           </div>
           <button className="btn-primary" onClick={openCreateForm}>
             ➕ Schedule New Visit

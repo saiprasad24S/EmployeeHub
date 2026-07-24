@@ -14,7 +14,7 @@ export function SettingsPage() {
         </article>
         <article className="report-card">
           <strong>Tracking</strong>
-          <p>Default employee addresses, geofence defaults, GPS interval policy, and audit logging.</p>
+          <p>Geofence defaults, GPS interval policy, and audit logging.</p>
         </article>
       </div>
     </section>

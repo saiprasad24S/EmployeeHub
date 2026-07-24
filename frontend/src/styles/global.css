@@ -729,10 +729,6 @@ th {
   flex-direction: column;
 }
 
-.camera-modal img {
-  display: block;
-}
-
 .camera-header {
   padding: 1.25rem 1.5rem;
   border-bottom: 1px solid var(--panel-border);

@@ -18,10 +18,10 @@ from apps.attendance.models import Attendance, Session
 from apps.common.cloudinary_service import upload_attendance_image, upload_profile_image
 from apps.common.utils import distance_meters
 from apps.tracking.models import LocationLog
-from apps.vision.services import FaceRecognitionService, LivenessService
+from apps.vision.services import FaceService, LivenessService
 
 
-face_service = FaceRecognitionService()
+face_service = FaceService()
 liveness_service = LivenessService()
 
 
@@ -155,51 +155,73 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
     sheet = workbook.active
     sheet.title = 'Attendance'
     headers = [
-        'SNo', 'Date', 'Emp ID', 'Name', 'Email', 'Phone Number', 'Login Time', 'Logout Time', 'Total Hours',
+        'SNo', 'Date', 'Emp ID', 'Name', 'Gmail', 'Phone Number', 'Login Time', 'Logout Time', 'Total Hours',
         'Days Present', 'Days Absent'
     ]
     sheet.append(headers)
 
     employees = Employee.objects.all().order_by('employee_id')
-    current_date = start_date
-    while current_date <= end_date:
-        for index, employee in enumerate(employees, start=1):
+    
+    # Pre-calculate totals for each employee over the selected range
+    employee_summaries = {}
+    for employee in employees:
+        present_days = 0
+        absent_days = 0
+        current_date = start_date
+        while current_date <= end_date:
             session = get_session_for_date(employee, current_date)
+            if session:
+                present_days += 1
+            else:
+                absent_days += 1
+            current_date += timedelta(days=1)
+        employee_summaries[employee.id] = {
+            'present': present_days,
+            'absent': absent_days
+        }
+
+    current_date = start_date
+    sno = 1
+    while current_date <= end_date:
+        for employee in employees:
+            session = get_session_for_date(employee, current_date)
+            summary = employee_summaries[employee.id]
             if not session:
                 sheet.append([
-                    index,
+                    sno,
                     current_date.strftime('%Y-%m-%d'),
                     employee.employee_id,
                     employee.name,
-                    employee.email,
+                    employee.email,  # gmail
                     employee.phone,
                     '',
                     '',
                     '',
-                    '0',
-                    '1',
+                    summary['present'],
+                    summary['absent'],
                 ])
-                continue
-
-            login_time = session.login_time
-            logout_time = session.logout_time or ''
-            total_hours = ''
-            if logout_time:
-                delta = logout_time - login_time
-                total_hours = f"{int(delta.total_seconds() // 3600)}:{int((delta.total_seconds() % 3600) // 60):02d}"
-            sheet.append([
-                index,
-                current_date.strftime('%Y-%m-%d'),
-                employee.employee_id,
-                employee.name,
-                employee.email,
-                employee.phone,
-                login_time.strftime('%H:%M:%S') if login_time else '',
-                logout_time.strftime('%H:%M:%S') if logout_time else '',
-                total_hours,
-                '1',
-                '0',
-            ])
+            else:
+                login_time = session.login_time
+                logout_time = session.logout_time
+                total_hours = ''
+                if logout_time:
+                    delta = logout_time - login_time
+                    total_hours = f"{int(delta.total_seconds() // 3600)}:{int((delta.total_seconds() % 3600) // 60):02d}"
+                
+                sheet.append([
+                    sno,
+                    current_date.strftime('%Y-%m-%d'),
+                    employee.employee_id,
+                    employee.name,
+                    employee.email,  # gmail
+                    employee.phone,
+                    timezone.localtime(login_time).strftime('%H:%M:%S') if login_time else '',
+                    timezone.localtime(logout_time).strftime('%H:%M:%S') if logout_time else '',
+                    total_hours,
+                    summary['present'],
+                    summary['absent'],
+                ])
+            sno += 1
         current_date += timedelta(days=1)
 
     output = BytesIO()
@@ -278,17 +300,6 @@ def annotate_image(image_file, *, timestamp: str | None = None, location: str | 
 def validate_liveness(image_file, liveness_score: float | None = None) -> None:
     if not liveness_service.is_live(image_file=image_file, liveness_score=liveness_score):
         raise ValidationError({"detail": "Liveness check failed."})
-
-
-def verify_face_against_employee(employee: Employee, image_file) -> float:
-    if not employee.face_embedding:
-        raise ValidationError({"detail": "Face not registered."})
-
-    incoming_embedding = face_service.generate_embedding(image_file)
-    score = face_service.compare_with_store(incoming_embedding, employee.face_embedding)
-    if score < face_service.similarity_threshold:
-        raise ValidationError({"detail": "Face verification failed."})
-    return score
 
 
 def log_location(

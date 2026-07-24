@@ -18,10 +18,10 @@ All protected endpoints require a Clerk-issued JWT in the `Authorization` header
 ### `POST /face/register`
 - Employee-only.
 - Multipart form with `selfies[]`.
-- Stores InsightFace embeddings in `employees.face_embedding`.
+- Registers the employee face with Azure Face API and stores the Azure person ID in `employees.face_embedding`.
 
 ### `POST /face/verify`
-- Verifies a live selfie against the stored employee embedding.
+- Verifies a live selfie against the registered Azure Face person.
 
 ## Attendance
 

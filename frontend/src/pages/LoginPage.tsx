@@ -11,9 +11,13 @@ export function LoginPage() {
             className="auth-illustration"
             style={{ maxWidth: '360px', marginBottom: '1rem' }}
           />
-          <div>
-            <span className="eyebrow">Skandan Home Carre Clinic LLP</span>
-            <h1>Employee Management System</h1>
+          <span className="eyebrow">Skandan Home Carre Clinic LLP</span>
+          <h1>Employee Management System</h1>
+          <p>Secure Google sign-in through Clerk. The dashboard opens only for users registered as employees or admins.</p>
+          <div className="hero-badges">
+            <span>Clean healthcare UI</span>
+            <span>Live attendance</span>
+            <span>GPS tracking</span>
           </div>
         </div>
         <div className="auth-card">
@@ -21,7 +25,7 @@ export function LoginPage() {
             path="/sign-in"
             routing="path"
             signUpUrl="/sign-up"
-            afterSignInUrl="/"
+            forceRedirectUrl="/"
           />
         </div>
       </div>

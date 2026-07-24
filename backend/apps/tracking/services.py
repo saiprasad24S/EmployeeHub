@@ -39,11 +39,18 @@ def get_employee_route(employee: Employee, session: Session | None = None) -> li
     ]
 
 
-def get_today_distance(employee: Employee, session: Session | None = None) -> float:
+def get_today_distance(employee: Employee, session: Session | None = None, target_date: date | None = None) -> float:
     active_session = session or get_active_session(employee)
     if not active_session:
         return 0.0
-    logs = list(LocationLog.objects.filter(employee=employee, session=active_session).order_by("timestamp"))
+    target_date = target_date or timezone.localdate()
+    logs = list(
+        LocationLog.objects.filter(
+            employee=employee,
+            session=active_session,
+            timestamp__date=target_date,
+        ).order_by("timestamp")
+    )
     if len(logs) < 2:
         return 0.0
     total = 0.0

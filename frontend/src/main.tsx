@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, useNavigate } from 'react-router-dom'
 import App from './App'
 import { SearchProvider } from './context/SearchContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import 'leaflet/dist/leaflet.css'
 import './styles/global.css'
 
@@ -32,8 +33,11 @@ function AppProviders() {
 
 ReactDOM.createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <AppProviders />
-    </BrowserRouter>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <AppProviders />
+      </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>,
 )
+
