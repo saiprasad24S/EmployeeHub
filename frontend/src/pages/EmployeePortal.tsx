@@ -563,6 +563,12 @@ export function EmployeePortal() {
           throw new Error(getErrorMessage(errData, 'Attendance request failed.'))
         }
 
+        if (cameraMode === 'checkin') {
+          localStorage.setItem('skandan_active_session', 'true')
+        } else {
+          localStorage.setItem('skandan_active_session', 'false')
+        }
+
         queryClient.invalidateQueries({ queryKey: ['my-assignment'] })
         queryClient.invalidateQueries({ queryKey: ['my-route', profile?.id] })
         await queryClient.refetchQueries({ queryKey: ['employee-portal-profile'], type: 'active' })

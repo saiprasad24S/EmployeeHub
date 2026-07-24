@@ -3,8 +3,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { SignedIn, SignedOut, SignOutButton, useAuth } from '@clerk/clerk-react'
 import { AppShell } from './components/AppShell'
 import { authedFetch } from './lib/api'
-import { EmployeePortal } from './pages/EmployeePortal'
+import { useLocationTracker } from './hooks/useLocationTracker'
 
+const EmployeePortal = lazy(() => import('./pages/EmployeePortal').then((m) => ({ default: m.EmployeePortal })))
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })))
 const SignUpPage = lazy(() => import('./pages/SignUpPage').then((m) => ({ default: m.SignUpPage })))
 const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
@@ -77,26 +78,35 @@ function MainAppSelector() {
   }
 
   if (role === 'EMPLOYEE') {
-    return <EmployeePortal />
+    return (
+      <Suspense fallback={<RouteFallback />}>
+        <EmployeePortal />
+      </Suspense>
+    )
   }
 
   return (
     <AppShell>
-      <Routes>
-        <Route path="/" element={<DashboardPage />} />
-        <Route path="/employees" element={<EmployeesPage />} />
-        <Route path="/attendance" element={<AttendancePage />} />
-        <Route path="/assignments" element={<AssignmentsPage />} />
-        <Route path="/tracking" element={<TrackingPage />} />
-        <Route path="/tracking/:employeeId" element={<TrackingPage />} />
-        <Route path="/settings" element={<SettingsPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <Suspense fallback={<RouteFallback />}>
+        <Routes>
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/employees" element={<EmployeesPage />} />
+          <Route path="/attendance" element={<AttendancePage />} />
+          <Route path="/assignments" element={<AssignmentsPage />} />
+          <Route path="/tracking" element={<TrackingPage />} />
+          <Route path="/tracking/:employeeId" element={<TrackingPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
     </AppShell>
   )
 }
 
 export default function App() {
+  const { getToken } = useAuth()
+  useLocationTracker(getToken)
+
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>

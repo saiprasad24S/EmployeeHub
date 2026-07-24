@@ -206,15 +206,16 @@ h6 {
 .topbar-actions {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  flex-wrap: wrap;
+  gap: 1rem;
+  flex-wrap: nowrap;
 }
 
 .search-shell {
-  display: grid;
-  gap: 0.35rem;
-  min-width: 0;
-  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 180px;
+  width: clamp(200px, 28vw, 340px);
 }
 
 .search-shell span {
@@ -1254,45 +1255,123 @@ form .stack textarea {
   .mobile-nav-link { padding: 0.25rem 0.1rem !important; }
 }
 
-/* ── Auth / Login page mobile ── */
+/* ── Auth / Login page styling ── */
+.auth-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  width: 100%;
+  background:
+    radial-gradient(circle at 30% 20%, rgba(107, 47, 160, 0.08), transparent 40%),
+    radial-gradient(circle at 70% 80%, rgba(29, 182, 166, 0.08), transparent 40%),
+    var(--bg);
+}
+
+.auth-panel {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+  box-sizing: border-box;
+  margin: 0 auto;
+}
+
+.auth-hero {
+  padding: 1.25rem;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, rgba(107, 47, 160, 0.06), rgba(29, 182, 166, 0.08));
+  border: 1px solid var(--panel-border);
+  text-align: center;
+  word-break: break-word;
+}
+
+.auth-hero h1 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin: 0.25rem 0 0 0;
+  color: var(--text);
+}
+
+.auth-card {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Clerk's inner SignIn/SignUp widget styling & responsiveness */
+.auth-card > div,
+.auth-card iframe,
+.auth-card .cl-rootBox,
+.auth-card .cl-card {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  margin: 0 auto !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.auth-card .cl-card {
+  padding: 0.5rem 0 !important;
+}
+
+.auth-card .cl-headerTitle {
+  font-size: 1.25rem !important;
+}
+
+.auth-card .cl-formFieldInput {
+  border-radius: 10px !important;
+  padding: 0.75rem 1rem !important;
+}
+
+.auth-card .cl-formButtonPrimary {
+  border-radius: 10px !important;
+  background: var(--primary) !important;
+  padding: 0.75rem !important;
+  font-weight: 600 !important;
+}
+
 @media (max-width: 600px) {
   .auth-screen {
-    padding: 0.75rem !important;
-    align-items: flex-start !important;
+    padding: 1rem 0.75rem !important;
+    justify-content: flex-start !important;
   }
 
   .auth-panel {
     padding: 0 !important;
     width: 100% !important;
+    gap: 1rem !important;
   }
 
   .auth-hero {
     padding: 1rem !important;
     border-radius: 14px !important;
-    margin-bottom: 0.75rem !important;
   }
 
   .auth-hero h1 {
-    font-size: 1.3rem !important;
+    font-size: 1.2rem !important;
   }
 
   .auth-illustration {
-    max-width: 220px !important;
-    margin-bottom: 0.75rem !important;
+    max-width: 200px !important;
+    margin-bottom: 0.5rem !important;
   }
 
   .auth-card {
     padding: 0.5rem !important;
     border-radius: 14px !important;
-    overflow: hidden !important;
-  }
-
-  /* Force Clerk widget full-width on mobile */
-  .auth-card .cl-rootBox,
-  .auth-card .cl-card,
-  .auth-card > div {
-    width: 100% !important;
-    max-width: 100% !important;
-    min-width: 0 !important;
   }
 }

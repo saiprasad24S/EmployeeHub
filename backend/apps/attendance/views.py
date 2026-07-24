@@ -144,6 +144,8 @@ class CheckOutView(APIView):
                     timestamp=request.data.get("timestamp") or None,
                     location=location_text,
                 )
+                photo_url = upload_result["url"]
+                photo_public_id = upload_result["public_id"]
                 attendance = record_attendance(
                     employee=employee,
                     assignment=get_active_assignment(employee),
