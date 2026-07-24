@@ -13,12 +13,6 @@ export function LoginPage() {
           />
           <span className="eyebrow">Skandan Home Carre Clinic LLP</span>
           <h1>Employee Management System</h1>
-          <p>Secure Google sign-in through Clerk. The dashboard opens only for users registered as employees or admins.</p>
-          <div className="hero-badges">
-            <span>Clean healthcare UI</span>
-            <span>Live attendance</span>
-            <span>GPS tracking</span>
-          </div>
         </div>
         <div className="auth-card">
           <SignIn

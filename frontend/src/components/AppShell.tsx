@@ -35,6 +35,9 @@ export function AppShell({ children }: PropsWithChildren) {
     return current?.label ?? 'Dashboard'
   }, [location.pathname])
 
+  const hideSearchOn = ['/attendance', '/assignments', '/settings']
+  const shouldShowSearch = !hideSearchOn.some((path) => location.pathname.startsWith(path))
+
   return (
     <div className="shell">
       <aside className="sidebar">
@@ -74,15 +77,17 @@ export function AppShell({ children }: PropsWithChildren) {
             <p>{currentDate}</p>
           </div>
           <div className="topbar-actions">
-            <label className="search-shell">
-              <span>Search</span>
-              <input
-                type="search"
-                placeholder="Search mail, ID, location..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </label>
+            {shouldShowSearch && (
+              <label className="search-shell">
+                <span>Search</span>
+                <input
+                  type="search"
+                  placeholder="Search mail, ID, location..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </label>
+            )}
             <button
               className="theme-toggle"
               type="button"
@@ -98,9 +103,6 @@ export function AppShell({ children }: PropsWithChildren) {
                 <span className="theme-toggle-knob" />
               </span>
             </button>
-            <button className="icon-button" type="button" aria-label="Notifications">
-              3
-            </button>
             <UserButton afterSignOutUrl="/sign-in" />
           </div>
         </header>
@@ -109,4 +111,3 @@ export function AppShell({ children }: PropsWithChildren) {
     </div>
   )
 }
-

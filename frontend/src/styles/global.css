@@ -925,9 +925,36 @@ th {
 
   .topbar-actions {
     width: 100%;
+    flex-wrap: wrap;
   }
 
   .search-shell {
     min-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .content {
+    padding: 1rem !important;
+  }
+  .table-wrap {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    width: 100%;
+  }
+  .table-wrap table {
+    min-width: 600px;
+  }
+  .camera-modal {
+    width: 95% !important;
+    max-width: 100% !important;
+    margin: 0 auto;
+  }
+  .portal-layout {
+    padding: 0.75rem !important;
+  }
+  .portal-header {
+    flex-direction: row;
+    justify-content: space-between;
   }
 }

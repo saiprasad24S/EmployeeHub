@@ -13,12 +13,6 @@ export function SignUpPage() {
           />
           <span className="eyebrow">Skandan Home Carre Clinic LLP</span>
           <h1>Create Your Account</h1>
-          <p>Sign up with your Google account to get started. Only registered employees and admins can access the dashboard.</p>
-          <div className="hero-badges">
-            <span>Clean healthcare UI</span>
-            <span>Live attendance</span>
-            <span>GPS tracking</span>
-          </div>
         </div>
         <div className="auth-card">
           <SignUp

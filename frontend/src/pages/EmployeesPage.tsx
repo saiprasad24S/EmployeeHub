@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch, API_BASE_URL } from '../lib/api'
+import { useSearch } from '../context/SearchContext'
 import { RouteMap } from '../components/RouteMap'
 
 type Employee = {
@@ -81,7 +82,22 @@ export function EmployeesPage() {
     },
   })
 
-  const employees = employeesQuery.data ?? []
+  const { searchQuery } = useSearch()
+  const rawEmployees = employeesQuery.data ?? []
+
+  const employees = useMemo(() => {
+    if (!searchQuery.trim()) return rawEmployees
+    const query = searchQuery.toLowerCase().trim()
+    return rawEmployees.filter(
+      (emp) =>
+        emp.name.toLowerCase().includes(query) ||
+        emp.employee_id.toLowerCase().includes(query) ||
+        emp.email.toLowerCase().includes(query) ||
+        (emp.phone && emp.phone.toLowerCase().includes(query)) ||
+        (emp.department && emp.department.toLowerCase().includes(query)) ||
+        (emp.default_address && emp.default_address.toLowerCase().includes(query))
+    )
+  }, [rawEmployees, searchQuery])
 
   // Create/Update Mutation
   const saveMutation = useMutation({

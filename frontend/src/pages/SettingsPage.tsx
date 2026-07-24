@@ -13,7 +13,7 @@ export function SettingsPage() {
   }
 
   return (
-    <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '900px' }}>
+    <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
       <div className="glass-card card-soft" style={{ padding: '2rem' }}>
         <div className="section-header" style={{ marginBottom: '1.5rem' }}>
           <div>
