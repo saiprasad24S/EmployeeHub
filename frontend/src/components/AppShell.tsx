@@ -4,12 +4,12 @@ import { SignOutButton, UserButton } from '@clerk/clerk-react'
 import { useSearch } from '../context/SearchContext'
 
 const navItems = [
-  { label: 'Dashboard', icon: '📊', to: '/' },
-  { label: 'Employees', icon: '👥', to: '/employees' },
-  { label: 'Attendance', icon: '📅', to: '/attendance' },
-  { label: 'Assignments', icon: '📋', to: '/assignments' },
-  { label: 'Live Tracking', icon: '📍', to: '/tracking' },
-  { label: 'Settings', icon: '⚙️', to: '/settings' },
+  { label: 'Dashboard', to: '/' },
+  { label: 'Employees', to: '/employees' },
+  { label: 'Attendance', to: '/attendance' },
+  { label: 'Assignments', to: '/assignments' },
+  { label: 'Live Tracking', to: '/tracking' },
+  { label: 'Settings', to: '/settings' },
 ]
 
 export function AppShell({ children }: PropsWithChildren) {
@@ -58,7 +58,7 @@ export function AppShell({ children }: PropsWithChildren) {
         <nav>
           {navItems.map((item) => (
             <NavLink key={item.to} to={item.to} end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              <span style={{ marginRight: '0.5rem' }}>{item.icon}</span> {item.label}
+              {item.label}
             </NavLink>
           ))}
         </nav>
@@ -153,7 +153,6 @@ export function AppShell({ children }: PropsWithChildren) {
       <nav className="mobile-bottom-nav">
         {navItems.map((item) => (
           <NavLink key={item.to} to={item.to} end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
-            <span className="mobile-nav-icon">{item.icon}</span>
             <span className="mobile-nav-label">{item.label}</span>
           </NavLink>
         ))}

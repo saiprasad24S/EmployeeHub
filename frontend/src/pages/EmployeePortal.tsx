@@ -785,17 +785,20 @@ export function EmployeePortal() {
                       {isPastOrToday ? (
                         <span
                           style={{
-                            fontSize: '0.68rem',
-                            fontWeight: 700,
-                            padding: '0.15rem 0.3rem',
-                            borderRadius: '6px',
-                            background: isPresent ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                            fontSize: '0.72rem',
+                            fontWeight: 800,
+                            width: '22px',
+                            height: '22px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderRadius: '50%',
+                            background: isPresent ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
                             color: isPresent ? '#10B981' : '#EF4444',
                             marginTop: '0.2rem',
-                            whiteSpace: 'nowrap',
                           }}
                         >
-                          {isPresent ? '🟢 Present' : '🔴 Absent'}
+                          {isPresent ? 'P' : 'A'}
                         </span>
                       ) : (
                         <span style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '0.2rem' }}>—</span>

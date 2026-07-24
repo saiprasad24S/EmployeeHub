@@ -538,6 +538,9 @@ th {
   display: grid;
   place-items: center;
   padding: 1.5rem;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  width: 100%;
   background:
     radial-gradient(circle at 30% 20%, rgba(107, 47, 160, 0.08), transparent 40%),
     radial-gradient(circle at 70% 80%, rgba(29, 182, 166, 0.08), transparent 40%),
@@ -545,14 +548,17 @@ th {
 }
 
 .auth-panel {
-  width: min(1200px, 100%);
+  width: 100%;
+  max-width: min(760px, 100%);
   padding: 1rem;
+  box-sizing: border-box;
 }
 
 .auth-hero {
-  padding: 1.5rem;
+  padding: 1.25rem;
   border-radius: var(--radius);
   background: linear-gradient(180deg, rgba(107, 47, 160, 0.06), rgba(29, 182, 166, 0.08));
+  word-break: break-word;
 }
 
 .auth-card {
@@ -561,12 +567,27 @@ th {
   border-radius: var(--radius);
   padding: 0.75rem;
   box-shadow: var(--shadow);
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+/* Clerk's inner SignIn widget must not overflow */
+.auth-card > div,
+.auth-card iframe,
+.auth-card .cl-rootBox,
+.auth-card .cl-card {
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .auth-illustration {
   width: 100%;
-  max-width: 520px;
-  justify-self: center;
+  max-width: 360px;
+  height: auto;
+  display: block;
+  margin: 0 auto;
 }
 
 .light-block {
@@ -1033,8 +1054,9 @@ input[type="file"] {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 0.15rem;
-    padding: 0.3rem 0.2rem;
+    justify-content: center;
+    gap: 0;
+    padding: 0.4rem 0.25rem;
     border-radius: 10px;
     color: var(--muted);
     text-decoration: none;
@@ -1049,10 +1071,11 @@ input[type="file"] {
   }
   .mobile-nav-icon { font-size: 1.25rem; line-height: 1; }
   .mobile-nav-label {
-    font-size: 0.6rem;
+    font-size: 0.68rem;
     font-weight: 600;
     letter-spacing: 0.01em;
     white-space: nowrap;
+    text-align: center;
   }
 
   /* Content */
@@ -1234,4 +1257,45 @@ input[type="file"] {
   .mobile-nav-link { padding: 0.25rem 0.1rem !important; }
 }
 
+/* ── Auth / Login page mobile ── */
+@media (max-width: 600px) {
+  .auth-screen {
+    padding: 0.75rem !important;
+    align-items: flex-start !important;
+  }
 
+  .auth-panel {
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  .auth-hero {
+    padding: 1rem !important;
+    border-radius: 14px !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .auth-hero h1 {
+    font-size: 1.3rem !important;
+  }
+
+  .auth-illustration {
+    max-width: 220px !important;
+    margin-bottom: 0.75rem !important;
+  }
+
+  .auth-card {
+    padding: 0.5rem !important;
+    border-radius: 14px !important;
+    overflow: hidden !important;
+  }
+
+  /* Force Clerk widget full-width on mobile */
+  .auth-card .cl-rootBox,
+  .auth-card .cl-card,
+  .auth-card > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+}
