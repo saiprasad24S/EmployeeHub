@@ -132,18 +132,24 @@ export function EmployeesPage() {
     },
   })
 
+  const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null)
+  const [deleteRemark, setDeleteRemark] = useState('')
+
   // Delete Mutation
   const deleteMutation = useMutation({
-    mutationFn: async (id: number) => {
+    mutationFn: async (payload: { id: number; remark: string }) => {
       const token = await getToken()
       if (!token) throw new Error('No auth token')
-      const res = await authedFetch(`/api/employees/${id}/`, token, {
+      const res = await authedFetch(`/api/employees/${payload.id}/?remark=${encodeURIComponent(payload.remark)}`, token, {
         method: 'DELETE',
       })
       if (!res.ok) throw new Error('Failed to delete employee')
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
+      setDeletingEmployee(null)
+      setDeleteRemark('')
     },
   })
 
@@ -247,7 +253,7 @@ export function EmployeesPage() {
 
   const handleDelete = (id: number) => {
     if (confirm('Are you sure you want to delete this employee profile?')) {
-      deleteMutation.mutate(id)
+      deleteMutation.mutate({ id, remark: 'Manual deletion' })
     }
   }
 
@@ -438,25 +444,48 @@ export function EmployeesPage() {
 
                         {/* ACTIONS */}
                         <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <button
-                            onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
-                            style={{
-                              border: '1px solid var(--border)',
-                              background: 'var(--panel)',
-                              borderRadius: '20px',
-                              padding: '0.4rem 0.9rem',
-                              fontSize: '0.8rem',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '0.3rem',
-                              color: 'var(--text)',
-                              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                            }}
-                          >
-                            📍 {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
-                          </button>
+                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
+                            <button
+                              onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
+                              style={{
+                                border: '1px solid var(--border)',
+                                background: 'var(--panel)',
+                                borderRadius: '20px',
+                                padding: '0.4rem 0.8rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem',
+                                color: 'var(--text)',
+                                boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                              }}
+                            >
+                              📍 {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setDeletingEmployee(employee)
+                                setDeleteRemark('')
+                              }}
+                              style={{
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                background: 'rgba(239, 68, 68, 0.08)',
+                                borderRadius: '20px',
+                                padding: '0.4rem 0.8rem',
+                                fontSize: '0.8rem',
+                                fontWeight: 600,
+                                cursor: 'pointer',
+                                color: '#EF4444',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '0.3rem'
+                              }}
+                            >
+                              🗑️ Delete
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     )
@@ -792,6 +821,85 @@ export function EmployeesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Employee Remark Modal */}
+      {deletingEmployee && (
+        <div className="camera-modal-backdrop">
+          <div className="camera-modal" style={{ maxWidth: '440px', width: '100%', height: 'auto' }}>
+            <div className="camera-header">
+              <h3 style={{ fontSize: '1.15rem', color: '#EF4444' }}>🗑️ Delete Employee Profile</h3>
+              <button
+                onClick={() => {
+                  setDeletingEmployee(null)
+                  setDeleteRemark('')
+                }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  color: 'var(--muted)',
+                }}
+              >
+                &times;
+              </button>
+            </div>
+
+            <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5 }}>
+                Are you sure you want to remove <strong>{deletingEmployee.name}</strong> (<code>{deletingEmployee.employee_id}</code>) from the employee directory?
+              </p>
+
+              <div className="stack" style={{ gap: '0.4rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Deletion Remark / Reason (Required)</label>
+                <textarea
+                  value={deleteRemark}
+                  onChange={(e) => setDeleteRemark(e.target.value)}
+                  placeholder="e.g. Resigned on 20-Jul-2026 / Contract Ended / Discontinued"
+                  rows={3}
+                  style={{
+                    padding: '0.6rem',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--panel)',
+                    color: 'var(--text)',
+                    resize: 'vertical',
+                  }}
+                />
+              </div>
+
+              <div className="button-group-row" style={{ marginTop: '0.5rem' }}>
+                <button
+                  type="button"
+                  className="btn-secondary"
+                  onClick={() => {
+                    setDeletingEmployee(null)
+                    setDeleteRemark('')
+                  }}
+                  disabled={deleteMutation.isPending}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="btn-primary"
+                  style={{ background: '#EF4444' }}
+                  onClick={() => {
+                    if (!deleteRemark.trim()) {
+                      alert('Please type a deletion remark (e.g. Resigned, Contract ended, etc.)')
+                      return
+                    }
+                    deleteMutation.mutate({ id: deletingEmployee.id, remark: deleteRemark })
+                  }}
+                  disabled={deleteMutation.isPending}
+                >
+                  {deleteMutation.isPending ? 'Deleting...' : 'Confirm Deletion'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

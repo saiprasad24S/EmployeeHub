@@ -77,10 +77,22 @@ class AuthLogoutView(APIView):
 class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all().order_by("employee_id")
     serializer_class = EmployeeSerializer
-    permission_classes = [IsAdminRole]
+    permission_classes = [IsAuthenticated]
     pagination_class = None
     filterset_fields = ["department", "designation", "is_active"]
     search_fields = ["employee_id", "name", "email"]
+
+    def get_permissions(self):
+        if self.action in {"create", "update", "partial_update", "destroy"}:
+            return [IsAdminRole()]
+        return [IsAuthenticated()]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        remark = request.query_params.get("remark") or request.data.get("remark") or "No remark provided"
+        print(f"[EMPLOYEE DELETED] ID: {instance.employee_id}, Name: {instance.name}, Remark: {remark}")
+        self.perform_destroy(instance)
+        return Response({"detail": f"Employee {instance.name} deleted successfully.", "remark": remark}, status=status.HTTP_200_OK)
 
     def get_serializer_class(self):
         if self.action in {"create", "update", "partial_update"}:

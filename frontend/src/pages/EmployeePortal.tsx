@@ -259,23 +259,45 @@ export function EmployeePortal() {
     },
   })
 
-  const historyDays = useMemo(() => {
+  const calendarData = useMemo(() => {
+    const now = new Date()
+    const year = now.getFullYear()
+    const month = now.getMonth()
+
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+
+    const startingDayOfWeek = firstDay.getDay()
+    const totalDays = lastDay.getDate()
+
     const records = attendanceHistoryQuery.data ?? []
     const presentDates = new Set(records.map((r) => new Date(r.created_at).toDateString()))
 
+    const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+
     const days = []
-    for (let i = 0; i < 14; i++) {
-      const d = new Date()
-      d.setDate(d.getDate() - i)
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      days.push(null)
+    }
+
+    for (let day = 1; day <= totalDays; day++) {
+      const d = new Date(year, month, day)
       const dateStr = d.toDateString()
-      const isPresent = presentDates.has(dateStr) || (i === 0 && (sessionActive || profile?.active_session))
+      const isToday = dateStr === now.toDateString()
+      const isPast = d < new Date(now.getFullYear(), now.getMonth(), now.getDate())
+
+      const isPresent = presentDates.has(dateStr) || (isToday && (sessionActive || profile?.active_session))
+
       days.push({
-        date: d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' }),
-        weekday: d.toLocaleDateString('en-IN', { weekday: 'short' }),
-        isPresent,
+        dayNumber: day,
+        dateStr,
+        isToday,
+        isPast,
+        isPresent: isToday ? (sessionActive || profile?.active_session || presentDates.has(dateStr)) : isPresent,
       })
     }
-    return days
+
+    return { monthName, days }
   }, [attendanceHistoryQuery.data, profile, sessionActive])
 
   // Background tracker: fires coordinate posts every 45s when session is active
@@ -717,34 +739,73 @@ export function EmployeePortal() {
                 )}
             </div>
 
-            {/* Employee Daily Attendance Log History (Tabular Format) */}
+            {/* Employee Monthly Attendance Calendar View */}
             <div className="glass-card card-soft" style={{ marginTop: '1.5rem', padding: '1.5rem' }}>
-              <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
-                📅 My Attendance Log
-              </h4>
-              <div className="table-wrap data-table-shell">
-                <table style={{ width: '100%' }}>
-                  <thead>
-                    <tr style={{ textTransform: 'uppercase', fontSize: '0.75rem', color: 'var(--muted)', letterSpacing: '0.04em' }}>
-                      <th style={{ textAlign: 'left', padding: '0.75rem' }}>DATE</th>
-                      <th style={{ textAlign: 'left', padding: '0.75rem' }}>DAY</th>
-                      <th style={{ textAlign: 'center', padding: '0.75rem' }}>ATTENDANCE STATUS</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {historyDays.map((day, idx) => (
-                      <tr key={idx} style={{ background: 'var(--panel)', borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ fontWeight: 600, fontSize: '0.85rem', padding: '0.75rem' }}>{day.date}</td>
-                        <td style={{ fontSize: '0.85rem', color: 'var(--muted)', padding: '0.75rem' }}>{day.weekday}</td>
-                        <td style={{ textAlign: 'center', padding: '0.75rem' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: day.isPresent ? '#10B981' : '#EF4444' }}>
-                            {day.isPresent ? '🟢 Present' : '🔴 Absent'}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
+                <h4 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem' }}>
+                  📅 My Attendance Calendar
+                </h4>
+                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', background: 'var(--panel)', padding: '0.4rem 0.8rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                  {calendarData.monthName}
+                </span>
+              </div>
+
+              {/* Day Name Headers */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem', textAlign: 'center', marginBottom: '0.5rem' }}>
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                  <div key={d} style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                    {d}
+                  </div>
+                ))}
+              </div>
+
+              {/* Days Grid */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem' }}>
+                {calendarData.days.map((item, idx) => {
+                  if (!item) {
+                    return <div key={`empty-${idx}`} style={{ minHeight: '54px', background: 'transparent' }} />
+                  }
+
+                  const isPresent = item.isPresent
+                  const isPastOrToday = item.isPast || item.isToday
+
+                  return (
+                    <div
+                      key={item.dayNumber}
+                      style={{
+                        minHeight: '58px',
+                        background: 'var(--panel)',
+                        border: item.isToday ? '2px solid var(--primary)' : '1px solid var(--border)',
+                        borderRadius: '12px',
+                        padding: '0.4rem',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                      }}
+                    >
+                      <span style={{ fontSize: '0.8rem', fontWeight: item.isToday ? 800 : 600 }}>{item.dayNumber}</span>
+                      {isPastOrToday ? (
+                        <span
+                          style={{
+                            fontSize: '0.68rem',
+                            fontWeight: 700,
+                            padding: '0.15rem 0.3rem',
+                            borderRadius: '6px',
+                            background: isPresent ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)',
+                            color: isPresent ? '#10B981' : '#EF4444',
+                            marginTop: '0.2rem',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {isPresent ? '🟢 Present' : '🔴 Absent'}
+                        </span>
+                      ) : (
+                        <span style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '0.2rem' }}>—</span>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           </div>
