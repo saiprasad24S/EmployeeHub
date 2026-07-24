@@ -717,40 +717,34 @@ export function EmployeePortal() {
                 )}
             </div>
 
-            {/* Employee Daily Attendance Log History */}
+            {/* Employee Daily Attendance Log History (Tabular Format) */}
             <div className="glass-card card-soft" style={{ marginTop: '1.5rem', padding: '1.5rem' }}>
               <h4 style={{ margin: '0 0 1rem 0', color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem' }}>
                 📅 My Attendance Log
               </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(115px, 1fr))', gap: '0.75rem' }}>
-                {historyDays.map((day, idx) => (
-                  <div
-                    key={idx}
-                    style={{
-                      background: 'var(--panel)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '12px',
-                      padding: '0.65rem',
-                      textAlign: 'center',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '0.2rem',
-                    }}
-                  >
-                    <span style={{ fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 600 }}>{day.weekday}</span>
-                    <strong style={{ fontSize: '0.8rem' }}>{day.date}</strong>
-                    <span
-                      style={{
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        color: day.isPresent ? '#10B981' : '#EF4444',
-                        marginTop: '0.2rem',
-                      }}
-                    >
-                      {day.isPresent ? '🟢 Present' : '🔴 Absent'}
-                    </span>
-                  </div>
-                ))}
+              <div className="table-wrap data-table-shell">
+                <table style={{ width: '100%' }}>
+                  <thead>
+                    <tr style={{ textTransform: 'uppercase', fontSize: '0.75rem', color: 'var(--muted)', letterSpacing: '0.04em' }}>
+                      <th style={{ textAlign: 'left', padding: '0.75rem' }}>DATE</th>
+                      <th style={{ textAlign: 'left', padding: '0.75rem' }}>DAY</th>
+                      <th style={{ textAlign: 'center', padding: '0.75rem' }}>ATTENDANCE STATUS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historyDays.map((day, idx) => (
+                      <tr key={idx} style={{ background: 'var(--panel)', borderBottom: '1px solid var(--border)' }}>
+                        <td style={{ fontWeight: 600, fontSize: '0.85rem', padding: '0.75rem' }}>{day.date}</td>
+                        <td style={{ fontSize: '0.85rem', color: 'var(--muted)', padding: '0.75rem' }}>{day.weekday}</td>
+                        <td style={{ textAlign: 'center', padding: '0.75rem' }}>
+                          <span style={{ fontSize: '0.85rem', fontWeight: 700, color: day.isPresent ? '#10B981' : '#EF4444' }}>
+                            {day.isPresent ? '🟢 Present' : '🔴 Absent'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>

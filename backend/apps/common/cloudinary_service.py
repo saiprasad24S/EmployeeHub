@@ -160,9 +160,10 @@ def _build_watermark(image: Image.Image, metadata: dict[str, Any]) -> Image.Imag
     return Image.alpha_composite(image, overlay)
 
 
-def _compress_and_prepare(image_file, metadata: dict[str, Any]) -> io.BytesIO:
+def _compress_and_prepare(image_file, metadata: dict[str, Any], kind: str = "attendance") -> io.BytesIO:
     image = _load_image(image_file)
-    image = _build_watermark(image, metadata)
+    if kind == "attendance":
+        image = _build_watermark(image, metadata)
     width, height = image.size
     max_dimension = 1920
     if max(width, height) > max_dimension:
@@ -211,7 +212,7 @@ def upload_image(
     date_str: str | None = None,
 ) -> dict[str, Any]:
     validate_upload_file(image_file)
-    prepared = _compress_and_prepare(image_file, metadata or {})
+    prepared = _compress_and_prepare(image_file, metadata or {}, kind=kind)
     folder = _get_folder_path(kind, employee_id, patient_id=patient_id, date_str=date_str)
     public_id = _build_public_id(kind, employee_id, file_name=file_name, patient_id=patient_id, date_str=date_str)
     result = cloudinary.uploader.upload(

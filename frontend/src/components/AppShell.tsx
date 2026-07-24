@@ -41,15 +41,16 @@ export function AppShell({ children }: PropsWithChildren) {
   return (
     <div className="shell">
       <aside className="sidebar">
-        <div className="brand">
+        <div className="brand" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
           <img
             src="https://skandanhomecarre.com/wp-content/uploads/2025/06/cropped-SKANDA-fav-192x192.png"
             alt="Skandan Home Carre Clinic"
             className="brand-logo"
+            style={{ width: '44px', height: '44px', objectFit: 'contain', flexShrink: 0 }}
           />
-          <div>
-            <h1>Skandan</h1>
-            <p>Home Carre Clinic LLP</p>
+          <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+            <h1 style={{ fontSize: '1.2rem', lineHeight: '1.2', margin: 0, fontWeight: 700 }}>Skandan</h1>
+            <p style={{ fontSize: '0.8rem', margin: '0.1rem 0 0 0', color: 'var(--muted)', whiteSpace: 'nowrap' }}>Home Carre Clinic LLP</p>
           </div>
         </div>
         <div className="sidebar-chip">Healthcare field workforce platform</div>

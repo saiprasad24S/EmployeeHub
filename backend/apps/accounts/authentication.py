@@ -186,6 +186,8 @@ class ClerkJWTAuthentication(BaseAuthentication):
 
         employee = Employee.objects.filter(email__iexact=email).first()
         if employee:
+            if not employee.is_active:
+                raise AuthenticationFailed("Account Suspended: Your employee profile is inactive.")
             return AuthenticatedPrincipal(
                 email=email,
                 role="EMPLOYEE",
@@ -193,11 +195,4 @@ class ClerkJWTAuthentication(BaseAuthentication):
                 clerk_subject=claims.get("sub"),
             )
 
-        # If a Clerk user is not registered yet, create a lightweight employee record automatically.
-        employee = _create_employee_from_claims(email, claims)
-        return AuthenticatedPrincipal(
-            email=email,
-            role="EMPLOYEE",
-            employee_id=employee.id,
-            clerk_subject=claims.get("sub"),
-        )
+        raise AuthenticationFailed("Access Denied: Your email address is not registered in the employee directory. Only Admins can register new employees.")

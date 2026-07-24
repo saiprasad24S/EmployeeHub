@@ -51,7 +51,8 @@ class CheckInView(APIView):
                         if not employee.default_address or not ensure_default_coordinates(employee):
                             return Response({"detail": "No active assignment found and no default location set for employee."}, status=status.HTTP_400_BAD_REQUEST)
 
-                    radius = employee.default_radius or 100
+                    raw_radius = float(employee.default_radius or 0.1)
+                    radius = raw_radius * 1000 if raw_radius <= 10 else raw_radius
                     distance = distance_meters(
                         float(latitude),
                         float(longitude),
@@ -60,7 +61,9 @@ class CheckInView(APIView):
                     )
                     buffer = max(10.0, accuracy * 1.5)
                     if distance > radius + buffer:
-                        raise ValidationError({"detail": f"Geofence Verification Failed: You are outside your default work range by {round(distance - radius, 2)} meters. Attendance was not marked."})
+                        dist_diff = round((distance - radius) / 1000, 2) if radius >= 100 else round(distance - radius, 2)
+                        unit_str = "km" if radius >= 100 else "meters"
+                        raise ValidationError({"detail": f"Geofence Verification Failed: You are outside your default work range by {dist_diff} {unit_str}. Attendance was not marked."})
 
                 selfie = request.FILES.get("selfie")
                 if not selfie:

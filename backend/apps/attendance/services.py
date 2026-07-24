@@ -205,7 +205,7 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
 
     col_idx = 3
     for dt in date_list:
-        date_str = dt.strftime("%d-%b-%Y")
+        date_str = f"{dt.strftime('%d-%b-%Y')}\n({dt.strftime('%A')})"
         ws.cell(row=6, column=col_idx, value=date_str)
         ws.merge_cells(start_row=6, start_column=col_idx, end_row=6, end_column=col_idx + 2)
         

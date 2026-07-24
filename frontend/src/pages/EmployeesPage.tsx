@@ -508,7 +508,7 @@ export function EmployeesPage() {
                   <strong>Coordinates:</strong> {selectedEmployee.default_latitude ? `${selectedEmployee.default_latitude}, ${selectedEmployee.default_longitude}` : 'Not set'}
                 </p>
                 <p style={{ margin: '0.2rem 0', fontSize: '0.875rem' }}>
-                  <strong>Radius:</strong> {selectedEmployee.default_radius} meters
+                  <strong>Radius:</strong> {selectedEmployee.default_radius ? (selectedEmployee.default_radius > 10 ? (selectedEmployee.default_radius / 1000).toFixed(1) : selectedEmployee.default_radius) : 0.1} km
                 </p>
               </div>
 
@@ -735,12 +735,13 @@ export function EmployeesPage() {
 
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                 <div className="stack" style={{ gap: '0.4rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Geofence Radius (meters)</label>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Geofence Radius (km)</label>
                   <input
                     type="number"
+                    step="0.1"
                     value={radius}
                     onChange={(e) => setRadius(e.target.value)}
-                    placeholder="e.g. 100"
+                    placeholder="e.g. 0.1 or 1"
                     style={{
                       padding: '0.6rem',
                       borderRadius: '10px',

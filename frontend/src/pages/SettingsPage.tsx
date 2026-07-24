@@ -1,7 +1,7 @@
 import { useState } from 'react'
 
 export function SettingsPage() {
-  const [defaultRadius, setDefaultRadius] = useState(100)
+  const [defaultRadius, setDefaultRadius] = useState(0.1)
   const [allowNoAssignment, setAllowNoAssignment] = useState(true)
   const [livenessStrictness, setLivenessStrictness] = useState('Normal')
   const [saveSuccess, setSaveSuccess] = useState(false)
@@ -38,9 +38,10 @@ export function SettingsPage() {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
               <div className="stack" style={{ gap: '0.5rem' }}>
-                <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Default Geofence Radius (meters)</label>
+                <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Default Geofence Radius (km)</label>
                 <input
                   type="number"
+                  step="0.1"
                   value={defaultRadius}
                   onChange={(e) => setDefaultRadius(Number(e.target.value))}
                   style={{
