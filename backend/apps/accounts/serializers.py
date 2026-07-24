@@ -71,6 +71,17 @@ class EmployeeSerializer(serializers.ModelSerializer):
             return ""
         return obj.profile_photo if obj.profile_photo.startswith("http") else ""
 
+    def to_representation(self, instance: Employee):
+        data = super().to_representation(instance)
+        from apps.attendance.services import get_active_assignment
+        active_assignment = get_active_assignment(instance)
+        if active_assignment:
+            data["default_address"] = f"{active_assignment.patient_address} (Scheduled: {active_assignment.patient_name})"
+            data["default_latitude"] = float(active_assignment.latitude)
+            data["default_longitude"] = float(active_assignment.longitude)
+            data["default_radius"] = active_assignment.radius
+        return data
+
 
 class EmployeeCreateSerializer(serializers.ModelSerializer):
     class Meta:

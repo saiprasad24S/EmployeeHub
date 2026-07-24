@@ -743,7 +743,7 @@ export function EmployeePortal() {
             <div className="glass-card card-soft" style={{ marginTop: '1.5rem', padding: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <h4 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem' }}>
-                  📅 My Attendance Calendar
+                  Attendance Calendar
                 </h4>
                 <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', background: 'var(--panel)', padding: '0.4rem 0.8rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
                   {calendarData.monthName}

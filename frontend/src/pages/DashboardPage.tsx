@@ -82,7 +82,7 @@ export function DashboardPage() {
         <MetricCard label="Pending Visits" value={String(metricsQuery.data?.pending_visits ?? 0)} />
         <MetricCard label="Distance Covered" value={`${Math.round(metricsQuery.data?.distance_covered_today_meters ?? 0)} m`} />
       </div>
-      <div className="split-layout">
+      <div style={{ width: '100%', maxWidth: '1100px', margin: '0 auto' }}>
         <div className="glass-card card-soft">
           <div className="section-header">
             <div>
@@ -92,26 +92,12 @@ export function DashboardPage() {
             <span className="badge success">Tracking active</span>
           </div>
           {liveLocationsQuery.isLoading ? (
-            <div style={{ height: '350px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
+            <div style={{ height: '420px', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', borderRadius: '14px' }}>
               Loading map...
             </div>
           ) : (
             <LiveLocationsMap locations={filteredLocations} />
           )}
-        </div>
-        <div className="glass-card card-soft stack">
-          <div className="section-header">
-            <div>
-              <span className="eyebrow">Operational rules</span>
-              <h4>Attendance policy</h4>
-            </div>
-          </div>
-          <ul className="info-list">
-            <li>Check-in is allowed only inside the active assignment radius.</li>
-            <li>Selfies are verified against stored face embeddings.</li>
-            <li>Location logs are restricted to authenticated admins and the owning employee.</li>
-            <li>GPS points are collected only during an active working session.</li>
-          </ul>
         </div>
       </div>
     </section>

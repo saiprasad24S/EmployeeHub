@@ -266,6 +266,14 @@ export function EmployeesPage() {
     }
   }
 
+  const formatDuration = (seconds: number | undefined) => {
+    if (!seconds) return '0m'
+    const h = Math.floor(seconds / 3600)
+    const m = Math.floor((seconds % 3600) / 60)
+    if (h > 0) return `${h}h ${m}m`
+    return `${m}m`
+  }
+
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div className="glass-card card-soft" style={{ padding: '2rem' }}>
@@ -415,12 +423,24 @@ export function EmployeesPage() {
                                   Check-in {loginTime}
                                 </div>
                               )}
+                              {logoutTime && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.1rem', fontWeight: 500 }}>
+                                  Checked out {logoutTime} ({formatDuration(employee.session_duration_seconds)})
+                                </div>
+                              )}
                             </div>
                           ) : (
-                            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#EF4444', fontWeight: 600, fontSize: '0.85rem' }}>
-                              <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} />
-                              Absent
-                            </span>
+                            <div>
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem', color: '#EF4444', fontWeight: 600, fontSize: '0.85rem' }}>
+                                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }} />
+                                Absent
+                              </span>
+                              {logoutTime && (
+                                <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.1rem', fontWeight: 500 }}>
+                                  Checked out {logoutTime} ({formatDuration(employee.session_duration_seconds)})
+                                </div>
+                              )}
+                            </div>
                           )}
                         </td>
 
@@ -444,48 +464,25 @@ export function EmployeesPage() {
 
                         {/* ACTIONS */}
                         <td style={{ textAlign: 'center', verticalAlign: 'middle' }}>
-                          <div style={{ display: 'flex', gap: '0.4rem', justifyContent: 'center' }}>
-                            <button
-                              onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
-                              style={{
-                                border: '1px solid var(--border)',
-                                background: 'var(--panel)',
-                                borderRadius: '20px',
-                                padding: '0.4rem 0.8rem',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem',
-                                color: 'var(--text)',
-                                boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
-                              }}
-                            >
-                              📍 {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setDeletingEmployee(employee)
-                                setDeleteRemark('')
-                              }}
-                              style={{
-                                border: '1px solid rgba(239, 68, 68, 0.3)',
-                                background: 'rgba(239, 68, 68, 0.08)',
-                                borderRadius: '20px',
-                                padding: '0.4rem 0.8rem',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                cursor: 'pointer',
-                                color: '#EF4444',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '0.3rem'
-                              }}
-                            >
-                              🗑️ Delete
-                            </button>
-                          </div>
+                          <button
+                            onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
+                            style={{
+                              border: '1px solid var(--border)',
+                              background: 'var(--panel)',
+                              borderRadius: '20px',
+                              padding: '0.4rem 0.9rem',
+                              fontSize: '0.8rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '0.3rem',
+                              color: 'var(--text)',
+                              boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
+                            }}
+                          >
+                            📍 {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
+                          </button>
                         </td>
                       </tr>
                     )
@@ -812,13 +809,30 @@ export function EmployeesPage() {
                 </label>
               </div>
 
-              <div className="button-group-row" style={{ marginTop: '1rem' }}>
-                <button type="button" className="btn-secondary" onClick={closeForm} disabled={saveMutation.isPending}>
-                  Cancel
-                </button>
-                <button type="submit" className="btn-primary" disabled={saveMutation.isPending}>
-                  {saveMutation.isPending ? 'Saving...' : 'Save Profile'}
-                </button>
+              <div className="button-group-row" style={{ marginTop: '1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {editingEmployee ? (
+                  <button
+                    type="button"
+                    className="btn-secondary"
+                    style={{ background: 'rgba(239, 68, 68, 0.08)', color: '#EF4444', border: '1px solid rgba(239, 68, 68, 0.3)', width: 'auto', padding: '0.6rem 1rem' }}
+                    onClick={() => {
+                      const empToDelete = editingEmployee
+                      closeForm()
+                      setDeletingEmployee(empToDelete)
+                      setDeleteRemark('')
+                    }}
+                  >
+                    🗑️ Delete Profile
+                  </button>
+                ) : <div />}
+                <div style={{ display: 'flex', gap: '0.75rem', width: 'auto' }}>
+                  <button type="button" className="btn-secondary" onClick={closeForm} disabled={saveMutation.isPending} style={{ width: 'auto' }}>
+                    Cancel
+                  </button>
+                  <button type="submit" className="btn-primary" disabled={saveMutation.isPending} style={{ width: 'auto' }}>
+                    {saveMutation.isPending ? 'Saving...' : 'Save Profile'}
+                  </button>
+                </div>
               </div>
             </form>
           </div>
