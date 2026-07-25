@@ -83,34 +83,53 @@ def get_today_distance(employee: Employee, session: Session | None = None, targe
 
 
 def get_travel_history(employee: Employee, history_date: date | None = None) -> dict:
-    active_session = get_active_session(employee)
-    if history_date:
-        logs = LocationLog.objects.filter(employee=employee, timestamp__date=history_date).order_by("timestamp")
-        route = [
-            {
-                "latitude": float(log.latitude),
-                "longitude": float(log.longitude),
-                "timestamp": log.timestamp,
-                "accuracy": log.accuracy,
-                "speed": log.speed,
-                "battery_percentage": log.battery_percentage,
-            }
-            for log in logs
-        ]
-        distance = 0.0
-        if len(logs) >= 2:
-            for previous, current in zip(logs, logs[1:]):
-                distance += distance_meters(float(previous.latitude), float(previous.longitude), float(current.latitude), float(current.longitude))
-        return {
-            "points": route,
-            "distance": distance,
-            "count": logs.count(),
-        }
-
-    session_logs = LocationLog.objects.filter(employee=employee, session=active_session).order_by("timestamp") if active_session else []
-    route = get_employee_route(employee, active_session)
+    from apps.attendance.models import Attendance
+    
+    target_date = history_date or timezone.localdate()
+    
+    # Fetch attendance checkin / checkout records for the requested date
+    attendances = Attendance.objects.filter(
+        employee=employee,
+        created_at__date=target_date
+    ).order_by("created_at")
+    
+    # Fetch location logs for the requested date
+    logs = LocationLog.objects.filter(
+        employee=employee,
+        timestamp__date=target_date
+    ).order_by("timestamp")
+    
+    points = []
+    for att in attendances:
+        if att.latitude is not None and att.longitude is not None:
+            points.append({
+                "latitude": float(att.latitude),
+                "longitude": float(att.longitude),
+                "timestamp": att.created_at,
+                "type": att.attendance_type,
+            })
+            
+    for log in logs:
+        points.append({
+            "latitude": float(log.latitude),
+            "longitude": float(log.longitude),
+            "timestamp": log.timestamp,
+            "accuracy": log.accuracy,
+            "speed": log.speed,
+            "battery_percentage": log.battery_percentage,
+            "type": "LOCATION_PING",
+        })
+        
+    points.sort(key=lambda p: p["timestamp"])
+    
+    distance = 0.0
+    if len(points) >= 2:
+        for prev_p, curr_p in zip(points, points[1:]):
+            distance += distance_meters(prev_p["latitude"], prev_p["longitude"], curr_p["latitude"], curr_p["longitude"])
+            
     return {
-        "points": route,
-        "distance": get_today_distance(employee, active_session),
-        "count": len(session_logs),
+        "points": points,
+        "distance": distance,
+        "count": len(points),
+        "date": target_date.strftime("%Y-%m-%d"),
     }

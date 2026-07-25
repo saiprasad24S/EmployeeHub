@@ -44,26 +44,7 @@ class CheckInView(APIView):
                 longitude = float(request.data["longitude"])
 
                 accuracy = float(request.data.get('accuracy') or 0)
-                if assignment:
-                    validate_geofence(assignment, latitude, longitude, accuracy)
-                else:
-                    if employee.default_latitude is None or employee.default_longitude is None:
-                        if not employee.default_address or not ensure_default_coordinates(employee):
-                            return Response({"detail": "No active assignment found and no default location set for employee."}, status=status.HTTP_400_BAD_REQUEST)
-
-                    raw_radius = float(employee.default_radius or 0.1)
-                    radius = raw_radius * 1000 if raw_radius <= 10 else raw_radius
-                    distance = distance_meters(
-                        float(latitude),
-                        float(longitude),
-                        float(employee.default_latitude),
-                        float(employee.default_longitude),
-                    )
-                    buffer = max(10.0, accuracy * 1.5)
-                    if distance > radius + buffer:
-                        dist_diff = round((distance - radius) / 1000, 2) if radius >= 100 else round(distance - radius, 2)
-                        unit_str = "km" if radius >= 100 else "meters"
-                        raise ValidationError({"detail": f"Geofence Verification Failed: You are outside your default work range by {dist_diff} {unit_str}. Attendance was not marked."})
+                validate_geofence(employee, assignment, latitude, longitude, accuracy)
 
                 selfie = request.FILES.get("selfie")
                 if not selfie:
@@ -136,6 +117,9 @@ class CheckOutView(APIView):
                     return Response({"detail": "Face match not confirmed on the client."}, status=status.HTTP_400_BAD_REQUEST)
                 latitude = float(request.data["latitude"])
                 longitude = float(request.data["longitude"])
+                accuracy = float(request.data.get("accuracy") or 0)
+                assignment = get_active_assignment(employee)
+                validate_geofence(employee, assignment, latitude, longitude, accuracy)
                 location_text = request.data.get("address") or request.data.get("location") or f"Lat: {latitude:.4f}, Lon: {longitude:.4f}"
                 upload_result = upload_selfie(
                     selfie,

@@ -235,7 +235,7 @@ export function TrackingPage() {
                 No tracking route points recorded for today.
               </div>
             ) : (
-              <RouteMap points={routeQuery.data?.route || []} />
+              <RouteMap points={routeQuery.data?.route || []} isLive={routeQuery.data?.is_present} />
             )
           ) : liveLocationsQuery.isLoading ? (
             <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>

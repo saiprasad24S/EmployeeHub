@@ -113,14 +113,24 @@ class EmployeeRouteView(APIView):
         employee = _resolve_employee(employee_id)
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
-        active_session = get_active_session(employee)
-        route = get_employee_route(employee, active_session)
+        
+        date_str = request.query_params.get("date")
+        target_date = None
+        if date_str:
+            try:
+                target_date = datetime.strptime(date_str, "%Y-%m-%d").date()
+            except ValueError:
+                pass
+                
+        history = get_travel_history(employee, target_date)
         last_known_location = _serialize_location(_get_latest_location_source(employee))
         presence = get_employee_presence_summary(employee)
         return Response({
             "employee_id": employee.employee_id,
-            "route": route,
-            "distance_covered_meters": get_today_distance(employee, active_session),
+            "employee_name": employee.name,
+            "date": history["date"],
+            "route": history["points"],
+            "distance_covered_meters": history["distance"],
             "last_known_location": last_known_location,
             "presence_status": presence['status'],
             "is_present": presence['is_present'],

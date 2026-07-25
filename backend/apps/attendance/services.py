@@ -67,12 +67,36 @@ def ensure_default_coordinates(employee: Employee) -> bool:
     return True
 
 
-def validate_geofence(assignment: Assignment, latitude: float, longitude: float, accuracy: float | None = None) -> None:
-    radius = assignment.radius or settings.DEFAULT_GEOFENCE_RADIUS_METERS
-    distance = distance_meters(float(latitude), float(longitude), float(assignment.latitude), float(assignment.longitude))
+def validate_geofence(
+    employee: Employee,
+    assignment: Assignment | None,
+    latitude: float,
+    longitude: float,
+    accuracy: float | None = None
+) -> None:
+    if assignment:
+        radius = float(assignment.radius or settings.DEFAULT_GEOFENCE_RADIUS_METERS)
+        target_lat = float(assignment.latitude)
+        target_lon = float(assignment.longitude)
+        location_label = f"patient assignment location ({assignment.patient_name})"
+    else:
+        if employee.default_latitude is None or employee.default_longitude is None:
+            if not employee.default_address or not ensure_default_coordinates(employee):
+                raise ValidationError({"detail": "No active assignment found and no default work location configured on your profile."})
+        target_lat = float(employee.default_latitude)
+        target_lon = float(employee.default_longitude)
+        raw_radius = float(employee.default_radius or 0.1)
+        radius = raw_radius * 1000 if raw_radius <= 10 else raw_radius
+        location_label = f"default work location ({employee.default_address or 'Profile Address'})"
+
+    distance = distance_meters(float(latitude), float(longitude), target_lat, target_lon)
     buffer = max(10.0, (accuracy or 0) * 1.5)
     if distance > radius + buffer:
-        raise ValidationError({"detail": f"Geofence Verification Failed: You are outside the patient's scheduled range by {round(distance - radius, 2)} meters. Attendance was not marked."})
+        dist_diff = round((distance - radius) / 1000, 2) if radius >= 1000 else round(distance - radius, 2)
+        unit_str = "km" if radius >= 1000 else "meters"
+        raise ValidationError({
+            "detail": f"Geofence Verification Failed: You are outside your {location_label} by {dist_diff} {unit_str}. Attendance request rejected."
+        })
 
 
 def upload_selfie(

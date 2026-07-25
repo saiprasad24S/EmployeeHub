@@ -37,6 +37,11 @@ export function EmployeesPage() {
   const queryClient = useQueryClient()
 
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null)
+  const [trackDate, setTrackDate] = useState(() => {
+    const yesterday = new Date()
+    yesterday.setDate(yesterday.getDate() - 1)
+    return yesterday.toISOString().split('T')[0]
+  })
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null)
 
@@ -71,12 +76,12 @@ export function EmployeesPage() {
   })
 
   const routeQuery = useQuery({
-    queryKey: ['employee-route', selectedEmployee?.id],
+    queryKey: ['employee-route', selectedEmployee?.id, trackDate],
     enabled: !!selectedEmployee,
     queryFn: async () => {
       const token = await getToken()
       if (!token || !selectedEmployee) throw new Error('No token')
-      const response = await authedFetch(`/api/location/employee/route/${selectedEmployee.id}`, token)
+      const response = await authedFetch(`/api/location/employee/route/${selectedEmployee.id}?date=${trackDate}`, token)
       if (!response.ok) return { route: [] as RoutePoint[], distance_covered_meters: 0 }
       return response.json() as Promise<{ route: RoutePoint[]; distance_covered_meters: number }>
     },
@@ -547,27 +552,64 @@ export function EmployeesPage() {
       {/* Selected Employee Route History */}
       {selectedEmployee && (
         <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
-          <div className="section-header">
+          <div className="section-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
             <div>
-              <span className="eyebrow">Employee Tracking</span>
-              <h4>
-                {selectedEmployee.name} ({selectedEmployee.employee_id}) — Today's Route
+              <span className="eyebrow">Employee Tracking History</span>
+              <h4 style={{ margin: '0.2rem 0' }}>
+                {selectedEmployee.name} ({selectedEmployee.employee_id}) — Route History
               </h4>
             </div>
-            <button
-              className="ghost-button"
-              onClick={() => setSelectedEmployee(null)}
-              style={{ padding: '0.4rem 0.8rem', width: 'auto' }}
-            >
-              ✕ Close
-            </button>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', flexWrap: 'wrap' }}>
+              <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted)' }}>Select Date:</label>
+              <input
+                type="date"
+                value={trackDate}
+                onChange={(e) => setTrackDate(e.target.value)}
+                style={{
+                  padding: '0.4rem 0.7rem',
+                  borderRadius: '10px',
+                  border: '1px solid var(--border)',
+                  background: 'var(--panel)',
+                  color: 'var(--text)',
+                  fontSize: '0.85rem',
+                }}
+              />
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem', width: 'auto' }}
+                onClick={() => setTrackDate(new Date().toISOString().split('T')[0])}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                style={{ padding: '0.4rem 0.7rem', fontSize: '0.8rem', width: 'auto' }}
+                onClick={() => {
+                  const y = new Date()
+                  y.setDate(y.getDate() - 1)
+                  setTrackDate(y.toISOString().split('T')[0])
+                }}
+              >
+                Yesterday
+              </button>
+              <button
+                className="ghost-button"
+                onClick={() => setSelectedEmployee(null)}
+                style={{ padding: '0.4rem 0.8rem', width: 'auto' }}
+              >
+                ✕ Close
+              </button>
+            </div>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1rem' }} className="emp-route-grid">
-            <div style={{ height: '350px', borderRadius: '14px', overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginTop: '1.25rem' }} className="emp-route-grid">
+            <div style={{ minHeight: '380px', borderRadius: '14px', overflow: 'hidden' }}>
               {routeQuery.isLoading ? (
-                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)' }}>
-                  Loading track...
+                <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--panel)', minHeight: '380px' }}>
+                  Loading track map...
                 </div>
               ) : (
                 <RouteMap points={routeQuery.data?.route || []} />
@@ -588,13 +630,14 @@ export function EmployeesPage() {
                 </p>
               </div>
 
-              {routeQuery.data && routeQuery.data.distance_covered_meters > 0 && (
-                <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '1rem', borderRadius: '12px', color: '#10B981' }}>
-                  <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>
-                    📏 Distance Traveled Today: {(routeQuery.data.distance_covered_meters / 1000).toFixed(2)} km
-                  </p>
-                </div>
-              )}
+              <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '1rem', borderRadius: '12px', color: '#10B981' }}>
+                <p style={{ margin: 0, fontWeight: 600, fontSize: '0.9rem' }}>
+                  📏 Distance Traveled ({trackDate}): {((routeQuery.data?.distance_covered_meters || 0) / 1000).toFixed(2)} km
+                </p>
+                <p style={{ margin: '0.3rem 0 0 0', fontSize: '0.8rem', color: 'var(--muted)' }}>
+                  Total GPS points recorded: {routeQuery.data?.route?.length ?? 0}
+                </p>
+              </div>
             </div>
           </div>
         </div>
