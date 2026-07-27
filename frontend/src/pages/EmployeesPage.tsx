@@ -56,6 +56,10 @@ export function EmployeesPage() {
   const [latitude, setLatitude] = useState('')
   const [longitude, setLongitude] = useState('')
   const [radius, setRadius] = useState('100')
+  const [shiftName, setShiftName] = useState('General Shift')
+  const [shiftStartTime, setShiftStartTime] = useState('09:00')
+  const [shiftEndTime, setShiftEndTime] = useState('18:00')
+  const [weeklyOffDays, setWeeklyOffDays] = useState('Sunday')
   const [isActive, setIsActive] = useState(true)
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null)
 
@@ -170,13 +174,17 @@ export function EmployeesPage() {
     setLatitude('')
     setLongitude('')
     setRadius('100')
+    setShiftName('General Shift')
+    setShiftStartTime('09:00')
+    setShiftEndTime('18:00')
+    setWeeklyOffDays('Sunday')
     setIsActive(true)
     setProfilePhotoFile(null)
     setErrorMsg(null)
     setIsFormOpen(true)
   }
 
-  const openEditForm = (employee: Employee) => {
+  const openEditForm = (employee: any) => {
     setEditingEmployee(employee)
     setEmpId(employee.employee_id)
     setName(employee.name)
@@ -188,6 +196,10 @@ export function EmployeesPage() {
     setLatitude(employee.default_latitude ? String(employee.default_latitude) : '')
     setLongitude(employee.default_longitude ? String(employee.default_longitude) : '')
     setRadius(String(employee.default_radius ?? 100))
+    setShiftName(employee.shift_name || 'General Shift')
+    setShiftStartTime(employee.shift_start_time || '09:00')
+    setShiftEndTime(employee.shift_end_time || '18:00')
+    setWeeklyOffDays(employee.weekly_off_days || 'Sunday')
     setIsActive(employee.is_active)
     setProfilePhotoFile(null)
     setErrorMsg(null)
@@ -247,6 +259,10 @@ export function EmployeesPage() {
     if (latitude) formData.append('default_latitude', latitude)
     if (longitude) formData.append('default_longitude', longitude)
     formData.append('default_radius', radius)
+    formData.append('shift_name', shiftName)
+    formData.append('shift_start_time', shiftStartTime)
+    formData.append('shift_end_time', shiftEndTime)
+    formData.append('weekly_off_days', weeklyOffDays)
     formData.append('is_active', String(isActive))
 
     if (profilePhotoFile) {
@@ -451,21 +467,10 @@ export function EmployeesPage() {
                         </td>
 
                         {/* SESSION DETAILS */}
-                        <td style={{ verticalAlign: 'middle', fontSize: '0.75rem', color: 'var(--muted)' }}>
-                          {isPresent ? (
-                            <div>
-                              <div>📍 Location verified via portal</div>
-                              <div>
-                                {employee.active_session
-                                  ? 'Active working session'
-                                  : logoutTime
-                                  ? `Checkout ${logoutTime}`
-                                  : ''}
-                              </div>
-                            </div>
-                          ) : (
-                            '—'
-                          )}
+                        <td style={{ verticalAlign: 'middle', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>
+                          {employee.active_session
+                            ? `Active Session (${formatDuration(employee.session_duration_seconds)})`
+                            : `Inactive (${formatDuration(employee.session_duration_seconds)})`}
                         </td>
 
                         {/* ACTIONS */}
@@ -487,7 +492,7 @@ export function EmployeesPage() {
                               boxShadow: '0 2px 6px rgba(0,0,0,0.04)'
                             }}
                           >
-                            📍 {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
+                            {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
                           </button>
                         </td>
                       </tr>
@@ -524,7 +529,7 @@ export function EmployeesPage() {
                     </span>
                   </div>
                   <div style={{ fontSize: '0.8rem', color: 'var(--muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    📧 {employee.email}
+                    {employee.email}
                   </div>
                   {loginTime && <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>Check-in: {loginTime}{logoutTime ? ` · Out: ${logoutTime} (${formatDuration(employee.session_duration_seconds)})` : ''}</div>}
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
@@ -532,13 +537,13 @@ export function EmployeesPage() {
                       onClick={() => openEditForm(employee)}
                       style={{ border: '1px solid var(--border)', background: 'var(--panel)', borderRadius: '10px', padding: '0.3rem 0.7rem', fontSize: '0.78rem', cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }}
                     >
-                      ✏️ Edit
+                      Edit
                     </button>
                     <button
                       onClick={() => setSelectedEmployee(selectedEmployee?.id === employee.id ? null : employee)}
                       style={{ border: '1px solid var(--border)', background: 'var(--panel)', borderRadius: '10px', padding: '0.3rem 0.7rem', fontSize: '0.78rem', cursor: 'pointer', color: 'var(--text)', fontWeight: 600 }}
                     >
-                      📍 {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
+                      {selectedEmployee?.id === employee.id ? 'Close' : 'Track'}
                     </button>
                   </div>
                 </div>
@@ -709,8 +714,69 @@ export function EmployeesPage() {
                 <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Default Address</label>
                 <textarea value={defaultAddress} onChange={(e) => setDefaultAddress(e.target.value)} placeholder="e.g. Madhapur, Hyderabad" rows={2} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', resize: 'vertical', width: '100%' }} />
                 <button type="button" onClick={handleGeocode} disabled={isGeocoding} style={{ alignSelf: 'flex-start', padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(107, 47, 160, 0.08)', color: 'var(--primary)', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                  {isGeocoding ? '🔄 Locating...' : '📍 Auto-detect Coordinates'}
+                  {isGeocoding ? 'Locating...' : 'Auto-detect Coordinates'}
                 </button>
+              </div>
+
+              <div style={{ background: 'var(--accent-soft)', padding: '0.9rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)' }}>Shift Type Preset</label>
+                <select
+                  onChange={(e) => {
+                    const preset = e.target.value
+                    if (preset === '24hr') {
+                      setShiftName('24 Hour Regular Shift')
+                      setShiftStartTime('00:00')
+                      setShiftEndTime('23:59')
+                      setWeeklyOffDays('None')
+                    } else if (preset === 'general') {
+                      setShiftName('General Shift')
+                      setShiftStartTime('09:00')
+                      setShiftEndTime('18:00')
+                      setWeeklyOffDays('Sunday')
+                    } else if (preset === 'night') {
+                      setShiftName('Night Shift')
+                      setShiftStartTime('22:00')
+                      setShiftEndTime('06:00')
+                      setWeeklyOffDays('Sunday')
+                    }
+                  }}
+                  style={{
+                    padding: '0.6rem',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    background: 'var(--panel)',
+                    color: 'var(--text)',
+                    fontSize: '0.85rem',
+                    fontWeight: 600
+                  }}
+                >
+                  <option value="general">General Shift (09:00 - 18:00)</option>
+                  <option value="24hr">24 Hour Regular Shift (00:00 - 23:59)</option>
+                  <option value="night">Night Shift (22:00 - 06:00)</option>
+                  <option value="custom">Custom / Rotating Shift</option>
+                </select>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Shift Name</label>
+                  <input type="text" value={shiftName} onChange={(e) => setShiftName(e.target.value)} placeholder="e.g. 24 Hour Regular Shift" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
+                </div>
+                <div className="stack" style={{ gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Weekly Off Days</label>
+                  <input type="text" value={weeklyOffDays} onChange={(e) => setWeeklyOffDays(e.target.value)} placeholder="e.g. Sunday or None" style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
+                <div className="stack" style={{ gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Shift Start Time</label>
+                  <input type="time" value={shiftStartTime} onChange={(e) => setShiftStartTime(e.target.value)} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
+                </div>
+                <div className="stack" style={{ gap: '0.35rem' }}>
+                  <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Shift End Time</label>
+                  <input type="time" value={shiftEndTime} onChange={(e) => setShiftEndTime(e.target.value)} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', width: '100%' }} />
+                </div>
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
@@ -753,7 +819,7 @@ export function EmployeesPage() {
                       setDeleteRemark('')
                     }}
                   >
-                    🗑️ Delete Profile
+                    Delete Profile
                   </button>
                 ) : <div />}
                 <div style={{ display: 'flex', gap: '0.75rem', width: 'auto' }}>

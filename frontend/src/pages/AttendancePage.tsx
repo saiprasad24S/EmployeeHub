@@ -110,7 +110,7 @@ export function AttendancePage() {
             <h3>Today's Attendance Status</h3>
           </div>
           <button className="btn-primary" onClick={() => setIsDownloadModalOpen(true)}>
-            📥 Download Report
+            Download Report
           </button>
         </div>
 

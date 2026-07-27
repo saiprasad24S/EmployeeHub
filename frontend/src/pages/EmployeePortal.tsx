@@ -100,6 +100,9 @@ export function EmployeePortal() {
     if (typeof payload === 'string') return payload
     if (typeof payload === 'object' && payload !== null) {
       const record = payload as Record<string, unknown>
+      if ('message' in record && typeof record.message === 'string') {
+        return `Failed – ${record.message} You are not within your assigned work location.`
+      }
       if ('detail' in record && typeof record.detail === 'string') {
         return record.detail
       }
@@ -109,7 +112,6 @@ export function EmployeePortal() {
       if (Array.isArray(payload)) {
         return payload.map((item) => getErrorMessage(item, '')).filter(Boolean).join('; ') || fallback
       }
-      return JSON.stringify(payload)
     }
     return fallback
   }
@@ -726,7 +728,7 @@ export function EmployeePortal() {
                           onClick={() => startCamera('checkin')}
                           style={{ flex: 1, minWidth: '200px' }}
                         >
-                          ✅ Mark Attendance (Check In)
+                          Mark Attendance (Check In)
                         </button>
                       ) : (
                         <button
@@ -734,7 +736,7 @@ export function EmployeePortal() {
                           style={{ background: 'var(--danger)', flex: 1, minWidth: '200px' }}
                           onClick={() => startCamera('checkout')}
                         >
-                          🔴 Attendance Logout (Check Out)
+                          Attendance Logout (Check Out)
                         </button>
                       )}
                     </div>

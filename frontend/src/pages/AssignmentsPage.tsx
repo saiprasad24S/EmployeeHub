@@ -252,7 +252,7 @@ export function AssignmentsPage() {
             <p>Manage and assign visits, coordinates, and geofences for employees.</p>
           </div>
           <button className="btn-primary" onClick={openCreateForm}>
-            ➕ Schedule New Visit
+            Schedule New Visit
           </button>
         </div>
 
@@ -459,7 +459,7 @@ export function AssignmentsPage() {
                     marginTop: '0.2rem'
                   }}
                 >
-                  {isGeocoding ? '🔄 Locating...' : '📍 Auto-detect Latitude/Longitude'}
+                  {isGeocoding ? 'Locating...' : 'Auto-detect Latitude/Longitude'}
                 </button>
               </div>
 

@@ -15,6 +15,7 @@ from apps.accounts.models import Employee
 from apps.attendance.models import Attendance, Session
 from apps.attendance.serializers import AttendanceSerializer
 from apps.attendance.services import (
+    GeofenceValidationError,
     end_session,
     ensure_default_coordinates,
     generate_attendance_export,
@@ -90,12 +91,17 @@ class CheckInView(APIView):
                     {"detail": "Check-in successful.", "attendance": AttendanceSerializer(attendance).data, "session_id": session.id},
                     status=status.HTTP_201_CREATED,
                 )
+        except GeofenceValidationError as exc:
+            return Response(
+                {"success": False, "status": "failed", "message": "Attendance not marked."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except ValidationError as exc:
             print("[CHECKIN ERROR]", exc)
-            return Response({"detail": exc.detail if hasattr(exc, 'detail') else str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"success": False, "status": "failed", "message": "Attendance not marked."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
             print("[CHECKIN ERROR]", traceback.format_exc())
-            return Response({"detail": str(exc) or "Attendance check-in failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"success": False, "status": "failed", "message": "Attendance not marked."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CheckOutView(APIView):
@@ -152,12 +158,17 @@ class CheckOutView(APIView):
                 )
                 end_session(employee)
                 return Response({"detail": "Check-out successful.", "attendance": AttendanceSerializer(attendance).data})
+        except GeofenceValidationError as exc:
+            return Response(
+                {"success": False, "status": "failed", "message": "Attendance not marked."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         except ValidationError as exc:
             print("[CHECKOUT ERROR]", exc)
-            return Response({"detail": exc.detail if hasattr(exc, 'detail') else str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"success": False, "status": "failed", "message": "Attendance not marked."}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
             print("[CHECKOUT ERROR]", traceback.format_exc())
-            return Response({"detail": str(exc) or "Attendance check-out failed."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"success": False, "status": "failed", "message": "Attendance not marked."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AttendanceListView(APIView):

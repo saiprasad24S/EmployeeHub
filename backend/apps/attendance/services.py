@@ -67,6 +67,13 @@ def ensure_default_coordinates(employee: Employee) -> bool:
     return True
 
 
+class GeofenceValidationError(Exception):
+    def __init__(self, message: str = "Attendance not marked.", admin_details: dict | None = None):
+        super().__init__(message)
+        self.message = message
+        self.admin_details = admin_details or {}
+
+
 def validate_geofence(
     employee: Employee,
     assignment: Assignment | None,
@@ -78,7 +85,7 @@ def validate_geofence(
         radius = float(assignment.radius or settings.DEFAULT_GEOFENCE_RADIUS_METERS)
         target_lat = float(assignment.latitude)
         target_lon = float(assignment.longitude)
-        location_label = f"patient assignment location ({assignment.patient_name})"
+        location_label = assignment.patient_address or assignment.patient_name
     else:
         if employee.default_latitude is None or employee.default_longitude is None:
             if not employee.default_address or not ensure_default_coordinates(employee):
@@ -87,16 +94,32 @@ def validate_geofence(
         target_lon = float(employee.default_longitude)
         raw_radius = float(employee.default_radius or 0.1)
         radius = raw_radius * 1000 if raw_radius <= 10 else raw_radius
-        location_label = f"default work location ({employee.default_address or 'Profile Address'})"
+        location_label = employee.default_address or "Default Profile Location"
 
     distance = distance_meters(float(latitude), float(longitude), target_lat, target_lon)
     buffer = max(10.0, (accuracy or 0) * 1.5)
     if distance > radius + buffer:
-        dist_diff = round((distance - radius) / 1000, 2) if radius >= 1000 else round(distance - radius, 2)
-        unit_str = "km" if radius >= 1000 else "meters"
-        raise ValidationError({
-            "detail": f"Geofence Verification Failed: You are outside your {location_label} by {dist_diff} {unit_str}. Attendance request rejected."
-        })
+        dist_diff_km = round(distance / 1000, 2)
+        logger.warning(
+            "\n================ [ADMIN GEOFENCE LOG] ================\n"
+            "Employee:\n%s (%s)\n\n"
+            "Assigned Location:\n%s\n\n"
+            "Current Distance:\n%.2f km\n\n"
+            "Reason:\nOutside geofence (Allowed radius: %.0f meters)\n\n"
+            "Timestamp:\n%s\n"
+            "======================================================",
+            employee.name, employee.employee_id, location_label, dist_diff_km, radius, timezone.now()
+        )
+        raise GeofenceValidationError(
+            message="Attendance not marked.",
+            admin_details={
+                "employee": f"{employee.name} ({employee.employee_id})",
+                "assigned_location": location_label,
+                "current_distance_km": dist_diff_km,
+                "reason": "Outside geofence",
+                "timestamp": str(timezone.now()),
+            }
+        )
 
 
 def upload_selfie(
@@ -222,12 +245,14 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
     # Row 6: Main Header Row
     ws.cell(row=6, column=1, value="Employee ID")
     ws.cell(row=6, column=2, value="Employee Name")
+    ws.cell(row=6, column=3, value="Service Start")
 
-    # Merge Row 6 & Row 7 for first two columns
+    # Merge Row 6 & Row 7 for first three columns
     ws.merge_cells(start_row=6, start_column=1, end_row=7, end_column=1)
     ws.merge_cells(start_row=6, start_column=2, end_row=7, end_column=2)
+    ws.merge_cells(start_row=6, start_column=3, end_row=7, end_column=3)
 
-    col_idx = 3
+    col_idx = 4
     for dt in date_list:
         date_str = f"{dt.strftime('%d-%b-%Y')} ({dt.strftime('%a')})"
         ws.cell(row=6, column=col_idx, value=date_str)
@@ -240,9 +265,14 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
         
         col_idx += 3
 
+    # Last column: Working Days
+    working_days_col = col_idx
+    ws.cell(row=6, column=working_days_col, value="Working Days")
+    ws.merge_cells(start_row=6, start_column=working_days_col, end_row=7, end_column=working_days_col)
+
     # Apply Header Styles
     for r in range(6, 8):
-        for c in range(1, col_idx):
+        for c in range(1, working_days_col + 1):
             cell = ws.cell(row=r, column=c)
             cell.alignment = center_align
             cell.border = thin_border
@@ -250,7 +280,7 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
                 cell.fill = header_fill
                 cell.font = header_font
             else:
-                if c > 2:
+                if c >= 4 and c < working_days_col:
                     cell.fill = sub_header_fill
                     cell.font = sub_header_font
 
@@ -259,13 +289,17 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
     row_idx = 8
 
     for emp in employees:
+        service_start_str = emp.created_at.strftime("%d-%b-%Y") if emp.created_at else "-"
         ws.cell(row=row_idx, column=1, value=emp.employee_id).alignment = left_align
         ws.cell(row=row_idx, column=2, value=emp.name).alignment = left_align
+        ws.cell(row=row_idx, column=3, value=service_start_str).alignment = center_align
 
         ws.cell(row=row_idx, column=1).font = bold_font
         ws.cell(row=row_idx, column=2).font = bold_font
+        ws.cell(row=row_idx, column=3).font = regular_font
 
-        c_idx = 3
+        c_idx = 4
+        present_count = 0
         for dt in date_list:
             session = Session.objects.filter(employee=emp, login_time__date=dt).first()
             if not session:
@@ -276,6 +310,7 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
                 check_out_val = "-"
                 hours_val = "Absent"
             else:
+                present_count += 1
                 login_time = session.login_time
                 logout_time = session.logout_time
                 
@@ -307,15 +342,23 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
 
             c_idx += 3
 
+        # Write Working Days count in the last column
+        c_work = ws.cell(row=row_idx, column=working_days_col, value=present_count)
+        c_work.alignment = center_align
+        c_work.font = bold_font
+        c_work.border = thin_border
+
         row_idx += 1
 
-    # Apply borders to employee columns in data region
+    # Apply borders to employee fixed columns in data region
     for r in range(8, row_idx):
         ws.cell(row=r, column=1).border = thin_border
         ws.cell(row=r, column=2).border = thin_border
+        ws.cell(row=r, column=3).border = thin_border
+        ws.cell(row=r, column=working_days_col).border = thin_border
 
-    # Freeze Panes below headers and after column B
-    ws.freeze_panes = "C8"
+    # Freeze Panes below headers and after column C
+    ws.freeze_panes = "D8"
 
     # Auto-adjust column widths
     for col in ws.columns:

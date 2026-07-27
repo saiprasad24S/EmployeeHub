@@ -34,6 +34,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
             "default_latitude",
             "default_longitude",
             "default_radius",
+            "shift_name",
+            "shift_start_time",
+            "shift_end_time",
+            "weekly_off_days",
             "is_present",
             "presence_status",
             "session_login_time",
@@ -100,6 +104,10 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             "default_latitude",
             "default_longitude",
             "default_radius",
+            "shift_name",
+            "shift_start_time",
+            "shift_end_time",
+            "weekly_off_days",
         ]
 
 

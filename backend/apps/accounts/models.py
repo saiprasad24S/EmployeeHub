@@ -38,6 +38,10 @@ class Employee(models.Model):
     default_latitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     default_longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     default_radius = models.PositiveIntegerField(default=100)
+    shift_name = models.CharField(max_length=80, default="General Shift")
+    shift_start_time = models.TimeField(default="09:00:00")
+    shift_end_time = models.TimeField(default="18:00:00")
+    weekly_off_days = models.CharField(max_length=120, default="Sunday", help_text="Comma separated off days e.g. Sunday or Monday,Sunday")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -46,6 +50,18 @@ class Employee(models.Model):
 
     def __str__(self) -> str:
         return f"{self.employee_id} - {self.name}"
+
+    def get_weekly_off_days_list(self) -> list[str]:
+        if not self.weekly_off_days:
+            return ["Sunday"]
+        return [d.strip().title() for d in self.weekly_off_days.split(",") if d.strip()]
+
+    def is_weekly_off(self, target_date=None) -> bool:
+        from django.utils import timezone
+        if target_date is None:
+            target_date = timezone.localdate()
+        day_name = target_date.strftime("%A")
+        return day_name in self.get_weekly_off_days_list()
 
 
 @receiver(pre_save, sender=Employee)
