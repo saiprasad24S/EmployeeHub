@@ -195,6 +195,7 @@ else:
 
 logger.info("Database configuration source: %s", DB_CONFIG_SOURCE)
 
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env("CORS_ALLOWED_ORIGINS", default="").split(",") if origin.strip()]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https?://localhost(:\d+)?$",

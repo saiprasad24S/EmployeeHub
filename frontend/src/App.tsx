@@ -26,30 +26,37 @@ function MainAppSelector() {
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
 
-  useEffect(() => {
-    async function determineRole() {
-      try {
-        const token = await getToken()
-        if (!token) {
-          setAuthError('Missing Clerk session token.')
-          setLoading(false)
-          return
-        }
-        const res = await authedFetch('/api/auth/login', token, { method: 'POST' })
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}))
-          setAuthError(errData.detail || 'Access restricted. You are not registered in the system.')
-          setLoading(false)
-          return
-        }
-        const data = await res.json()
-        setRole(data.role)
+  const determineRole = async () => {
+    setLoading(true)
+    setAuthError(null)
+    try {
+      const token = await getToken()
+      if (!token) {
+        setAuthError('Missing authentication session token. Please log in again.')
         setLoading(false)
-      } catch (err: any) {
-        setAuthError(err.message || 'Verification failed')
-        setLoading(false)
+        return
       }
+      const res = await authedFetch('/api/auth/login', token, { method: 'POST' })
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        setAuthError(errData.detail || 'Access restricted. Your account is not registered in the system.')
+        setLoading(false)
+        return
+      }
+      const data = await res.json()
+      setRole(data.role)
+      setLoading(false)
+    } catch (err: any) {
+      setAuthError(
+        err.message === 'Failed to fetch'
+          ? 'Unable to connect to the server (Failed to fetch). Please ensure the backend server is running and accessible.'
+          : err.message || 'Verification failed'
+      )
+      setLoading(false)
     }
+  }
+
+  useEffect(() => {
     determineRole()
   }, [getToken])
 
@@ -67,12 +74,21 @@ function MainAppSelector() {
         <div className="unregistered-card">
           <div className="unregistered-icon">⚠️</div>
           <h2>Access Restricted</h2>
-          <p style={{ margin: '1rem 0 2rem 0', lineHeight: 1.6 }}>{authError || 'User profile not found.'}</p>
-          <SignOutButton>
-            <button className="btn-primary" style={{ background: 'var(--danger)', width: 'auto', padding: '0.8rem 2rem' }}>
-              Log Out / Switch Account
+          <p style={{ margin: '1rem 0 1.5rem 0', lineHeight: 1.6 }}>{authError || 'User profile not found.'}</p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn-primary"
+              onClick={determineRole}
+              style={{ width: 'auto', padding: '0.8rem 1.5rem' }}
+            >
+              Retry Connection
             </button>
-          </SignOutButton>
+            <SignOutButton>
+              <button className="btn-secondary" style={{ width: 'auto', padding: '0.8rem 1.5rem' }}>
+                Log Out / Switch Account
+              </button>
+            </SignOutButton>
+          </div>
         </div>
       </div>
     )
