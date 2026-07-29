@@ -1375,3 +1375,39 @@ form .stack textarea {
     border-radius: 14px !important;
   }
 }
+
+/* Invoice Portal Styles */
+.invoice-dash-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 10px 25px rgba(107, 47, 160, 0.15);
+}
+
+.active-tab-btn {
+  background: var(--primary) !important;
+  color: #ffffff !important;
+  border-color: var(--primary) !important;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .invoice-print-container, .invoice-print-container * {
+    visibility: visible;
+  }
+  .invoice-print-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 1.5cm !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}
+

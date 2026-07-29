@@ -9,7 +9,7 @@ const navItems = [
   { label: 'Attendance', to: '/attendance' },
   { label: 'Assignments', to: '/assignments' },
   { label: 'Live Tracking', to: '/tracking' },
-  { label: 'Settings', to: '/settings' },
+  { label: 'Invoice', to: '/invoice' },
 ]
 
 export function AppShell({ children }: PropsWithChildren) {

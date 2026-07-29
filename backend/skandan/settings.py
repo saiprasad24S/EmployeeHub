@@ -96,6 +96,7 @@ INSTALLED_APPS = [
     "apps.tracking",
     "apps.vision",
     "apps.analytics",
+    "apps.invoices",
 ]
 
 MIDDLEWARE = [

@@ -13,7 +13,8 @@ const EmployeesPage = lazy(() => import('./pages/EmployeesPage').then((m) => ({ 
 const AttendancePage = lazy(() => import('./pages/AttendancePage').then((m) => ({ default: m.AttendancePage })))
 const AssignmentsPage = lazy(() => import('./pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage })))
 const TrackingPage = lazy(() => import('./pages/TrackingPage').then((m) => ({ default: m.TrackingPage })))
-const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
+const InvoicePage = lazy(() => import('./pages/InvoicePage').then((m) => ({ default: m.InvoicePage })))
+const SettingsPage = lazy(() => import('./pages/InvoicePage').then((m) => ({ default: m.InvoicePage })))
 
 function RouteFallback() {
   return <div className="glass-card route-loading">Loading page...</div>
@@ -95,7 +96,8 @@ function MainAppSelector() {
           <Route path="/assignments" element={<AssignmentsPage />} />
           <Route path="/tracking" element={<TrackingPage />} />
           <Route path="/tracking/:employeeId" element={<TrackingPage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/invoice" element={<InvoicePage />} />
+          <Route path="/settings" element={<InvoicePage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

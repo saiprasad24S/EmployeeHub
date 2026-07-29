@@ -43,9 +43,10 @@ urlpatterns = [
     path("api/location/", include("apps.tracking.urls")),
     path("api/employees/", include("apps.accounts.employee_urls")),
     path("api/dashboard/", include("apps.analytics.urls")),
+    path("api/invoices/", include("apps.invoices.urls")),
     path("api/health/database", health_view, name="database-health"),
     path("api/health/cloudinary", cloudinary_health_view, name="cloudinary-health"),
 ]
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
