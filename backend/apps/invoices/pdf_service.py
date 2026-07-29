@@ -334,13 +334,43 @@ def generate_invoice_pdf(invoice) -> bytes:
 
     footer_text = Paragraph("<font color='#595959' size=7.5>This invoice is system generated. No signature is required.</font>", ParagraphStyle('F', parent=style_normal, alignment=1))
 
+    # Signatures Table (From Image 4)
+    sig_p1 = Paragraph("<b>Principal Signature</b>", ParagraphStyle('Sig', parent=style_normal, alignment=1, textColor=PRIMARY))
+    sig_p2 = Paragraph("<b>AO Signature</b>", ParagraphStyle('Sig', parent=style_normal, alignment=1, textColor=PRIMARY))
+    sig_p3 = Paragraph("<b>AGM Signature</b>", ParagraphStyle('Sig', parent=style_normal, alignment=1, textColor=PRIMARY))
+    sig_table = Table([[sig_p1, sig_p2, sig_p3]], colWidths=[185, 185, 185])
+    sig_table.setStyle(TableStyle([
+        ('LINEABOVE', (0,0), (-1,-1), 0.5, BORDER_CLR),
+        ('TOPPADDING', (0,0), (-1,-1), 10),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+    ]))
+
+    # OUR SERVICES Footer Bar (From Image 1/4)
+    services_bar_title = Paragraph("<font color='#102A71' size=8><b>OUR SERVICES</b></font>", ParagraphStyle('SBTitle', parent=style_normal, alignment=1))
+    services_list_text = Paragraph(
+        "<font color='#334155' size=7>ICU Care at Home &nbsp;|&nbsp; Doctor Visits &nbsp;|&nbsp; Nursing Care &nbsp;|&nbsp; Caretaker Services &nbsp;|&nbsp; Physiotherapy &nbsp;|&nbsp; Lab Tests at Home &nbsp;|&nbsp; Medical Equipment Rental &nbsp;|&nbsp; Medicine Delivery &nbsp;|&nbsp; Post-Operative Care</font>",
+        ParagraphStyle('SBBList', parent=style_normal, alignment=1)
+    )
+
+    services_bar_table = Table([[services_bar_title], [services_list_text]], colWidths=[555])
+    services_bar_table.setStyle(TableStyle([
+        ('LINEABOVE', (0,0), (-1,0), 1.5, PRIMARY),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('TOPPADDING', (0,0), (-1,-1), 2),
+        ('BOTTOMPADDING', (0,0), (-1,-1), 2),
+    ]))
+
     # Keep Totals & Payment info together
     bottom_section = KeepTogether([
         tot_block_table,
         Spacer(1, 8),
         bank_table,
         Spacer(1, 6),
-        footer_text
+        sig_table,
+        Spacer(1, 4),
+        footer_text,
+        Spacer(1, 4),
+        services_bar_table
     ])
 
     story.append(bottom_section)

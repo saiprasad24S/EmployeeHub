@@ -1008,9 +1008,43 @@ export function InvoicePage() {
 
             </div>
 
+            {/* Optional Signatures Block (From Image 4) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1.25rem', marginBottom: '1.25rem', textAlign: 'center', borderTop: '1px solid #E2E8F0', paddingTop: '1rem', fontSize: '0.78rem', fontWeight: 700, color: '#102A71' }}>
+              <div>
+                <div style={{ height: '35px' }}></div>
+                <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>Principal Signature</div>
+              </div>
+              <div>
+                <div style={{ height: '35px' }}></div>
+                <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>AO Signature</div>
+              </div>
+              <div>
+                <div style={{ height: '35px' }}></div>
+                <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>AGM Signature</div>
+              </div>
+            </div>
+
             {/* Footer Notice */}
-            <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748B', borderTop: '1px solid #E2E8F0', paddingTop: '0.75rem' }}>
+            <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748B', borderTop: '1px solid #E2E8F0', paddingTop: '0.5rem', marginBottom: '1rem' }}>
               This invoice is system generated. No signature is required.
+            </div>
+
+            {/* OUR SERVICES Footer Bar (From Image 1/4) */}
+            <div style={{ borderTop: '2px solid #102A71', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
+              <div style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, color: '#102A71', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
+                OUR SERVICES
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#334155', fontWeight: 600, flexWrap: 'wrap', gap: '0.3rem' }}>
+                <div>🛌 ICU Care at Home</div>
+                <div>👨‍⚕️ Doctor Visits</div>
+                <div>🩺 Nursing Care</div>
+                <div>🧑‍🦯 Caretaker Services</div>
+                <div>🏃 Physiotherapy</div>
+                <div>🔬 Lab Tests at Home</div>
+                <div>🩼 Medical Equipment Rental</div>
+                <div>💊 Medicine Delivery</div>
+                <div>🩹 Post-Operative Care</div>
+              </div>
             </div>
 
           </div>
