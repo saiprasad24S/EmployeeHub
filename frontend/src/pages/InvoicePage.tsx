@@ -804,40 +804,48 @@ export function InvoicePage() {
           <div className="invoice-print-container" style={{ background: '#ffffff', color: '#1A1A1A', padding: '2.5rem', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', maxWidth: '900px', margin: '0 auto', fontFamily: 'Arial, sans-serif', width: '100%' }}>
             
             {/* Header Block */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #CBD5E1', paddingBottom: '1.25rem', marginBottom: '1.25rem' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
               <div>
-                <img src="/assets/invoice/skandan_logo.png" alt="Skandan Logo" style={{ height: '55px', objectFit: 'contain', marginBottom: '0.4rem' }} />
-                <div style={{ fontSize: '0.8rem', color: '#475569', lineHeight: 1.5 }}>
-                  <strong>Plot No 13, SY NO 3,4, RR Plaza,</strong><br />
-                  Madhapur, Hyderabad, Telangana – 500081<br />
-                  <strong>Tel:</strong> +91 96609 66369 | <strong>Email:</strong> info@skandanhomecarre.com
-                </div>
+                <img src="/assets/invoice/skandan_logo.png" alt="Skandan Logo" style={{ height: '60px', objectFit: 'contain' }} />
               </div>
               
-              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.5rem' }}>
-                <h1 style={{ fontSize: '2rem', margin: 0, color: '#102A71', letterSpacing: '0.05em' }}>INVOICE</h1>
+              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
+                <h1 style={{ fontSize: '2.2rem', margin: 0, color: '#102A71', letterSpacing: '0.05em', fontFamily: 'serif', fontWeight: 'bold' }}>INVOICE</h1>
                 
                 {/* Code-128 Barcode Graphic */}
                 <div style={{ background: '#000', color: '#fff', padding: '4px 12px', fontFamily: 'monospace', letterSpacing: '4px', fontSize: '1rem', fontWeight: 'bold' }}>
                   |||||| ||| |||| || |||||||| ||||
                 </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '-0.3rem' }}>{invoiceNumber.replace(/\s+/g, '')}</div>
+                <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '-0.2rem' }}>{invoiceNumber.replace(/\s+/g, '')}</div>
+              </div>
+            </div>
 
-                <div style={{ fontSize: '0.82rem', color: '#1E293B', textAlign: 'right', lineHeight: 1.6, marginTop: '0.4rem' }}>
-                  <div><strong>Invoice No. :</strong> {invoiceNumber}</div>
-                  <div><strong>Invoice Date :</strong> {invoiceDate}</div>
-                  <div><strong>Billing Period :</strong> {billingPeriodText || 'N/A'}</div>
-                  <div><strong>Start Date :</strong> {startDateText || 'N/A'}</div>
-                </div>
+            {/* Sub-Header 3-Column Box (Address, Contact, Invoice Meta) */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.3fr 1.2fr', gap: '1rem', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem 1rem', background: '#FAFCFF', marginBottom: '1.25rem', fontSize: '0.78rem' }}>
+              <div>
+                <div><strong>📍 Plot No 13, SY NO 3,4, RR Plaza,</strong></div>
+                <div>Madhapur, Hyderabad,</div>
+                <div>Telangana – 500081</div>
+              </div>
+              <div>
+                <div><strong>📞 +91 96609 66369</strong></div>
+                <div><strong>✉️ info@skandanhomecarre.com</strong></div>
+                <div><strong>🌐 www.skandanhomecarre.com</strong></div>
+              </div>
+              <div style={{ lineHeight: 1.6 }}>
+                <div><strong>📱 Invoice No. :</strong> {invoiceNumber}</div>
+                <div><strong>📅 Invoice Date :</strong> {invoiceDate}</div>
+                <div><strong>🗓️ Billing Period :</strong> {billingPeriodText || 'N/A'}</div>
+                <div><strong>🗓️ Start Date :</strong> {startDateText || 'N/A'}</div>
               </div>
             </div>
 
             {/* Profile Grid (Billed To, Service Profile, Other Info) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.5rem' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
               
               {/* Billed To */}
-              <div style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '6px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>BILLED TO (CLIENT)</div>
+              <div style={{ background: '#FAFCFF', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem' }}>
+                <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>👤 BILLED TO (CLIENT)</div>
                 <div><strong>Client Name :</strong> {clientName || 'N/A'}</div>
                 <div><strong>Contact No. :</strong> {clientContact || 'N/A'}</div>
                 <div style={{ marginTop: '0.3rem' }}><strong>Address :</strong> {clientAddress || 'N/A'}</div>
@@ -846,30 +854,32 @@ export function InvoicePage() {
 
               {/* Service Profile */}
               {formType === 'SCHOOL' ? (
-                <div style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '6px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                  <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>INSTITUTION DETAILS</div>
+                <div style={{ background: '#FAFCFF', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem' }}>
+                  <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>🏫 INSTITUTION DETAILS</div>
                   <div><strong>School/Branch :</strong> {schoolBranch || 'N/A'}</div>
                   <div><strong>Contact Person :</strong> {contactPerson || 'N/A'}</div>
                   <div><strong>Designation :</strong> {contactPersonDesignation || 'N/A'}</div>
                   <div><strong>Nurses/Students :</strong> {noOfNurses} Nurses / {noOfStudents} Students</div>
                 </div>
               ) : (
-                <div style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '6px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                  <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>SERVICE PROFILE</div>
+                <div style={{ background: '#FAFCFF', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem' }}>
+                  <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>⚕️ SERVICE PROFILE</div>
                   <div><strong>Patient :</strong> {patientName || 'N/A'}</div>
                   <div><strong>Age / Gender :</strong> {patientAgeGender || 'N/A'}</div>
                   <div><strong>Service Type :</strong> {serviceType || 'N/A'}</div>
                   <div><strong>Consultant :</strong> {consultant || 'N/A'}</div>
+                  <div><strong>Service Started :</strong> {startDateText || 'N/A'}</div>
+                  <div><strong>Service End :</strong> In Process</div>
+                  <div><strong>Rendered Days :</strong> {renderedDays || 'N/A'}</div>
                 </div>
               )}
 
               {/* Other Info */}
-              <div style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '6px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>OTHER INFORMATION</div>
+              <div style={{ background: '#FAFCFF', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem' }}>
+                <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>ℹ️ OTHER INFORMATION</div>
                 <div><strong>Per Day Charges :</strong> ₹ {perDayCharges.toLocaleString()}</div>
                 <div><strong>Advance Amount :</strong> ₹ {advanceReceived.toLocaleString()}</div>
                 <div style={{ marginTop: '0.3rem' }}><strong>Payment Status :</strong> <span style={{ color: '#102A71', fontWeight: 700 }}>{paymentStatus}</span></div>
-                <div><strong>Rendered Days :</strong> {renderedDays || 'N/A'}</div>
               </div>
 
             </div>

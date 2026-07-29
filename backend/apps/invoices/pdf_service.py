@@ -107,42 +107,55 @@ def generate_invoice_pdf(invoice) -> bytes:
     # --- FULL HEADER BLOCK (Page 1) ---
     logo_img = RLImage(logo_path, width=190, height=48) if os.path.exists(logo_path) else Paragraph("<b>SKANDAN HOME CARE</b>", style_title)
     
-    header_address_text = (
-        "<b>Plot No 13, SY NO 3,4, RR Plaza,</b><br/>"
-        "Madhapur, Hyderabad, Telangana – 500081<br/>"
-        "<b>Tel:</b> +91 96609 66369 | <b>Email:</b> info@skandanhomecarre.com"
-    )
-
-    inv_meta_text = (
-        f"<b>Invoice No. :</b> {invoice.invoice_number}<br/>"
-        f"<b>Invoice Date :</b> {invoice.invoice_date.strftime('%d-%b-%Y') if invoice.invoice_date else ''}<br/>"
-        f"<b>Billing Period:</b> {invoice.billing_period_text or 'Monthly'}<br/>"
-        f"<b>Start Date :</b> {invoice.start_date.strftime('%d-%b-%Y') if invoice.start_date else ''}"
-    )
-
-    header_table_data = [
+    top_header_table = Table([
         [
             logo_img,
-            Paragraph("<font size=16 color='#102A71'><b>INVOICE</b></font>", ParagraphStyle('HRight', parent=style_normal, alignment=2)),
-        ],
-        [
-            Paragraph(header_address_text, style_normal),
-            barcode_obj,
+            Paragraph("<font size=20 color='#102A71'><b>INVOICE</b></font>", ParagraphStyle('HRight', parent=style_normal, alignment=2)),
         ],
         [
             Paragraph("", style_normal),
-            Paragraph(inv_meta_text, style_normal),
+            barcode_obj,
         ]
-    ]
-
-    header_table = Table(header_table_data, colWidths=[320, 235])
-    header_table.setStyle(TableStyle([
+    ], colWidths=[320, 235])
+    top_header_table.setStyle(TableStyle([
         ('VALIGN', (0,0), (-1,-1), 'TOP'),
         ('ALIGN', (1,0), (1,-1), 'RIGHT'),
-        ('BOTTOMPADDING', (0,0), (-1,-1), 1),
     ]))
-    story.append(header_table)
-    story.append(Spacer(1, 6))
+    story.append(top_header_table)
+    story.append(Spacer(1, 4))
+
+    # --- SUB-HEADER 3-COLUMN BOXED GRID ---
+    col1_addr = (
+        "<b>Plot No 13, SY NO 3,4, RR Plaza,</b><br/>"
+        "Madhapur, Hyderabad,<br/>"
+        "Telangana – 500081"
+    )
+    col2_contact = (
+        "<b>+91 96609 66369</b><br/>"
+        "<b>info@skandanhomecarre.com</b><br/>"
+        "<b>www.skandanhomecarre.com</b>"
+    )
+    col3_meta = (
+        f"<b>Invoice No. :</b> {invoice.invoice_number}<br/>"
+        f"<b>Invoice Date :</b> {invoice.invoice_date.strftime('%d-%b-%Y') if invoice.invoice_date else ''}<br/>"
+        f"<b>Billing Period :</b> {invoice.billing_period_text or 'Monthly'}<br/>"
+        f"<b>Start Date :</b> {invoice.start_date.strftime('%d-%b-%Y') if invoice.start_date else ''}"
+    )
+
+    sub_header_data = [[
+        Paragraph(col1_addr, style_normal),
+        Paragraph(col2_contact, style_normal),
+        Paragraph(col3_meta, style_normal),
+    ]]
+    sub_header_table = Table(sub_header_data, colWidths=[185, 185, 185])
+    sub_header_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), BG_LIGHT),
+        ('BOX', (0,0), (-1,-1), 0.5, BORDER_CLR),
+        ('PADDING', (0,0), (-1,-1), 5),
+        ('VALIGN', (0,0), (-1,-1), 'TOP'),
+    ]))
+    story.append(sub_header_table)
+    story.append(Spacer(1, 8))
 
     # --- CLIENT & SERVICE PROFILE BLOCK ---
     client_box = [
