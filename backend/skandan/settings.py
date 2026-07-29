@@ -148,7 +148,7 @@ MEDIA_ROOT = Path(_env("MEDIA_ROOT", default=str(BASE_DIR / "media")))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-DB_ENGINE = _env("DB_ENGINE", default="")
+DB_ENGINE = _env("DB_ENGINE", default="mysql")
 DB_NAME = _env("DB_NAME", default="")
 DB_USER = _env("DB_USER", default="")
 DB_PASSWORD = _env("DB_PASSWORD", default="")
@@ -190,17 +190,20 @@ if use_env_db:
     }
     DB_CONFIG_SOURCE = "env"
 else:
-    DATABASES = {"default": _database_config(_env("DATABASE_URL", default=""))}
-    DB_CONFIG_SOURCE = "DATABASE_URL"
+    db_url_val = _env("DATABASE_URL", default="")
+    if db_url_val:
+        DATABASES = {"default": _database_config(db_url_val)}
+        DB_CONFIG_SOURCE = "DATABASE_URL"
+    else:
+        DATABASES = {"default": {}}
+        DB_CONFIG_SOURCE = "none"
 
 logger.info("Database configuration source: %s", DB_CONFIG_SOURCE)
 
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env("CORS_ALLOWED_ORIGINS", default="").split(",") if origin.strip()]
 CORS_ALLOWED_ORIGIN_REGEXES = [
-    r"^https?://localhost(:\d+)?$",
-    r"^https?://127\.0\.0\.1(:\d+)?$",
-    r"^https?://192\.168\.\d+\.\d+(:\d+)?$",
+    r"^https?://.*$",
 ]
 CORS_ALLOW_CREDENTIALS = True
 
@@ -214,14 +217,14 @@ REST_FRAMEWORK = {
     "PAGE_SIZE": 25,
 }
 
-CLOUDINARY_STORAGE = {
-    "CLOUD_NAME": _env("CLOUDINARY_CLOUD_NAME", default=""),
-    "API_KEY": _env("CLOUDINARY_API_KEY", default=""),
-    "API_SECRET": _env("CLOUDINARY_API_SECRET", default=""),
-}
 CLOUDINARY_CLOUD_NAME = _env("CLOUDINARY_CLOUD_NAME", default="")
 CLOUDINARY_API_KEY = _env("CLOUDINARY_API_KEY", default="")
 CLOUDINARY_API_SECRET = _env("CLOUDINARY_API_SECRET", default="")
+CLOUDINARY_STORAGE = {
+    "CLOUD_NAME": CLOUDINARY_CLOUD_NAME,
+    "API_KEY": CLOUDINARY_API_KEY,
+    "API_SECRET": CLOUDINARY_API_SECRET,
+}
 CLOUDINARY_URL = _env("CLOUDINARY_URL", default="")
 CLOUDINARY_SECURE = _env_bool("CLOUDINARY_SECURE", default=True)
 CLOUDINARY_FOLDER = _env("CLOUDINARY_FOLDER", default="skandan")
@@ -234,7 +237,7 @@ AZURE_FACE_KEY = _env("AZURE_FACE_KEY", default="")
 AZURE_FACE_PERSON_GROUP_ID = _env("AZURE_FACE_PERSON_GROUP_ID", default="employeehub-face-group")
 
 CLERK_SECRET_KEY = _env("CLERK_SECRET_KEY", default="")
-CLERK_JWKS_URL = _env("CLERK_JWKS_URL", default="")
+CLERK_JWKS_URL = _env("CLERK_JWKS_URL", default="https://noble-vervet-62.clerk.accounts.dev/.well-known/jwks.json")
 CLERK_ISSUER = _env("CLERK_ISSUER", default="")
 CLERK_AUDIENCE = _env("CLERK_AUDIENCE", default="skandan-backend")
 DEFAULT_GEOFENCE_RADIUS_METERS = _env_int("DEFAULT_GEOFENCE_RADIUS_METERS", default=100)
