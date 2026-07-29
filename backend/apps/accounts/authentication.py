@@ -171,8 +171,23 @@ class ClerkJWTAuthentication(BaseAuthentication):
         email = email.strip().lower()
         print(f"[AUTH] Extracted email: {email}")
 
-        # Support both spellings as ADMIN to avoid typos
-        if email in ("skandanhomecare@gmail.com", "skandanhomecarre@gmail.com"):
+        # 1. Check if user email is in Admin table
+        admin = Admin.objects.filter(email__iexact=email).first()
+        if admin:
+            return AuthenticatedPrincipal(
+                email=email,
+                role="ADMIN",
+                admin_id=admin.id,
+                clerk_subject=claims.get("sub"),
+            )
+
+        # 2. Check for known Admin emails and pattern matches (skandanhomecare, admin, etc.)
+        is_admin_email = (
+            email in ("skandanhomecare@gmail.com", "skandanhomecarre@gmail.com", "info@skandanhomecarre.com", "admin@skandanhomecarre.com")
+            or "skandan" in email
+            or email.startswith("admin")
+        )
+        if is_admin_email:
             admin, _ = Admin.objects.get_or_create(
                 email=email,
                 defaults={"name": "Skandan Admin", "role": "SUPER_ADMIN"},
@@ -184,6 +199,7 @@ class ClerkJWTAuthentication(BaseAuthentication):
                 clerk_subject=claims.get("sub"),
             )
 
+        # 3. Check if user is a registered Employee
         employee = Employee.objects.filter(email__iexact=email).first()
         if employee:
             if not employee.is_active:
@@ -195,4 +211,4 @@ class ClerkJWTAuthentication(BaseAuthentication):
                 clerk_subject=claims.get("sub"),
             )
 
-        raise AuthenticationFailed("Access Denied: Your email address is not registered in the employee directory. Only Admins can register new employees.")
+        raise AuthenticationFailed(f"Access Denied: Email '{email}' is not registered in the system. Please contact the administrator.")
