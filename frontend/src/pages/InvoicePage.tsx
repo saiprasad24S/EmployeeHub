@@ -1008,21 +1008,23 @@ export function InvoicePage() {
 
             </div>
 
-            {/* Optional Signatures Block (From Image 4) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1.25rem', marginBottom: '1.25rem', textAlign: 'center', borderTop: '1px solid #E2E8F0', paddingTop: '1rem', fontSize: '0.78rem', fontWeight: 700, color: '#102A71' }}>
-              <div>
-                <div style={{ height: '35px' }}></div>
-                <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>Principal Signature</div>
+            {/* Optional Signatures Block (Shown for SCHOOL invoice template - Image 2) */}
+            {formType === 'SCHOOL' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1.25rem', marginBottom: '1.25rem', textAlign: 'center', borderTop: '1px solid #E2E8F0', paddingTop: '1rem', fontSize: '0.78rem', fontWeight: 700, color: '#102A71' }}>
+                <div>
+                  <div style={{ height: '35px' }}></div>
+                  <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>Principal Signature</div>
+                </div>
+                <div>
+                  <div style={{ height: '35px' }}></div>
+                  <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>AO Signature</div>
+                </div>
+                <div>
+                  <div style={{ height: '35px' }}></div>
+                  <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>AGM Signature</div>
+                </div>
               </div>
-              <div>
-                <div style={{ height: '35px' }}></div>
-                <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>AO Signature</div>
-              </div>
-              <div>
-                <div style={{ height: '35px' }}></div>
-                <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>AGM Signature</div>
-              </div>
-            </div>
+            )}
 
             {/* Footer Notice */}
             <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748B', borderTop: '1px solid #E2E8F0', paddingTop: '0.5rem', marginBottom: '1rem' }}>
