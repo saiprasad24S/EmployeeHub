@@ -800,7 +800,7 @@ export function InvoicePage() {
             </div>
           </div>
 
-          {/* Printable Invoice Container using Background Template Image */}
+          {/* Printable Invoice Container using 300 DPI Background Template Image */}
           <div
             className="invoice-print-container"
             style={{
@@ -825,23 +825,35 @@ export function InvoicePage() {
               fontSize: '0.8rem',
             }}
           >
-            {/* Dynamic Code-128 Barcode Top Right Box */}
+            {/* Market-Standard Code-128 Barcode Top Right Box */}
             <div
               style={{
                 position: 'absolute',
-                top: '5.2%',
-                right: '5.2%',
-                background: '#000',
-                color: '#fff',
-                padding: '2px 8px',
-                fontFamily: 'monospace',
-                letterSpacing: '2px',
-                fontSize: '0.8rem',
-                fontWeight: 'bold',
-                borderRadius: '2px',
+                top: '4.8%',
+                right: '4.8%',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
               }}
             >
-              |||||| ||| |||| || |||||||| ||||
+              <div
+                style={{
+                  background: '#fff',
+                  color: '#000',
+                  padding: '2px 8px',
+                  fontFamily: 'monospace',
+                  letterSpacing: '2px',
+                  fontSize: '0.85rem',
+                  fontWeight: 'bold',
+                  border: '1px solid #CBD5E1',
+                  borderRadius: '2px',
+                }}
+              >
+                |||||| ||| |||| || |||||||| ||||
+              </div>
+              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#000', marginTop: '1px' }}>
+                {invoiceNumber.replace(/\s+/g, '')}
+              </div>
             </div>
 
             {/* Top Right Header Meta Values (Aligned right after colon :) */}
@@ -912,7 +924,7 @@ export function InvoicePage() {
               {paymentStatus}
             </div>
 
-            {/* Dynamic Service Table Overlay Rows (Expands dynamically based on data entry) */}
+            {/* Dynamic Service Table Overlay Rows */}
             <div style={{ position: 'absolute', top: '48.5%', left: '2.5%', width: '95.0%' }}>
               {services.map((item, idx) => (
                 <div
@@ -948,28 +960,30 @@ export function InvoicePage() {
               {remarks || 'Invoice for the service period. Kindly process the due amount at the earliest.'}
             </div>
 
-            {/* Financial Summary Totals Overlay */}
-            <div style={{ position: 'absolute', top: '65.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
+            {/* Financial Summary Totals Overlay (Aligned on top of exact blank lines) */}
+            <div style={{ position: 'absolute', top: '64.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
               ₹ {gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '67.5%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
+            <div style={{ position: 'absolute', top: '66.3%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
               ₹ {discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '69.8%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#102A71' }}>
+            <div style={{ position: 'absolute', top: '68.4%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#102A71' }}>
               ₹ {totalAfterGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '72.0%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
+            <div style={{ position: 'absolute', top: '70.5%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
               ₹ {advanceReceived.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '74.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#102A71' }}>
+            <div style={{ position: 'absolute', top: '72.6%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#102A71' }}>
               ₹ {balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '77.0%', right: '5.5%', textAlign: 'right', fontWeight: 800, color: '#ffffff', fontSize: '0.9rem' }}>
+
+            {/* GRAND TOTAL Overlay (Inside Dark Navy Bar) */}
+            <div style={{ position: 'absolute', top: '75.2%', right: '5.5%', textAlign: 'right', fontWeight: 800, color: '#ffffff', fontSize: '0.9rem' }}>
               ₹ {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
 
-            {/* Amount In Words Overlay */}
-            <div style={{ position: 'absolute', top: '80.0%', left: '49.0%', fontWeight: 700, color: '#102A71', fontSize: '0.75rem', width: '47.0%' }}>
+            {/* Amount In Words Overlay (Directly on top of Amount In Words: line) */}
+            <div style={{ position: 'absolute', top: '78.5%', left: '51.0%', fontWeight: 700, color: '#102A71', fontSize: '0.75rem', width: '45.0%' }}>
               {amountInWords}
             </div>
 

@@ -1,6 +1,7 @@
 import os
 from io import BytesIO
 from django.conf import settings
+from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.graphics.barcode import code128
@@ -69,7 +70,7 @@ def generate_invoice_pdf(invoice) -> bytes:
     start_date_str = invoice.start_date.strftime("%d-%b-%Y") if getattr(invoice, "start_date", None) else ""
     billing_period_str = str(getattr(invoice, "billing_period_text", "")) or "Monthly"
 
-    # Select Background Template PNG
+    # Select Template Image
     if is_multi_page:
         bg_p1 = bg_multi_p1 if os.path.exists(bg_multi_p1) else bg_regular
     elif inv_type == "SCHOOL":
@@ -77,28 +78,31 @@ def generate_invoice_pdf(invoice) -> bytes:
     else:
         bg_p1 = bg_regular
 
-    # 1. Draw Crisp Background Template Image
+    # 1. Draw 300 DPI Ultra-Crisp Background Template Image
     if os.path.exists(bg_p1):
         c.drawImage(bg_p1, 0, 0, width=width, height=height)
 
-    # 2. Draw Dynamic Code-128 Barcode (Top Right Header)
+    # 2. Draw Clean Professional Code-128 Barcode (Black bars on white)
     try:
-        barcode_obj = code128.Code128(inv_num_clean, barHeight=20, barWidth=0.95)
-        barcode_obj.drawOn(c, 440, 770)
+        barcode_obj = code128.Code128(inv_num_clean, barHeight=18, barWidth=0.85, fillColor=colors.black)
+        barcode_obj.drawOn(c, 440, 772)
+        c.setFont("Helvetica-Bold", 7)
+        c.setFillColor(colors.black)
+        c.drawCentredString(507, 762, inv_num_clean)
     except Exception:
         pass
 
     # 3. Draw Top Right Header Meta Values (Aligned after colon)
     c.setFont("Helvetica-Bold", 8)
-    c.setFillColorRGB(0.06, 0.16, 0.44) # #102A71 Navy
+    c.setFillColor(colors.HexColor("#102A71"))
     c.drawString(475, 743, inv_num_str)
     c.drawString(475, 725, inv_date_str)
     c.drawString(475, 707, billing_period_str)
     c.drawString(475, 689, start_date_str)
 
-    # 4. Draw Profile Section
+    # 4. Draw Profile Grid
     c.setFont("Helvetica-Bold", 8)
-    c.setFillColorRGB(0.1, 0.1, 0.1)
+    c.setFillColor(colors.HexColor("#1A1A1A"))
     if inv_type == "SCHOOL":
         c.drawString(115, 620, str(getattr(invoice, "school_branch", "") or getattr(invoice, "client_name", "")))
         c.drawString(115, 592, str(getattr(invoice, "contact_person", "")))
@@ -131,9 +135,9 @@ def generate_invoice_pdf(invoice) -> bytes:
     c.drawString(480, 620, f"₹ {per_day:,.2f}" if per_day > 0 else "N/A")
     c.drawString(480, 592, f"₹ {adv_amt:,.2f}" if adv_amt > 0 else "Not Paid")
     c.setFont("Helvetica-Bold", 8)
-    c.setFillColorRGB(0.06, 0.16, 0.44)
+    c.setFillColor(colors.HexColor("#102A71"))
     c.drawString(480, 564, pay_stat)
-    c.setFillColorRGB(0.1, 0.1, 0.1)
+    c.setFillColor(colors.HexColor("#1A1A1A"))
 
     # 5. Dynamic Service Details Table Rows
     page1_items = services[:8] if is_multi_page else services
@@ -154,9 +158,9 @@ def generate_invoice_pdf(invoice) -> bytes:
         
         if desc:
             c.setFont("Helvetica", 6.5)
-            c.setFillColorRGB(0.35, 0.35, 0.35)
+            c.setFillColor(colors.HexColor("#595959"))
             c.drawString(56, y_pos - 8, desc[:60])
-            c.setFillColorRGB(0.1, 0.1, 0.1)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
 
         c.setFont("Helvetica", 7.5)
         c.drawRightString(292, y_pos, f"₹ {rate:,.2f}" if rate > 0 else "0.00")
@@ -175,7 +179,7 @@ def generate_invoice_pdf(invoice) -> bytes:
         rem_text = str(getattr(invoice, "remarks", "") or "Invoice for the service period. Kindly process the due amount at the earliest.")
         c.drawString(35, 235, rem_text[:65])
 
-        # Financial Summary Totals
+        # Financial Summary Totals (Aligned right on top of blank lines)
         subtotal = float(getattr(invoice, "subtotal", 0) or 0)
         gst = float(getattr(invoice, "gst", 0) or 0)
         discount = float(getattr(invoice, "discount", 0) or 0)
@@ -185,21 +189,22 @@ def generate_invoice_pdf(invoice) -> bytes:
         amt_words = str(getattr(invoice, "amount_in_words", "") or amount_in_rupees_words(grand_total))
 
         c.setFont("Helvetica-Bold", 8)
-        c.drawRightString(568, 252, f"₹ {gst:,.2f}")
-        c.drawRightString(568, 234, f"₹ {discount:,.2f}")
-        c.drawRightString(568, 216, f"₹ {tot_after_gst:,.2f}")
-        c.drawRightString(568, 198, f"₹ {adv_amt:,.2f}")
-        c.drawRightString(568, 180, f"₹ {balance_due:,.2f}")
+        c.setFillColor(colors.HexColor("#1A1A1A"))
+        c.drawRightString(568, 302, f"₹ {gst:,.2f}")
+        c.drawRightString(568, 284, f"₹ {discount:,.2f}")
+        c.drawRightString(568, 266, f"₹ {tot_after_gst:,.2f}")
+        c.drawRightString(568, 248, f"₹ {adv_amt:,.2f}")
+        c.drawRightString(568, 230, f"₹ {balance_due:,.2f}")
         
+        # Grand Total inside navy bar
         c.setFont("Helvetica-Bold", 9)
-        c.setFillColorRGB(1.0, 1.0, 1.0)
-        c.drawRightString(568, 158, f"₹ {grand_total:,.2f}")
-        c.setFillColorRGB(0.1, 0.1, 0.1)
+        c.setFillColor(colors.white)
+        c.drawRightString(568, 205, f"₹ {grand_total:,.2f}")
 
+        # Amount In Words
         c.setFont("Helvetica-Bold", 7.5)
-        c.setFillColorRGB(0.06, 0.16, 0.44)
-        c.drawString(335, 138, amt_words)
-        c.setFillColorRGB(0.1, 0.1, 0.1)
+        c.setFillColor(colors.HexColor("#102A71"))
+        c.drawString(345, 180, amt_words)
 
     # --- PAGE 2 DRAWING (FOR MULTI-PAGE > 8 ITEMS) ---
     if is_multi_page:
@@ -210,6 +215,7 @@ def generate_invoice_pdf(invoice) -> bytes:
 
         # Page 2 Top Meta Strip
         c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(colors.HexColor("#102A71"))
         c.drawString(75, 735, inv_num_str)
         c.drawString(190, 735, str(getattr(invoice, "patient_name", "") or getattr(invoice, "client_name", "")))
         c.drawString(330, 735, billing_period_str)
@@ -217,8 +223,11 @@ def generate_invoice_pdf(invoice) -> bytes:
 
         # Page 2 Barcode
         try:
-            barcode_obj = code128.Code128(inv_num_clean, barHeight=20, barWidth=0.95)
-            barcode_obj.drawOn(c, 440, 770)
+            barcode_obj = code128.Code128(inv_num_clean, barHeight=18, barWidth=0.85, fillColor=colors.black)
+            barcode_obj.drawOn(c, 440, 772)
+            c.setFont("Helvetica-Bold", 7)
+            c.setFillColor(colors.black)
+            c.drawCentredString(507, 762, inv_num_clean)
         except Exception:
             pass
 
@@ -241,9 +250,9 @@ def generate_invoice_pdf(invoice) -> bytes:
             
             if desc:
                 c.setFont("Helvetica", 6.5)
-                c.setFillColorRGB(0.35, 0.35, 0.35)
+                c.setFillColor(colors.HexColor("#595959"))
                 c.drawString(56, y_pos - 8, desc[:60])
-                c.setFillColorRGB(0.1, 0.1, 0.1)
+                c.setFillColor(colors.HexColor("#1A1A1A"))
 
             c.setFont("Helvetica", 7.5)
             c.drawRightString(292, y_pos, f"₹ {rate:,.2f}" if rate > 0 else "0.00")
@@ -269,21 +278,20 @@ def generate_invoice_pdf(invoice) -> bytes:
         amt_words = str(getattr(invoice, "amount_in_words", "") or amount_in_rupees_words(grand_total))
 
         c.setFont("Helvetica-Bold", 8)
-        c.drawRightString(568, 252, f"₹ {gst:,.2f}")
-        c.drawRightString(568, 234, f"₹ {discount:,.2f}")
-        c.drawRightString(568, 216, f"₹ {tot_after_gst:,.2f}")
-        c.drawRightString(568, 198, f"₹ {adv_amt:,.2f}")
-        c.drawRightString(568, 180, f"₹ {balance_due:,.2f}")
+        c.setFillColor(colors.HexColor("#1A1A1A"))
+        c.drawRightString(568, 302, f"₹ {gst:,.2f}")
+        c.drawRightString(568, 284, f"₹ {discount:,.2f}")
+        c.drawRightString(568, 266, f"₹ {tot_after_gst:,.2f}")
+        c.drawRightString(568, 248, f"₹ {adv_amt:,.2f}")
+        c.drawRightString(568, 230, f"₹ {balance_due:,.2f}")
         
         c.setFont("Helvetica-Bold", 9)
-        c.setFillColorRGB(1.0, 1.0, 1.0)
-        c.drawRightString(568, 158, f"₹ {grand_total:,.2f}")
-        c.setFillColorRGB(0.1, 0.1, 0.1)
+        c.setFillColor(colors.white)
+        c.drawRightString(568, 205, f"₹ {grand_total:,.2f}")
 
         c.setFont("Helvetica-Bold", 7.5)
-        c.setFillColorRGB(0.06, 0.16, 0.44)
-        c.drawString(335, 138, amt_words)
-        c.setFillColorRGB(0.1, 0.1, 0.1)
+        c.setFillColor(colors.HexColor("#102A71"))
+        c.drawString(345, 180, amt_words)
 
     c.save()
     pdf_data = buffer.getvalue()
