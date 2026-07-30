@@ -800,255 +800,176 @@ export function InvoicePage() {
             </div>
           </div>
 
-          {/* Printable Invoice Page Container */}
-          <div className="invoice-print-container" style={{ background: '#ffffff', color: '#1A1A1A', padding: '2.5rem', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.15)', maxWidth: '900px', margin: '0 auto', fontFamily: 'Arial, sans-serif', width: '100%' }}>
-            
-            {/* Header Block */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '1rem' }}>
-              <div>
-                <img src="/assets/invoice/skandan_logo.png" alt="Skandan Logo" style={{ height: '60px', objectFit: 'contain' }} />
-              </div>
-              
-              <div style={{ textAlign: 'right', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.2rem' }}>
-                <h1 style={{ fontSize: '2.2rem', margin: 0, color: '#102A71', letterSpacing: '0.05em', fontFamily: 'serif', fontWeight: 'bold' }}>INVOICE</h1>
-                
-                {/* Code-128 Barcode Graphic */}
-                <div style={{ background: '#000', color: '#fff', padding: '4px 12px', fontFamily: 'monospace', letterSpacing: '4px', fontSize: '1rem', fontWeight: 'bold' }}>
-                  |||||| ||| |||| || |||||||| ||||
-                </div>
-                <div style={{ fontSize: '0.75rem', color: '#64748B', marginTop: '-0.2rem' }}>{invoiceNumber.replace(/\s+/g, '')}</div>
-              </div>
+          {/* Printable Invoice Container using Uploaded Template Image as Background Layer */}
+          <div
+            className="invoice-print-container"
+            style={{
+              position: 'relative',
+              width: '100%',
+              maxWidth: '800px',
+              aspectRatio: '682 / 1024',
+              backgroundImage: `url(${
+                formType === 'SCHOOL'
+                  ? '/assets/invoice/template_school.png'
+                  : formType === 'MULTI_SERVICE'
+                  ? '/assets/invoice/template_multi_p1.png'
+                  : '/assets/invoice/template_regular.png'
+              })`,
+              backgroundSize: '100% 100%',
+              backgroundRepeat: 'no-repeat',
+              margin: '0 auto',
+              borderRadius: '8px',
+              boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
+              fontFamily: 'Arial, sans-serif',
+              color: '#1A1A1A',
+              fontSize: '0.8rem',
+            }}
+          >
+            {/* Dynamic Code-128 Barcode Top Right */}
+            <div
+              style={{
+                position: 'absolute',
+                top: '4.8%',
+                right: '4.5%',
+                background: '#000',
+                color: '#fff',
+                padding: '2px 8px',
+                fontFamily: 'monospace',
+                letterSpacing: '3px',
+                fontSize: '0.85rem',
+                fontWeight: 'bold',
+                borderRadius: '2px',
+              }}
+            >
+              |||||| ||| |||| || |||||||| ||||
             </div>
 
-            {/* Sub-Header 3-Column Box (Address, Contact, Invoice Meta) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.3fr 1.2fr', gap: '1rem', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem 1rem', background: '#FAFCFF', marginBottom: '1.25rem', fontSize: '0.78rem' }}>
-              <div>
-                <div><strong>📍 Plot No 13, SY NO 3,4, RR Plaza,</strong></div>
-                <div>Madhapur, Hyderabad,</div>
-                <div>Telangana – 500081</div>
-              </div>
-              <div>
-                <div><strong>📞 +91 96609 66369</strong></div>
-                <div><strong>✉️ info@skandanhomecarre.com</strong></div>
-                <div><strong>🌐 www.skandanhomecarre.com</strong></div>
-              </div>
-              <div style={{ lineHeight: 1.6 }}>
-                <div><strong>📱 Invoice No. :</strong> {invoiceNumber}</div>
-                <div><strong>📅 Invoice Date :</strong> {invoiceDate}</div>
-                <div><strong>🗓️ Billing Period :</strong> {billingPeriodText || 'N/A'}</div>
-                <div><strong>🗓️ Start Date :</strong> {startDateText || 'N/A'}</div>
-              </div>
+            {/* Top Right Header Meta Values */}
+            <div style={{ position: 'absolute', top: '11.5%', left: '71%', fontWeight: 700, fontSize: '0.78rem' }}>
+              {invoiceNumber}
+            </div>
+            <div style={{ position: 'absolute', top: '13.5%', left: '71%', fontWeight: 700, fontSize: '0.78rem' }}>
+              {invoiceDate}
+            </div>
+            <div style={{ position: 'absolute', top: '15.5%', left: '71%', fontWeight: 700, fontSize: '0.78rem' }}>
+              {billingPeriodText || 'Monthly'}
+            </div>
+            <div style={{ position: 'absolute', top: '17.5%', left: '71%', fontWeight: 700, fontSize: '0.78rem' }}>
+              {startDateText || 'N/A'}
             </div>
 
-            {/* Profile Grid (Billed To, Service Profile, Other Info) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginBottom: '1.25rem' }}>
-              
-              {/* Billed To */}
-              <div style={{ background: '#FAFCFF', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>👤 BILLED TO (CLIENT)</div>
-                <div><strong>Client Name :</strong> {clientName || 'N/A'}</div>
-                <div><strong>Contact No. :</strong> {clientContact || 'N/A'}</div>
-                <div style={{ marginTop: '0.3rem' }}><strong>Address :</strong> {clientAddress || 'N/A'}</div>
-                {clientGst && <div style={{ marginTop: '0.3rem' }}><strong>GST No. :</strong> {clientGst}</div>}
-              </div>
-
-              {/* Service Profile */}
-              {formType === 'SCHOOL' ? (
-                <div style={{ background: '#FAFCFF', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                  <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>🏫 INSTITUTION DETAILS</div>
-                  <div><strong>School/Branch :</strong> {schoolBranch || 'N/A'}</div>
-                  <div><strong>Contact Person :</strong> {contactPerson || 'N/A'}</div>
-                  <div><strong>Designation :</strong> {contactPersonDesignation || 'N/A'}</div>
-                  <div><strong>Nurses/Students :</strong> {noOfNurses} Nurses / {noOfStudents} Students</div>
-                </div>
-              ) : (
-                <div style={{ background: '#FAFCFF', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                  <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>⚕️ SERVICE PROFILE</div>
-                  <div><strong>Patient :</strong> {patientName || 'N/A'}</div>
-                  <div><strong>Age / Gender :</strong> {patientAgeGender || 'N/A'}</div>
-                  <div><strong>Service Type :</strong> {serviceType || 'N/A'}</div>
-                  <div><strong>Consultant :</strong> {consultant || 'N/A'}</div>
-                  <div><strong>Service Started :</strong> {startDateText || 'N/A'}</div>
-                  <div><strong>Service End :</strong> In Process</div>
-                  <div><strong>Rendered Days :</strong> {renderedDays || 'N/A'}</div>
-                </div>
-              )}
-
-              {/* Other Info */}
-              <div style={{ background: '#FAFCFF', border: '1px solid #CBD5E1', borderRadius: '8px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem', fontSize: '0.85rem' }}>ℹ️ OTHER INFORMATION</div>
-                <div><strong>Per Day Charges :</strong> ₹ {perDayCharges.toLocaleString()}</div>
-                <div><strong>Advance Amount :</strong> ₹ {advanceReceived.toLocaleString()}</div>
-                <div style={{ marginTop: '0.3rem' }}><strong>Payment Status :</strong> <span style={{ color: '#102A71', fontWeight: 700 }}>{paymentStatus}</span></div>
-              </div>
-
+            {/* Profile Section Box 1 (Billed To) */}
+            <div style={{ position: 'absolute', top: '26.8%', left: '17.5%', fontWeight: 700, fontSize: '0.78rem' }}>
+              {formType === 'SCHOOL' ? schoolBranch || clientName || 'N/A' : clientName || 'N/A'}
             </div>
-
-            {/* Service Details Table */}
-            <div style={{ marginBottom: '1.5rem' }}>
-              <div style={{ color: '#102A71', fontWeight: 800, fontSize: '0.9rem', marginBottom: '0.5rem' }}>SERVICE DETAILS</div>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem' }}>
-                <thead>
-                  <tr style={{ background: '#102A71', color: '#ffffff' }}>
-                    <th style={{ padding: '0.6rem', textAlign: 'center', border: '1px solid #102A71' }}>S.No.</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'left', border: '1px solid #102A71' }}>Particulars / Service Details</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'center', border: '1px solid #102A71' }}>Per Day Rate (₹)</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'center', border: '1px solid #102A71' }}>No. of Days</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'center', border: '1px solid #102A71' }}>Amount (₹)</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'center', border: '1px solid #102A71' }}>Other Expenses (₹)</th>
-                    <th style={{ padding: '0.6rem', textAlign: 'center', border: '1px solid #102A71' }}>Total (₹)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {services.map((item, idx) => (
-                    <tr key={idx} style={{ borderBottom: '1px solid #E2E8F0' }}>
-                      <td style={{ padding: '0.55rem', textAlign: 'center', fontWeight: 700, border: '1px solid #CBD5E1' }}>{idx + 1}</td>
-                      <td style={{ padding: '0.55rem', border: '1px solid #CBD5E1' }}>
-                        <div style={{ fontWeight: 700 }}>{item.service_name || 'Service Details'}</div>
-                        <div style={{ color: '#64748B', fontSize: '0.72rem' }}>{item.description}</div>
-                      </td>
-                      <td style={{ padding: '0.55rem', textAlign: 'center', border: '1px solid #CBD5E1' }}>{item.rate.toLocaleString()}</td>
-                      <td style={{ padding: '0.55rem', textAlign: 'center', border: '1px solid #CBD5E1' }}>{item.days}</td>
-                      <td style={{ padding: '0.55rem', textAlign: 'center', border: '1px solid #CBD5E1' }}>{item.amount.toLocaleString()}</td>
-                      <td style={{ padding: '0.55rem', textAlign: 'center', border: '1px solid #CBD5E1' }}>
-                        {item.other_expenses > 0 ? item.other_expenses.toLocaleString() : 'Not Applicable (Zero)'}
-                      </td>
-                      <td style={{ padding: '0.55rem', textAlign: 'center', fontWeight: 700, border: '1px solid #CBD5E1' }}>{item.total.toLocaleString()}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div style={{ position: 'absolute', top: '30.0%', left: '17.5%', fontWeight: 600, fontSize: '0.78rem' }}>
+              {formType === 'SCHOOL' ? contactPerson || clientContact || 'N/A' : clientContact || 'N/A'}
             </div>
-
-            {/* Remarks & Financial Totals Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.2fr', gap: '1.5rem', marginBottom: '1.5rem' }}>
-              
-              {/* Remarks */}
-              <div style={{ background: '#F8FAFC', border: '1px solid #CBD5E1', borderRadius: '6px', padding: '0.75rem', fontSize: '0.78rem' }}>
-                <div style={{ color: '#102A71', fontWeight: 800, marginBottom: '0.5rem' }}>REMARKS</div>
-                <div style={{ color: '#475569', lineHeight: 1.5, whiteSpace: 'pre-line' }}>{remarks || 'No specific remarks.'}</div>
-              </div>
-
-              {/* Totals Table */}
-              <div>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
-                  <tbody>
-                    <tr>
-                      <td style={{ padding: '0.35rem', color: '#475569' }}>Subtotal</td>
-                      <td style={{ padding: '0.35rem', textAlign: 'right', fontWeight: 600 }}>₹ {subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '0.35rem', color: '#475569' }}>GST</td>
-                      <td style={{ padding: '0.35rem', textAlign: 'right' }}>₹ {gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '0.35rem', color: '#475569' }}>Discount</td>
-                      <td style={{ padding: '0.35rem', textAlign: 'right' }}>₹ {discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                    <tr style={{ borderTop: '1px solid #CBD5E1', fontWeight: 700 }}>
-                      <td style={{ padding: '0.4rem', color: '#102A71' }}>Total After GST</td>
-                      <td style={{ padding: '0.4rem', textAlign: 'right' }}>₹ {totalAfterGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                    <tr>
-                      <td style={{ padding: '0.35rem', color: '#475569' }}>Advance Received</td>
-                      <td style={{ padding: '0.35rem', textAlign: 'right' }}>₹ {advanceReceived.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                    <tr style={{ borderTop: '1px solid #CBD5E1', fontWeight: 700 }}>
-                      <td style={{ padding: '0.4rem', color: '#102A71' }}>Balance Due</td>
-                      <td style={{ padding: '0.4rem', textAlign: 'right' }}>₹ {balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                    <tr style={{ background: '#102A71', color: '#ffffff', fontWeight: 800, fontSize: '0.95rem' }}>
-                      <td style={{ padding: '0.6rem' }}>GRAND TOTAL</td>
-                      <td style={{ padding: '0.6rem', textAlign: 'right' }}>₹ {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                    </tr>
-                  </tbody>
-                </table>
-                <div style={{ marginTop: '0.5rem', fontSize: '0.75rem', fontWeight: 700, color: '#102A71' }}>
-                  Amount In Words: <span style={{ color: '#334155', fontWeight: 600 }}>{amountInWords}</span>
-                </div>
-              </div>
-
+            <div style={{ position: 'absolute', top: '33.2%', left: '17.5%', fontSize: '0.75rem', width: '28%', lineHeight: 1.3 }}>
+              {clientAddress || 'N/A'}
             </div>
-
-            {/* Bank Transfer & UPI Payment Block */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1.5fr', gap: '1rem', border: '1px solid #CBD5E1', borderRadius: '6px', padding: '0.85rem', background: '#F8FAFC', marginBottom: '1.25rem' }}>
-              
-              {/* Bank Details */}
-              <div style={{ fontSize: '0.75rem', lineHeight: 1.6 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.4rem' }}>
-                  <img src="/assets/invoice/hdfc_logo.png" alt="HDFC Bank" style={{ height: '22px', objectFit: 'contain' }} />
-                  <span style={{ fontWeight: 800, color: '#102A71' }}>BANK TRANSFER (NEFT / RTGS)</span>
-                </div>
-                <div><strong>Beneficiary Name :</strong> SKANDAN HOME CARE & CCLINIC LLP</div>
-                <div><strong>Account Number :</strong> 50200090644327</div>
-                <div><strong>Account Type :</strong> Current Account</div>
-                <div><strong>IFSC Code :</strong> HDFC0004277</div>
-                <div><strong>MICR Code :</strong> 500240078</div>
-              </div>
-
-              {/* UPI Payment */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', borderLeft: '1px dashed #CBD5E1', paddingLeft: '1rem' }}>
-                <div style={{ flex: 1, fontSize: '0.75rem', lineHeight: 1.6 }}>
-                  <div style={{ fontWeight: 800, color: '#102A71', marginBottom: '0.2rem' }}>UPI PAYMENT</div>
-                  <div><strong>UPI ID:</strong> 9866613699@hdfcbank</div>
-                  <div style={{ marginTop: '0.4rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <img src="/assets/invoice/payment_methods.png" alt="Payment Apps" style={{ height: '22px', objectFit: 'contain' }} />
-                  </div>
-                </div>
-                
-                {/* QR Code */}
-                <div style={{ textAlign: 'center' }}>
-                  <img src="/assets/invoice/payment_qr_clean.png" alt="Payment QR" style={{ width: '75px', height: '75px', border: '1px solid #CBD5E1', padding: '2px', background: '#fff' }} />
-                  <div style={{ fontSize: '0.65rem', color: '#64748B', marginTop: '2px' }}>Scan & Pay</div>
-                </div>
-
-                {/* Verified Seal */}
-                <div>
-                  <img src="/assets/invoice/skandan_verified_seal.png" alt="Verified Seal" style={{ width: '75px', height: '75px', objectFit: 'contain' }} />
-                </div>
-              </div>
-
-            </div>
-
-            {/* Optional Signatures Block (Shown for SCHOOL invoice template) */}
-            {formType === 'SCHOOL' && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem', marginTop: '1.25rem', marginBottom: '1.25rem', textAlign: 'center', borderTop: '1px solid #E2E8F0', paddingTop: '1rem', fontSize: '0.78rem', fontWeight: 700, color: '#102A71' }}>
-                <div>
-                  <div style={{ height: '35px' }}></div>
-                  <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>Principal Signature</div>
-                </div>
-                <div>
-                  <div style={{ height: '35px' }}></div>
-                  <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>AO Signature</div>
-                </div>
-                <div>
-                  <div style={{ height: '35px' }}></div>
-                  <div style={{ borderTop: '1px solid #CBD5E1', paddingTop: '4px' }}>AGM Signature</div>
-                </div>
+            {clientGst && (
+              <div style={{ position: 'absolute', top: '36.4%', left: '17.5%', fontSize: '0.75rem' }}>
+                {clientGst}
               </div>
             )}
 
-            {/* Footer Notice */}
-            <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748B', borderTop: '1px solid #E2E8F0', paddingTop: '0.5rem', marginBottom: '1rem' }}>
-              This invoice is system generated. No signature is required.
+            {/* Profile Section Box 2 (Service Profile) */}
+            {formType !== 'SCHOOL' && (
+              <>
+                <div style={{ position: 'absolute', top: '26.8%', left: '46.5%', fontWeight: 700, fontSize: '0.78rem' }}>
+                  {patientName || 'N/A'}
+                </div>
+                <div style={{ position: 'absolute', top: '30.0%', left: '46.5%', fontSize: '0.78rem' }}>
+                  {patientAgeGender || 'N/A'}
+                </div>
+                <div style={{ position: 'absolute', top: '33.2%', left: '46.5%', fontSize: '0.78rem' }}>
+                  {serviceType || 'N/A'}
+                </div>
+                <div style={{ position: 'absolute', top: '36.4%', left: '46.5%', fontSize: '0.78rem' }}>
+                  {consultant || 'N/A'}
+                </div>
+                <div style={{ position: 'absolute', top: '39.6%', left: '46.5%', fontSize: '0.78rem' }}>
+                  {startDateText || 'N/A'}
+                </div>
+                <div style={{ position: 'absolute', top: '42.8%', left: '46.5%', fontSize: '0.78rem' }}>
+                  In Process
+                </div>
+                <div style={{ position: 'absolute', top: '46.0%', left: '46.5%', fontSize: '0.78rem' }}>
+                  {renderedDays || 'N/A'}
+                </div>
+              </>
+            )}
+
+            {/* Profile Section Box 3 (Other Information) */}
+            <div style={{ position: 'absolute', top: '26.8%', left: '80.0%', fontWeight: 700, fontSize: '0.78rem' }}>
+              ₹ {perDayCharges.toLocaleString()}
+            </div>
+            <div style={{ position: 'absolute', top: '30.0%', left: '80.0%', fontSize: '0.78rem' }}>
+              ₹ {advanceReceived.toLocaleString()}
+            </div>
+            <div style={{ position: 'absolute', top: '33.2%', left: '80.0%', fontWeight: 700, color: '#102A71', fontSize: '0.78rem' }}>
+              {paymentStatus}
             </div>
 
-            {/* OUR SERVICES Footer Bar */}
-            <div style={{ borderTop: '2px solid #102A71', paddingTop: '0.5rem', marginTop: '0.5rem' }}>
-              <div style={{ textAlign: 'center', fontSize: '0.75rem', fontWeight: 800, color: '#102A71', letterSpacing: '0.05em', marginBottom: '0.4rem' }}>
-                OUR SERVICES
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem', color: '#334155', fontWeight: 600, flexWrap: 'wrap', gap: '0.3rem' }}>
-                <div>ICU Care at Home</div>
-                <div>Doctor Visits</div>
-                <div>Nursing Care</div>
-                <div>Caretaker Services</div>
-                <div>Physiotherapy</div>
-                <div>Lab Tests at Home</div>
-                <div>Medical Equipment Rental</div>
-                <div>Medicine Delivery</div>
-                <div>Post-Operative Care</div>
-              </div>
+            {/* Service Table Overlay Rows */}
+            <div style={{ position: 'absolute', top: '49.0%', left: '2.5%', width: '95.0%' }}>
+              {services.slice(0, 8).map((item, idx) => (
+                <div
+                  key={idx}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: '5% 36% 12% 10% 12% 12% 13%',
+                    padding: '0.2rem 0',
+                    fontSize: '0.74rem',
+                    alignItems: 'center',
+                    minHeight: '28px',
+                  }}
+                >
+                  <div style={{ textAlign: 'center', fontWeight: 700 }}>{idx + 1}</div>
+                  <div>
+                    <div style={{ fontWeight: 700 }}>{item.service_name}</div>
+                    <div style={{ fontSize: '0.65rem', color: '#555' }}>{item.description}</div>
+                  </div>
+                  <div style={{ textAlign: 'right' }}>₹ {(item.rate || 0).toLocaleString()}</div>
+                  <div style={{ textAlign: 'center' }}>{item.days}</div>
+                  <div style={{ textAlign: 'right' }}>₹ {(item.amount || 0).toLocaleString()}</div>
+                  <div style={{ textAlign: 'center' }}>
+                    {item.other_expenses > 0 ? `₹ ${item.other_expenses.toLocaleString()}` : 'Not Applicable'}
+                  </div>
+                  <div style={{ textAlign: 'right', fontWeight: 700 }}>₹ {(item.total || 0).toLocaleString()}</div>
+                </div>
+              ))}
+            </div>
+
+            {/* Remarks Overlay */}
+            <div style={{ position: 'absolute', top: '67.0%', left: '5.5%', width: '33.0%', fontSize: '0.74rem', color: '#334155', lineHeight: 1.4 }}>
+              {remarks || 'Invoice for the service period. Kindly process the due amount at the earliest.'}
+            </div>
+
+            {/* Financial Summary Totals Overlay */}
+            <div style={{ position: 'absolute', top: '65.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+              ₹ {gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ position: 'absolute', top: '67.5%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+              ₹ {discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ position: 'absolute', top: '69.8%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+              ₹ {totalAfterGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ position: 'absolute', top: '72.0%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+              ₹ {advanceReceived.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ position: 'absolute', top: '74.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+              ₹ {balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div style={{ position: 'absolute', top: '77.0%', right: '5.5%', textAlign: 'right', fontWeight: 800, color: '#ffffff', fontSize: '0.9rem' }}>
+              ₹ {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+
+            {/* Amount In Words Overlay */}
+            <div style={{ position: 'absolute', top: '80.0%', left: '49.0%', fontWeight: 700, color: '#102A71', fontSize: '0.75rem', width: '47.0%' }}>
+              {amountInWords}
             </div>
 
           </div>
