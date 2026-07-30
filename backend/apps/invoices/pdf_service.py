@@ -69,7 +69,7 @@ def generate_invoice_pdf(invoice) -> bytes:
     start_date_str = invoice.start_date.strftime("%d-%b-%Y") if getattr(invoice, "start_date", None) else ""
     billing_period_str = str(getattr(invoice, "billing_period_text", "")) or "Monthly"
 
-    # --- PAGE 1 DRAWING ---
+    # Select Background Template PNG
     if is_multi_page:
         bg_p1 = bg_multi_p1 if os.path.exists(bg_multi_p1) else bg_regular
     elif inv_type == "SCHOOL":
@@ -77,64 +77,67 @@ def generate_invoice_pdf(invoice) -> bytes:
     else:
         bg_p1 = bg_regular
 
-    # 1. Draw Template Image Background
+    # 1. Draw Crisp Background Template Image
     if os.path.exists(bg_p1):
         c.drawImage(bg_p1, 0, 0, width=width, height=height)
 
-    # 2. Draw Barcode (Top Right Box)
+    # 2. Draw Dynamic Code-128 Barcode (Top Right Header)
     try:
-        barcode_obj = code128.Code128(inv_num_clean, barHeight=22, barWidth=1.0)
-        barcode_obj.drawOn(c, 435, 770)
+        barcode_obj = code128.Code128(inv_num_clean, barHeight=20, barWidth=0.95)
+        barcode_obj.drawOn(c, 440, 770)
     except Exception:
         pass
 
-    # 3. Draw Header Meta (Top Right Box)
+    # 3. Draw Top Right Header Meta Values (Aligned after colon)
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColorRGB(0.06, 0.16, 0.44) # #102A71 Navy
+    c.drawString(475, 743, inv_num_str)
+    c.drawString(475, 725, inv_date_str)
+    c.drawString(475, 707, billing_period_str)
+    c.drawString(475, 689, start_date_str)
+
+    # 4. Draw Profile Section
     c.setFont("Helvetica-Bold", 8)
     c.setFillColorRGB(0.1, 0.1, 0.1)
-    c.drawString(472, 744, inv_num_str)
-    c.drawString(472, 728, inv_date_str)
-    c.drawString(472, 712, billing_period_str)
-    c.drawString(472, 696, start_date_str)
-
-    # 4. Draw Profile Grid
-    c.setFont("Helvetica-Bold", 8)
     if inv_type == "SCHOOL":
-        c.drawString(110, 620, str(getattr(invoice, "school_branch", "") or getattr(invoice, "client_name", "")))
-        c.drawString(110, 594, str(getattr(invoice, "contact_person", "")))
-        c.drawString(110, 568, str(getattr(invoice, "client_contact", "")))
-        c.drawString(110, 542, str(getattr(invoice, "client_address", ""))[:40])
+        c.drawString(115, 620, str(getattr(invoice, "school_branch", "") or getattr(invoice, "client_name", "")))
+        c.drawString(115, 592, str(getattr(invoice, "contact_person", "")))
+        c.drawString(115, 564, str(getattr(invoice, "client_contact", "")))
+        c.drawString(115, 536, str(getattr(invoice, "client_address", ""))[:38])
     else:
-        c.drawString(100, 620, str(getattr(invoice, "client_name", "")))
-        c.drawString(100, 594, str(getattr(invoice, "client_contact", "")))
-        c.drawString(100, 568, str(getattr(invoice, "client_address", ""))[:40])
+        c.drawString(110, 620, str(getattr(invoice, "client_name", "")))
+        c.drawString(110, 592, str(getattr(invoice, "client_contact", "")))
+        c.drawString(110, 564, str(getattr(invoice, "client_address", ""))[:38])
         if getattr(invoice, "client_gst", None):
-            c.drawString(100, 536, str(invoice.client_gst))
+            c.drawString(110, 536, str(invoice.client_gst))
 
     # Service Profile (Middle Box)
     if inv_type != "SCHOOL":
         c.setFont("Helvetica", 8)
         c.drawString(278, 620, str(getattr(invoice, "patient_name", "")))
-        c.drawString(278, 594, str(getattr(invoice, "patient_age_gender", "")))
-        c.drawString(278, 568, str(getattr(invoice, "service_type", "")))
-        c.drawString(278, 542, str(getattr(invoice, "consultant", "")))
-        c.drawString(278, 516, start_date_str)
-        c.drawString(278, 490, "In Process")
-        c.drawString(278, 464, str(getattr(invoice, "rendered_days", "") or "30 Days"))
+        c.drawString(278, 598, str(getattr(invoice, "patient_age_gender", "")))
+        c.drawString(278, 576, str(getattr(invoice, "service_type", "")))
+        c.drawString(278, 554, str(getattr(invoice, "consultant", "")))
+        c.drawString(278, 532, start_date_str)
+        c.drawString(278, 510, "In Process")
+        c.drawString(278, 488, str(getattr(invoice, "rendered_days", "") or "30 Days"))
 
-    # Other Info (Right Box)
+    # Other Information (Right Box)
     c.setFont("Helvetica", 8)
     per_day = float(getattr(invoice, "per_day_charges", 0) or 0)
     adv_amt = float(getattr(invoice, "advance_received", 0) or 0)
     pay_stat = str(getattr(invoice, "payment_status", "Pending"))
 
     c.drawString(480, 620, f"₹ {per_day:,.2f}" if per_day > 0 else "N/A")
-    c.drawString(480, 594, f"₹ {adv_amt:,.2f}" if adv_amt > 0 else "Not Paid")
+    c.drawString(480, 592, f"₹ {adv_amt:,.2f}" if adv_amt > 0 else "Not Paid")
     c.setFont("Helvetica-Bold", 8)
-    c.drawString(480, 568, pay_stat)
+    c.setFillColorRGB(0.06, 0.16, 0.44)
+    c.drawString(480, 564, pay_stat)
+    c.setFillColorRGB(0.1, 0.1, 0.1)
 
-    # 5. Service Table Rows (Page 1)
-    page1_items = services[:9] if is_multi_page else services
-    y_pos = 415
+    # 5. Dynamic Service Details Table Rows
+    page1_items = services[:8] if is_multi_page else services
+    y_pos = 405
     for idx, item in enumerate(page1_items, 1):
         s_no = item.get("s_no", idx)
         name = item.get("service_name", "")
@@ -151,7 +154,7 @@ def generate_invoice_pdf(invoice) -> bytes:
         
         if desc:
             c.setFont("Helvetica", 6.5)
-            c.setFillColorRGB(0.3, 0.3, 0.3)
+            c.setFillColorRGB(0.35, 0.35, 0.35)
             c.drawString(56, y_pos - 8, desc[:60])
             c.setFillColorRGB(0.1, 0.1, 0.1)
 
@@ -163,16 +166,16 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.setFont("Helvetica-Bold", 7.5)
         c.drawRightString(568, y_pos, f"₹ {tot:,.2f}" if tot > 0 else "0.00")
 
-        y_pos -= 26
+        y_pos -= 25
 
-    # If Single Page (Regular / School), Draw Remarks & Financial Totals
+    # If Single-Page Invoice, Draw Remarks & Financial Totals
     if not is_multi_page:
-        # Remarks
+        # Remarks Box
         c.setFont("Helvetica", 7)
         rem_text = str(getattr(invoice, "remarks", "") or "Invoice for the service period. Kindly process the due amount at the earliest.")
-        c.drawString(35, 245, rem_text[:65])
+        c.drawString(35, 235, rem_text[:65])
 
-        # Financial Summary
+        # Financial Summary Totals
         subtotal = float(getattr(invoice, "subtotal", 0) or 0)
         gst = float(getattr(invoice, "gst", 0) or 0)
         discount = float(getattr(invoice, "discount", 0) or 0)
@@ -194,11 +197,13 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.setFillColorRGB(0.1, 0.1, 0.1)
 
         c.setFont("Helvetica-Bold", 7.5)
+        c.setFillColorRGB(0.06, 0.16, 0.44)
         c.drawString(335, 138, amt_words)
+        c.setFillColorRGB(0.1, 0.1, 0.1)
 
-    # --- PAGE 2 DRAWING (IF MULTI-PAGE) ---
+    # --- PAGE 2 DRAWING (FOR MULTI-PAGE > 8 ITEMS) ---
     if is_multi_page:
-        c.showPage() # End Page 1, start Page 2
+        c.showPage()
 
         if os.path.exists(bg_multi_p2):
             c.drawImage(bg_multi_p2, 0, 0, width=width, height=height)
@@ -210,17 +215,17 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.drawString(330, 735, billing_period_str)
         c.drawString(515, 735, "2 of 2")
 
-        # Barcode on Page 2
+        # Page 2 Barcode
         try:
-            barcode_obj = code128.Code128(inv_num_clean, barHeight=22, barWidth=1.0)
-            barcode_obj.drawOn(c, 435, 770)
+            barcode_obj = code128.Code128(inv_num_clean, barHeight=20, barWidth=0.95)
+            barcode_obj.drawOn(c, 440, 770)
         except Exception:
             pass
 
-        # Page 2 Service Rows (Items 10+)
-        page2_items = services[9:]
+        # Page 2 Service Rows (Items 9+)
+        page2_items = services[8:]
         y_pos = 665
-        for idx, item in enumerate(page2_items, 10):
+        for idx, item in enumerate(page2_items, 9):
             s_no = item.get("s_no", idx)
             name = item.get("service_name", "")
             desc = item.get("description", "")
@@ -236,7 +241,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             
             if desc:
                 c.setFont("Helvetica", 6.5)
-                c.setFillColorRGB(0.3, 0.3, 0.3)
+                c.setFillColorRGB(0.35, 0.35, 0.35)
                 c.drawString(56, y_pos - 8, desc[:60])
                 c.setFillColorRGB(0.1, 0.1, 0.1)
 
@@ -248,12 +253,12 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.setFont("Helvetica-Bold", 7.5)
             c.drawRightString(568, y_pos, f"₹ {tot:,.2f}" if tot > 0 else "0.00")
 
-            y_pos -= 26
+            y_pos -= 25
 
         # Page 2 Remarks & Totals
         c.setFont("Helvetica", 7)
         rem_text = str(getattr(invoice, "remarks", "") or "Invoice for the service period. Kindly process the due amount at the earliest.")
-        c.drawString(35, 245, rem_text[:65])
+        c.drawString(35, 235, rem_text[:65])
 
         subtotal = float(getattr(invoice, "subtotal", 0) or 0)
         gst = float(getattr(invoice, "gst", 0) or 0)
@@ -276,7 +281,9 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.setFillColorRGB(0.1, 0.1, 0.1)
 
         c.setFont("Helvetica-Bold", 7.5)
+        c.setFillColorRGB(0.06, 0.16, 0.44)
         c.drawString(335, 138, amt_words)
+        c.setFillColorRGB(0.1, 0.1, 0.1)
 
     c.save()
     pdf_data = buffer.getvalue()

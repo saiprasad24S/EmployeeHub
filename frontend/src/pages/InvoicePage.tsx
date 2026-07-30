@@ -800,13 +800,13 @@ export function InvoicePage() {
             </div>
           </div>
 
-          {/* Printable Invoice Container using Uploaded Template Image as Background Layer */}
+          {/* Printable Invoice Container using Background Template Image */}
           <div
             className="invoice-print-container"
             style={{
               position: 'relative',
               width: '100%',
-              maxWidth: '800px',
+              maxWidth: '850px',
               aspectRatio: '682 / 1024',
               backgroundImage: `url(${
                 formType === 'SCHOOL'
@@ -821,22 +821,22 @@ export function InvoicePage() {
               borderRadius: '8px',
               boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
               fontFamily: 'Arial, sans-serif',
-              color: '#1A1A1A',
+              color: '#102A71',
               fontSize: '0.8rem',
             }}
           >
-            {/* Dynamic Code-128 Barcode Top Right */}
+            {/* Dynamic Code-128 Barcode Top Right Box */}
             <div
               style={{
                 position: 'absolute',
-                top: '4.8%',
-                right: '4.5%',
+                top: '5.2%',
+                right: '5.2%',
                 background: '#000',
                 color: '#fff',
                 padding: '2px 8px',
                 fontFamily: 'monospace',
-                letterSpacing: '3px',
-                fontSize: '0.85rem',
+                letterSpacing: '2px',
+                fontSize: '0.8rem',
                 fontWeight: 'bold',
                 borderRadius: '2px',
               }}
@@ -844,32 +844,32 @@ export function InvoicePage() {
               |||||| ||| |||| || |||||||| ||||
             </div>
 
-            {/* Top Right Header Meta Values */}
-            <div style={{ position: 'absolute', top: '11.5%', left: '71%', fontWeight: 700, fontSize: '0.78rem' }}>
+            {/* Top Right Header Meta Values (Aligned right after colon :) */}
+            <div style={{ position: 'absolute', top: '11.8%', left: '79.5%', fontWeight: 700, fontSize: '0.78rem' }}>
               {invoiceNumber}
             </div>
-            <div style={{ position: 'absolute', top: '13.5%', left: '71%', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '13.9%', left: '79.5%', fontWeight: 700, fontSize: '0.78rem' }}>
               {invoiceDate}
             </div>
-            <div style={{ position: 'absolute', top: '15.5%', left: '71%', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '16.0%', left: '79.5%', fontWeight: 700, fontSize: '0.78rem' }}>
               {billingPeriodText || 'Monthly'}
             </div>
-            <div style={{ position: 'absolute', top: '17.5%', left: '71%', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '18.1%', left: '79.5%', fontWeight: 700, fontSize: '0.78rem' }}>
               {startDateText || 'N/A'}
             </div>
 
             {/* Profile Section Box 1 (Billed To) */}
-            <div style={{ position: 'absolute', top: '26.8%', left: '17.5%', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '26.8%', left: '19.5%', fontWeight: 700, fontSize: '0.78rem' }}>
               {formType === 'SCHOOL' ? schoolBranch || clientName || 'N/A' : clientName || 'N/A'}
             </div>
-            <div style={{ position: 'absolute', top: '30.0%', left: '17.5%', fontWeight: 600, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '30.0%', left: '19.5%', fontWeight: 600, fontSize: '0.78rem' }}>
               {formType === 'SCHOOL' ? contactPerson || clientContact || 'N/A' : clientContact || 'N/A'}
             </div>
-            <div style={{ position: 'absolute', top: '33.2%', left: '17.5%', fontSize: '0.75rem', width: '28%', lineHeight: 1.3 }}>
+            <div style={{ position: 'absolute', top: '33.2%', left: '19.5%', fontSize: '0.75rem', width: '28%', lineHeight: 1.3 }}>
               {clientAddress || 'N/A'}
             </div>
             {clientGst && (
-              <div style={{ position: 'absolute', top: '36.4%', left: '17.5%', fontSize: '0.75rem' }}>
+              <div style={{ position: 'absolute', top: '36.4%', left: '19.5%', fontSize: '0.75rem' }}>
                 {clientGst}
               </div>
             )}
@@ -877,44 +877,44 @@ export function InvoicePage() {
             {/* Profile Section Box 2 (Service Profile) */}
             {formType !== 'SCHOOL' && (
               <>
-                <div style={{ position: 'absolute', top: '26.8%', left: '46.5%', fontWeight: 700, fontSize: '0.78rem' }}>
+                <div style={{ position: 'absolute', top: '26.8%', left: '47.5%', fontWeight: 700, fontSize: '0.78rem' }}>
                   {patientName || 'N/A'}
                 </div>
-                <div style={{ position: 'absolute', top: '30.0%', left: '46.5%', fontSize: '0.78rem' }}>
+                <div style={{ position: 'absolute', top: '29.3%', left: '47.5%', fontSize: '0.78rem' }}>
                   {patientAgeGender || 'N/A'}
                 </div>
-                <div style={{ position: 'absolute', top: '33.2%', left: '46.5%', fontSize: '0.78rem' }}>
+                <div style={{ position: 'absolute', top: '31.8%', left: '47.5%', fontSize: '0.78rem' }}>
                   {serviceType || 'N/A'}
                 </div>
-                <div style={{ position: 'absolute', top: '36.4%', left: '46.5%', fontSize: '0.78rem' }}>
+                <div style={{ position: 'absolute', top: '34.3%', left: '47.5%', fontSize: '0.78rem' }}>
                   {consultant || 'N/A'}
                 </div>
-                <div style={{ position: 'absolute', top: '39.6%', left: '46.5%', fontSize: '0.78rem' }}>
+                <div style={{ position: 'absolute', top: '36.8%', left: '47.5%', fontSize: '0.78rem' }}>
                   {startDateText || 'N/A'}
                 </div>
-                <div style={{ position: 'absolute', top: '42.8%', left: '46.5%', fontSize: '0.78rem' }}>
+                <div style={{ position: 'absolute', top: '39.3%', left: '47.5%', fontSize: '0.78rem' }}>
                   In Process
                 </div>
-                <div style={{ position: 'absolute', top: '46.0%', left: '46.5%', fontSize: '0.78rem' }}>
+                <div style={{ position: 'absolute', top: '41.8%', left: '47.5%', fontSize: '0.78rem' }}>
                   {renderedDays || 'N/A'}
                 </div>
               </>
             )}
 
             {/* Profile Section Box 3 (Other Information) */}
-            <div style={{ position: 'absolute', top: '26.8%', left: '80.0%', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '26.8%', left: '81.5%', fontWeight: 700, fontSize: '0.78rem' }}>
               ₹ {perDayCharges.toLocaleString()}
             </div>
-            <div style={{ position: 'absolute', top: '30.0%', left: '80.0%', fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '30.0%', left: '81.5%', fontSize: '0.78rem' }}>
               ₹ {advanceReceived.toLocaleString()}
             </div>
-            <div style={{ position: 'absolute', top: '33.2%', left: '80.0%', fontWeight: 700, color: '#102A71', fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '33.2%', left: '81.5%', fontWeight: 700, color: '#102A71', fontSize: '0.78rem' }}>
               {paymentStatus}
             </div>
 
-            {/* Service Table Overlay Rows */}
-            <div style={{ position: 'absolute', top: '49.0%', left: '2.5%', width: '95.0%' }}>
-              {services.slice(0, 8).map((item, idx) => (
+            {/* Dynamic Service Table Overlay Rows (Expands dynamically based on data entry) */}
+            <div style={{ position: 'absolute', top: '48.5%', left: '2.5%', width: '95.0%' }}>
+              {services.map((item, idx) => (
                 <div
                   key={idx}
                   style={{
@@ -923,13 +923,14 @@ export function InvoicePage() {
                     padding: '0.2rem 0',
                     fontSize: '0.74rem',
                     alignItems: 'center',
-                    minHeight: '28px',
+                    minHeight: '26px',
+                    color: '#1A1A1A',
                   }}
                 >
                   <div style={{ textAlign: 'center', fontWeight: 700 }}>{idx + 1}</div>
                   <div>
                     <div style={{ fontWeight: 700 }}>{item.service_name}</div>
-                    <div style={{ fontSize: '0.65rem', color: '#555' }}>{item.description}</div>
+                    {item.description && <div style={{ fontSize: '0.65rem', color: '#555' }}>{item.description}</div>}
                   </div>
                   <div style={{ textAlign: 'right' }}>₹ {(item.rate || 0).toLocaleString()}</div>
                   <div style={{ textAlign: 'center' }}>{item.days}</div>
@@ -948,19 +949,19 @@ export function InvoicePage() {
             </div>
 
             {/* Financial Summary Totals Overlay */}
-            <div style={{ position: 'absolute', top: '65.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '65.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
               ₹ {gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '67.5%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '67.5%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
               ₹ {discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '69.8%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '69.8%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#102A71' }}>
               ₹ {totalAfterGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '72.0%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '72.0%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
               ₹ {advanceReceived.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <div style={{ position: 'absolute', top: '74.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem' }}>
+            <div style={{ position: 'absolute', top: '74.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#102A71' }}>
               ₹ {balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
             <div style={{ position: 'absolute', top: '77.0%', right: '5.5%', textAlign: 'right', fontWeight: 800, color: '#ffffff', fontSize: '0.9rem' }}>
