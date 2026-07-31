@@ -1,4 +1,3 @@
-import cloudinary.uploader
 from rest_framework import status, viewsets
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
