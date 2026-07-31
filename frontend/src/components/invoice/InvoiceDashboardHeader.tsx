@@ -47,11 +47,12 @@ export const InvoiceDashboardHeader: React.FC<InvoiceDashboardHeaderProps> = ({
         position: 'sticky',
         top: 0,
         zIndex: 40,
-        background: 'rgba(255,255,255,0.92)',
+        background: 'var(--inv-card)',
         backdropFilter: 'blur(16px)',
         WebkitBackdropFilter: 'blur(16px)',
-        borderBottom: '1px solid #D8E3F5',
+        borderBottom: '1px solid var(--inv-border)',
         padding: '0 24px',
+        color: 'var(--inv-text)',
       }}
     >
       <div

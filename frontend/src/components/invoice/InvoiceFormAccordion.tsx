@@ -19,28 +19,28 @@ const AccordionSection: React.FC<{
   children: React.ReactNode;
 }> = ({ id, title, icon, isOpen, onToggle, children }) => (
   <div style={{
-    background: '#fff', borderRadius: 12, border: '1px solid #D8E3F5',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.04)', marginBottom: 12, overflow: 'hidden',
+    background: 'var(--inv-card)', borderRadius: 12, border: '1px solid var(--inv-border)',
+    boxShadow: 'var(--inv-shadow-sm)', marginBottom: 12, overflow: 'hidden',
   }}>
     <button
       onClick={() => onToggle(id)}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '12px 16px', background: '#fff', border: 'none', cursor: 'pointer',
-        borderLeft: '4px solid #0B2C8C', transition: 'background 0.15s',
+        padding: '12px 16px', background: 'var(--inv-card)', border: 'none', cursor: 'pointer',
+        borderLeft: '4px solid var(--inv-primary)', transition: 'background 0.15s',
       }}
-      onMouseEnter={e => (e.currentTarget.style.background = '#FAFBFE')}
-      onMouseLeave={e => (e.currentTarget.style.background = '#fff')}
+      onMouseEnter={e => (e.currentTarget.style.background = 'var(--inv-bg)')}
+      onMouseLeave={e => (e.currentTarget.style.background = 'var(--inv-card)')}
     >
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <div style={{
-          width: 30, height: 30, borderRadius: '50%', background: '#DCE7FF',
-          display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#1A4DD8',
+          width: 30, height: 30, borderRadius: '50%', background: 'var(--inv-light-border)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--inv-royal)',
         }}>{icon}</div>
-        <span style={{ fontSize: 13, fontWeight: 600, color: '#1A1A1A', fontFamily: 'Poppins, sans-serif' }}>{title}</span>
+        <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--inv-text)', fontFamily: 'Poppins, sans-serif' }}>{title}</span>
       </div>
       <motion.div animate={{ rotate: isOpen ? 180 : 0 }} transition={{ duration: 0.2 }}>
-        <ChevronDown style={{ width: 16, height: 16, color: '#9CA3AF' }} />
+        <ChevronDown style={{ width: 16, height: 16, color: 'var(--inv-text-secondary)' }} />
       </motion.div>
     </button>
     <AnimatePresence initial={false}>
@@ -52,7 +52,7 @@ const AccordionSection: React.FC<{
           transition={{ duration: 0.25, ease: 'easeInOut' }}
           style={{ overflow: 'hidden' }}
         >
-          <div style={{ padding: '14px 16px', borderTop: '1px solid #F0F4FA', background: '#FAFBFE' }}>
+          <div style={{ padding: '14px 16px', borderTop: '1px solid var(--inv-border)', background: 'var(--inv-bg)' }}>
             {children}
           </div>
         </motion.div>
@@ -70,18 +70,18 @@ const InputField: React.FC<{
 }> = ({ label, icon, type = 'text', value, onChange, options, isTextarea, readOnly }) => {
   const baseInputStyle: React.CSSProperties = {
     width: '100%', paddingLeft: 34, paddingRight: 10, paddingTop: 8, paddingBottom: 8,
-    border: '1px solid #D8E3F5', borderRadius: 8, fontSize: 12, fontFamily: 'Poppins, sans-serif',
-    outline: 'none', background: readOnly ? '#F0F4FA' : '#fff', color: '#1A1A1A',
+    border: '1px solid var(--inv-border)', borderRadius: 8, fontSize: 12, fontFamily: 'Poppins, sans-serif',
+    outline: 'none', background: readOnly ? 'var(--inv-light-border)' : 'var(--inv-card)', color: 'var(--inv-text)',
     transition: 'border-color 0.2s, box-shadow 0.2s',
   };
   const handleFocus = (e: React.FocusEvent<HTMLElement>) => {
     if (!readOnly) {
-      (e.currentTarget as HTMLElement).style.borderColor = '#0B2C8C';
-      (e.currentTarget as HTMLElement).style.boxShadow = '0 0 0 3px rgba(11,44,140,0.1)';
+      (e.currentTarget as HTMLElement).style.borderColor = 'var(--inv-primary)';
+      (e.currentTarget as HTMLElement).style.boxShadow = '0 0 0 3px rgba(11,44,140,0.15)';
     }
   };
   const handleBlur = (e: React.FocusEvent<HTMLElement>) => {
-    (e.currentTarget as HTMLElement).style.borderColor = '#D8E3F5';
+    (e.currentTarget as HTMLElement).style.borderColor = 'var(--inv-border)';
     (e.currentTarget as HTMLElement).style.boxShadow = 'none';
   };
 
@@ -148,11 +148,9 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
   const updateService = (index: number, field: keyof ServiceItem, value: any) => {
     const updated = [...data.services];
     const row = { ...updated[index], [field]: value };
-    const rate = Number(row.rate) || 0;
-    const days = Number(row.days) || 0;
+    const amount = Number(row.amount) || 0;
     const otherExp = Number(row.other_expenses) || 0;
-    row.amount = rate * days;
-    row.total = row.amount + otherExp;
+    row.total = amount + otherExp;
     updated[index] = row;
     onChange({ ...data, services: updated });
   };
@@ -173,7 +171,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
 
   // Auto-calculated values
   const subtotal = useMemo(() => data.services.reduce((a, s) => a + (s.total || 0), 0), [data.services]);
-  const totalAfterGst = useMemo(() => subtotal + (Number(data.gstAmount) || 0) - (Number(data.discountAmount) || 0), [subtotal, data.gstAmount, data.discountAmount]);
+  const totalAfterGst = useMemo(() => subtotal + (Number(data.gstAmount) || 0), [subtotal, data.gstAmount]);
   const balanceDue = useMemo(() => totalAfterGst - (Number(data.advanceReceived) || 0), [totalAfterGst, data.advanceReceived]);
   const grandTotal = useMemo(() => Math.max(0, balanceDue), [balanceDue]);
 
@@ -183,7 +181,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
     <div style={{ fontFamily: 'Poppins, sans-serif' }}>
       {/* 1. Invoice Information */}
       <AccordionSection id="invoice" title="Invoice Information" icon={<FileText style={iconSize} />} isOpen={!!openSections.invoice} onToggle={toggleSection}>
-        <InputField label="Invoice Number" icon={<FileText style={iconSize} />} value={data.invoiceNumber} onChange={v => updateField('invoiceNumber', v)} />
+        <InputField label="Invoice Number (Auto-Generated)" icon={<FileText style={iconSize} />} value={data.invoiceNumber} onChange={v => updateField('invoiceNumber', v)} readOnly={true} />
         <InputField label="Invoice Date" icon={<Calendar style={iconSize} />} type="date" value={data.invoiceDate} onChange={v => updateField('invoiceDate', v)} />
         <InputField label="Billing Period" icon={<Calendar style={iconSize} />} value={data.billingPeriodText} onChange={v => updateField('billingPeriodText', v)} />
         <InputField label="Start Date" icon={<Calendar style={iconSize} />} value={data.startDateText} onChange={v => updateField('startDateText', v)} />
@@ -252,12 +250,10 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
             <thead>
               <tr style={{ background: '#0B2C8C', color: '#fff', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>
                 <th style={{ padding: '8px 6px', textAlign: 'center', width: 36 }}>S.No</th>
-                <th style={{ padding: '8px 6px', textAlign: 'left' }}>Service Name</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', width: 70 }}>Rate</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', width: 50 }}>Days</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', width: 70 }}>Amount</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', width: 70 }}>Other Exp</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', width: 70 }}>Total</th>
+                <th style={{ padding: '8px 6px', textAlign: 'left' }}>Service Details</th>
+                <th style={{ padding: '8px 6px', textAlign: 'right', width: 85 }}>Amount</th>
+                <th style={{ padding: '8px 6px', textAlign: 'right', width: 85 }}>Other Exp</th>
+                <th style={{ padding: '8px 6px', textAlign: 'right', width: 85 }}>Total</th>
                 <th style={{ padding: '8px 6px', width: 32 }}></th>
               </tr>
             </thead>
@@ -267,6 +263,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
                   <td style={{ padding: '6px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#616161' }}>{row.s_no}</td>
                   <td style={{ padding: '4px 6px' }}>
                     <input
+                      placeholder="Service name & details..."
                       value={row.service_name}
                       onChange={e => updateService(idx, 'service_name', e.target.value)}
                       style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 8px', fontSize: 11, outline: 'none', background: '#fff' }}
@@ -275,16 +272,10 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
                     />
                   </td>
                   <td style={{ padding: '4px 6px' }}>
-                    <input type="number" value={row.rate} onChange={e => updateService(idx, 'rate', Number(e.target.value))}
+                    <input type="number" value={row.amount} onChange={e => updateService(idx, 'amount', Number(e.target.value))}
                       style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 6px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}
                       onFocus={e => { e.currentTarget.style.borderColor = '#0B2C8C'; }} onBlur={e => { e.currentTarget.style.borderColor = '#E8ECF4'; }} />
                   </td>
-                  <td style={{ padding: '4px 6px' }}>
-                    <input type="number" value={row.days} onChange={e => updateService(idx, 'days', Number(e.target.value))}
-                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 6px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}
-                      onFocus={e => { e.currentTarget.style.borderColor = '#0B2C8C'; }} onBlur={e => { e.currentTarget.style.borderColor = '#E8ECF4'; }} />
-                  </td>
-                  <td style={{ padding: '6px', textAlign: 'right', fontSize: 11, fontWeight: 600, color: '#1A1A1A' }}>{(row.amount || 0).toLocaleString('en-IN')}</td>
                   <td style={{ padding: '4px 6px' }}>
                     <input type="number" value={row.other_expenses} onChange={e => updateService(idx, 'other_expenses', Number(e.target.value))}
                       style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 6px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}

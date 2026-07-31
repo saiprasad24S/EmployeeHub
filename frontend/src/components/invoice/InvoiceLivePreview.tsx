@@ -93,12 +93,27 @@ function numToWords(amount: number): string {
 
 const ROWS_PER_PAGE = 3;
 
+function generatePreviewHash(data: InvoicePreviewData): string {
+  if (data.displayHash) return data.displayHash;
+  const str = `${data.invoiceNumber}-${data.clientName}-${data.invoiceDate}-${data.services.length}-${data.perDayCharges}`;
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = (hash << 5) - hash + char;
+    hash |= 0;
+  }
+  const hex = Math.abs(hash).toString(16).toUpperCase().padStart(8, '0');
+  const invClean = (data.invoiceNumber || '1370').replace(/[^0-9]/g, '').slice(-4);
+  return (hex + invClean + '91C2').slice(0, 16);
+}
+
 export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zoom }) => {
-  const subtotal = data.services.reduce((acc, curr) => acc + curr.total, 0);
-  const totalAfterGst = subtotal + (data.gstAmount || 0) - (data.discountAmount || 0);
-  const balanceDue = totalAfterGst - data.advanceReceived;
-  const grandTotal = totalAfterGst;
+  const subtotal = data.services.reduce((acc, curr) => acc + (curr.total || 0), 0);
+  const totalAfterGst = subtotal + (data.gstAmount || 0);
+  const balanceDue = totalAfterGst - (data.advanceReceived || 0);
+  const grandTotal = Math.max(0, balanceDue);
   const amountInWords = numToWords(grandTotal);
+  const currentDisplayHash = generatePreviewHash(data);
 
   const isMultiPage = data.invoiceType === 'MULTI_SERVICE' || data.services.length > 3;
   const pages: ServiceItem[][] = [];
@@ -131,7 +146,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
         padding: '30px',
         position: 'relative',
         boxSizing: 'border-box',
-        fontFamily: "'Poppins', sans-serif",
+        fontFamily: '"Times New Roman", Times, serif',
         color: '#333',
         transform: `scale(${zoom / 100})`,
         transformOrigin: 'top center'
@@ -151,7 +166,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           <div style={{ flex: 1, textAlign: 'right' }}>
             <h1 style={{ color: '#0B2C8C', fontSize: '32px', margin: 0, fontStyle: 'italic', fontWeight: 'bold' }}>INVOICE</h1>
             <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#0B2C8C', marginTop: '4px', letterSpacing: '0.5px' }}>
-              Verification ID : {data.displayHash || '8A0D4C6E6E7F91C2'}
+              Verification ID : {currentDisplayHash}
             </div>
           </div>
         </div>
@@ -161,7 +176,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           <div style={{ textAlign: 'right' }}>
             <h2 style={{ color: '#0B2C8C', margin: 0, fontStyle: 'italic' }}>INVOICE</h2>
             <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#0B2C8C' }}>
-              Verification ID : {data.displayHash || '8A0D4C6E6E7F91C2'}
+              Verification ID : {currentDisplayHash}
             </div>
           </div>
         </div>
@@ -184,7 +199,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           </div>
           <div style={{ flex: 1, padding: '0 10px', borderRight: '1px solid #DCE7FF', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> +91 96609 66369</div>
-            <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> info@skandanhomecarre.com</div>
+            <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> skandanhomecarre@gmail.com</div>
             <div style={{ display: 'flex', alignItems: 'center' }}><Globe size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> www.skandanhomecarre.com</div>
           </div>
           <div style={{ flex: 1, paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: '500' }}>
@@ -259,7 +274,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
             <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               <div style={{ display: 'flex' }}><span style={{ width: '100px', color: '#666' }}>Per Day Chg:</span> <strong>₹ {data.perDayCharges}</strong></div>
               <div style={{ display: 'flex' }}><span style={{ width: '100px', color: '#666' }}>Adv. Amount:</span> <span>₹ {data.advanceReceived}</span></div>
-              <div style={{ display: 'flex' }}><span style={{ width: '100px', color: '#666' }}>Payment Status:</span> <span style={{ color: data.paymentStatus === 'PAID' ? 'green' : data.paymentStatus === 'PARTIAL' ? 'orange' : 'red', fontWeight: 'bold' }}>{data.paymentStatus}</span></div>
+              <div style={{ display: 'flex' }}><span style={{ width: '100px', color: '#666' }}>Payment Status:</span> <span style={{ color: '#0B2C8C', fontWeight: 'bold' }}>{data.paymentStatus}</span></div>
             </div>
           </div>
         </div>
@@ -276,13 +291,11 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '11px' }}>
           <thead>
             <tr style={{ backgroundColor: '#0B2C8C', color: 'white' }}>
-              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'center', width: '5%' }}>S.No</th>
-              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'left', width: '40%' }}>Particulars / Service Details</th>
-              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'right', width: '12%' }}>Rate (₹)</th>
-              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'center', width: '10%' }}>Days</th>
-              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'right', width: '12%' }}>Amount (₹)</th>
-              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'right', width: '9%' }}>Other (₹)</th>
-              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'right', width: '12%' }}>Total (₹)</th>
+              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'center', width: '6%' }}>S.No</th>
+              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'left', width: '54%' }}>Service Details</th>
+              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'right', width: '13%' }}>Amount (₹)</th>
+              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'right', width: '13%' }}>Other Expenses (₹)</th>
+              <th style={{ padding: '8px', border: '1px solid #061A63', textAlign: 'right', width: '14%' }}>Total (₹)</th>
             </tr>
           </thead>
           <tbody>
@@ -293,8 +306,6 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
                   <div style={{ fontWeight: '500' }}>{service.service_name}</div>
                   {service.description && <div style={{ fontSize: '10px', color: '#666', marginTop: '2px' }}>{service.description}</div>}
                 </td>
-                <td style={{ padding: '8px', borderRight: '1px solid #D8E3F5', textAlign: 'right' }}>{service.rate.toFixed(2)}</td>
-                <td style={{ padding: '8px', borderRight: '1px solid #D8E3F5', textAlign: 'center' }}>{service.days}</td>
                 <td style={{ padding: '8px', borderRight: '1px solid #D8E3F5', textAlign: 'right' }}>{service.amount.toFixed(2)}</td>
                 <td style={{ padding: '8px', borderRight: '1px solid #D8E3F5', textAlign: 'right' }}>{service.other_expenses.toFixed(2)}</td>
                 <td style={{ padding: '8px', borderRight: '1px solid #D8E3F5', textAlign: 'right', fontWeight: '500' }}>{service.total.toFixed(2)}</td>
@@ -334,29 +345,21 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
                   <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>Sub Total</td>
                   <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right', fontWeight: '500' }}>₹ {subtotal.toFixed(2)}</td>
                 </tr>
-                {data.gstAmount > 0 && (
-                  <tr>
-                    <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>GST</td>
-                    <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {data.gstAmount.toFixed(2)}</td>
-                  </tr>
-                )}
-                {data.discountAmount > 0 && (
-                  <tr>
-                    <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>Discount</td>
-                    <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right', color: 'green' }}>- ₹ {data.discountAmount.toFixed(2)}</td>
-                  </tr>
-                )}
+                <tr>
+                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>GST</td>
+                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {(data.gstAmount || 0).toFixed(2)}</td>
+                </tr>
                 <tr style={{ backgroundColor: '#F7F9FC' }}>
                   <td style={{ padding: '8px 6px', borderBottom: '1px solid #DCE7FF', fontWeight: 'bold', color: '#0B2C8C' }}>Total After GST</td>
                   <td style={{ padding: '8px 6px', borderBottom: '1px solid #DCE7FF', textAlign: 'right', fontWeight: 'bold', color: '#0B2C8C' }}>₹ {totalAfterGst.toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>Advance Received</td>
-                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {data.advanceReceived.toFixed(2)}</td>
+                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {(data.advanceReceived || 0).toFixed(2)}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: '8px 6px', fontWeight: 'bold', color: balanceDue > 0 ? '#d32f2f' : 'green' }}>Balance Due</td>
-                  <td style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 'bold', color: balanceDue > 0 ? '#d32f2f' : 'green' }}>₹ {balanceDue.toFixed(2)}</td>
+                  <td style={{ padding: '8px 6px', fontWeight: 'bold', color: '#0B2C8C' }}>Balance Due</td>
+                  <td style={{ padding: '8px 6px', textAlign: 'right', fontWeight: 'bold', color: '#0B2C8C' }}>₹ {balanceDue.toFixed(2)}</td>
                 </tr>
               </tbody>
             </table>

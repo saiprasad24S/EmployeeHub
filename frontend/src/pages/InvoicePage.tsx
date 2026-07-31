@@ -54,7 +54,7 @@ export interface Invoice {
 }
 
 const defaultInvoiceData: InvoicePreviewData = {
-  invoiceNumber: '1370 - 0001',
+  invoiceNumber: '1369-0001',
   invoiceType: 'REGULAR',
   invoiceDate: new Date().toISOString().split('T')[0],
   billingPeriodText: '',
@@ -119,15 +119,7 @@ export function InvoicePage() {
   const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false)
 
   // Invoice Data
-  const [invoiceData, setInvoiceData] = useState<InvoicePreviewData>(() => {
-    const savedDraft = localStorage.getItem('skandan_direct_invoice_draft')
-    if (savedDraft) {
-      try {
-        return JSON.parse(savedDraft)
-      } catch (_e) { /* ignore */ }
-    }
-    return defaultInvoiceData
-  })
+  const [invoiceData, setInvoiceData] = useState<InvoicePreviewData>(defaultInvoiceData)
 
   // Queries
   const nextNumQuery = useQuery({
@@ -135,10 +127,17 @@ export function InvoicePage() {
     queryFn: async () => {
       const token = (await getToken()) || ''
       const res = await authedFetch('/api/invoices/next-number', token)
-      if (!res.ok) return { next_invoice_number: '1370 - 0001' }
+      if (!res.ok) return { next_invoice_number: '1369-0001' }
       return res.json()
     },
   })
+
+  // Set initial invoice number when nextNumQuery finishes
+  useEffect(() => {
+    if (nextNumQuery.data?.next_invoice_number && invoiceData.invoiceNumber === '1369-0001') {
+      setInvoiceData((prev) => ({ ...prev, invoiceNumber: nextNumQuery.data.next_invoice_number }))
+    }
+  }, [nextNumQuery.data])
 
   const invoicesQuery = useQuery({
     queryKey: ['invoices-list', searchQuery],
@@ -177,11 +176,22 @@ export function InvoicePage() {
       }
       return res.json() as Promise<Invoice>
     },
-    onSuccess: (savedInvoice) => {
+    onSuccess: async (savedInvoice) => {
       setSelectedInvoice(savedInvoice)
       queryClient.invalidateQueries({ queryKey: ['invoices-list'] })
-      queryClient.invalidateQueries({ queryKey: ['invoice-next-number'] })
+      const updatedNext = await queryClient.fetchQuery({
+        queryKey: ['invoice-next-number'],
+        queryFn: async () => {
+          const token = (await getToken()) || ''
+          const res = await authedFetch('/api/invoices/next-number', token)
+          if (!res.ok) return { next_invoice_number: '1369-0001' }
+          return res.json()
+        },
+      })
       alert(`Invoice ${savedInvoice.invoice_number} saved & generated successfully!`)
+      if (updatedNext?.next_invoice_number) {
+        setInvoiceData((prev) => ({ ...prev, invoiceNumber: updatedNext.next_invoice_number }))
+      }
     },
     onError: (err: any) => {
       alert(`Error saving invoice: ${err.message}`)
@@ -215,7 +225,7 @@ export function InvoicePage() {
   }, [invoiceData])
 
   const handleOpenEditor = (type: 'REGULAR' | 'SCHOOL' | 'MULTI_SERVICE') => {
-    const nextNum = nextNumQuery.data?.next_invoice_number || '1370 - 0001'
+    const nextNum = nextNumQuery.data?.next_invoice_number || '1369-0001'
     setInvoiceData({
       ...defaultInvoiceData,
       invoiceNumber: nextNum,
@@ -228,7 +238,7 @@ export function InvoicePage() {
 
   const handleSaveInvoice = () => {
     const subtotal = invoiceData.services.reduce((a, b) => a + (b.total || 0), 0)
-    const totalAfterGst = subtotal + (Number(invoiceData.gstAmount) || 0) - (Number(invoiceData.discountAmount) || 0)
+    const totalAfterGst = subtotal + (Number(invoiceData.gstAmount) || 0)
     const balanceDue = totalAfterGst - (Number(invoiceData.advanceReceived) || 0)
     const grandTotal = Math.max(0, balanceDue)
 
@@ -339,7 +349,8 @@ export function InvoicePage() {
   // ---- RENDER ----
   const containerStyle: React.CSSProperties = {
     fontFamily: "'Poppins', 'Inter', sans-serif",
-    background: '#F7F9FC',
+    background: 'var(--inv-bg)',
+    color: 'var(--inv-text)',
     minHeight: '100vh',
     display: 'flex',
     flexDirection: 'column',
@@ -429,11 +440,11 @@ export function InvoicePage() {
                     transition={{ delay: i * 0.08, duration: 0.35 }}
                     whileHover={{ y: -4, boxShadow: '0 8px 30px rgba(11,44,140,0.12)' }}
                     style={{
-                      background: '#fff',
+                      background: 'var(--inv-card)',
                       borderRadius: 14,
                       padding: 20,
-                      border: '1px solid #D8E3F5',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                      border: '1px solid var(--inv-border)',
+                      boxShadow: 'var(--inv-shadow-sm)',
                       position: 'relative',
                       overflow: 'hidden',
                       cursor: 'default',
@@ -540,11 +551,11 @@ export function InvoicePage() {
                     whileHover={{ y: -3, boxShadow: '0 8px 30px rgba(11,44,140,0.10)' }}
                     onClick={() => handleOpenEditor(action.type)}
                     style={{
-                      background: '#fff',
+                      background: 'var(--inv-card)',
                       borderRadius: 14,
                       padding: 22,
-                      border: '1px solid #D8E3F5',
-                      boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                      border: '1px solid var(--inv-border)',
+                      boxShadow: 'var(--inv-shadow-sm)',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'flex-start',
@@ -566,8 +577,8 @@ export function InvoicePage() {
                       <action.icon style={{ width: 20, height: 20, color: action.color }} />
                     </div>
                     <div>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>{action.title}</div>
-                      <div style={{ fontSize: 11, color: '#616161', marginTop: 3 }}>{action.desc}</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--inv-text)' }}>{action.title}</div>
+                      <div style={{ fontSize: 11, color: 'var(--inv-text-secondary)', marginTop: 3 }}>{action.desc}</div>
                       <div
                         style={{
                           fontSize: 11,
@@ -592,10 +603,10 @@ export function InvoicePage() {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.5, duration: 0.35 }}
                 style={{
-                  background: '#fff',
+                  background: 'var(--inv-card)',
                   borderRadius: 14,
-                  border: '1px solid #D8E3F5',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                  border: '1px solid var(--inv-border)',
+                  boxShadow: 'var(--inv-shadow-sm)',
                   overflow: 'hidden',
                 }}
               >
@@ -787,8 +798,8 @@ export function InvoicePage() {
               {/* LEFT PANEL: Form */}
               <div
                 style={{
-                  borderRight: '1px solid #D8E3F5',
-                  background: '#F7F9FC',
+                  borderRight: '1px solid var(--inv-border)',
+                  background: 'var(--inv-bg)',
                   overflowY: 'auto',
                   overflowX: 'hidden',
                   padding: isPreviewFullscreen ? 0 : '16px',
@@ -804,7 +815,7 @@ export function InvoicePage() {
               {/* RIGHT PANEL: Live Preview */}
               <div
                 style={{
-                  background: '#E8ECF4',
+                  background: 'var(--inv-bg)',
                   overflowY: 'auto',
                   display: 'flex',
                   flexDirection: 'column',
@@ -817,13 +828,14 @@ export function InvoicePage() {
                     position: 'sticky',
                     top: 0,
                     zIndex: 20,
-                    background: 'rgba(232,236,244,0.92)',
+                    background: 'var(--inv-card)',
                     backdropFilter: 'blur(8px)',
                     padding: '8px 16px',
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'space-between',
-                    borderBottom: '1px solid #D8E3F5',
+                    borderBottom: '1px solid var(--inv-border)',
+                    color: 'var(--inv-text)',
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -943,19 +955,20 @@ export function InvoicePage() {
             >
               <div
                 style={{
-                  background: '#fff',
+                  background: 'var(--inv-card)',
                   borderRadius: 14,
-                  border: '1px solid #D8E3F5',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                  border: '1px solid var(--inv-border)',
+                  boxShadow: 'var(--inv-shadow-sm)',
                   overflow: 'hidden',
+                  color: 'var(--inv-text)',
                 }}
               >
-                <div style={{ padding: '16px 20px', borderBottom: '1px solid #F0F4FA' }}>
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--inv-border)' }}>
                   <div
                     style={{
                       fontSize: 14,
                       fontWeight: 700,
-                      color: '#0B2C8C',
+                      color: 'var(--inv-primary)',
                       marginBottom: 12,
                     }}
                   >
@@ -970,7 +983,7 @@ export function InvoicePage() {
                         transform: 'translateY(-50%)',
                         width: 16,
                         height: 16,
-                        color: '#9CA3AF',
+                        color: 'var(--inv-text-secondary)',
                       }}
                     />
                     <input
@@ -982,18 +995,20 @@ export function InvoicePage() {
                         width: '100%',
                         padding: '10px 14px 10px 38px',
                         borderRadius: 10,
-                        border: '1px solid #D8E3F5',
+                        border: '1px solid var(--inv-border)',
+                        background: 'var(--inv-bg)',
+                        color: 'var(--inv-text)',
                         fontSize: 12,
                         fontFamily: 'Poppins, sans-serif',
                         outline: 'none',
                         transition: 'border-color 0.2s, box-shadow 0.2s',
                       }}
                       onFocus={(e) => {
-                        e.currentTarget.style.borderColor = '#0B2C8C'
-                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(11,44,140,0.1)'
+                        e.currentTarget.style.borderColor = 'var(--inv-primary)'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(11,44,140,0.15)'
                       }}
                       onBlur={(e) => {
-                        e.currentTarget.style.borderColor = '#D8E3F5'
+                        e.currentTarget.style.borderColor = 'var(--inv-border)'
                         e.currentTarget.style.boxShadow = 'none'
                       }}
                     />
@@ -1129,11 +1144,12 @@ export function InvoicePage() {
             >
               <div
                 style={{
-                  background: '#fff',
+                  background: 'var(--inv-card)',
                   borderRadius: 14,
-                  border: '1px solid #D8E3F5',
-                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                  border: '1px solid var(--inv-border)',
+                  boxShadow: 'var(--inv-shadow-sm)',
                   padding: 24,
+                  color: 'var(--inv-text)',
                 }}
               >
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
@@ -1151,10 +1167,10 @@ export function InvoicePage() {
                     <ShieldCheck style={{ width: 20, height: 20, color: '#2E7D32' }} />
                   </div>
                   <div>
-                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0B2C8C' }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--inv-primary)' }}>
                       Verify Invoice Authenticity
                     </div>
-                    <div style={{ fontSize: 11, color: '#616161' }}>
+                    <div style={{ fontSize: 11, color: 'var(--inv-text-secondary)' }}>
                       Enter an Invoice Number or SHA-256 Hash to verify.
                     </div>
                   </div>
@@ -1171,7 +1187,9 @@ export function InvoicePage() {
                       flex: 1,
                       padding: '10px 14px',
                       borderRadius: 10,
-                      border: '1px solid #D8E3F5',
+                      border: '1px solid var(--inv-border)',
+                      background: 'var(--inv-bg)',
+                      color: 'var(--inv-text)',
                       fontSize: 12,
                       fontFamily: 'monospace',
                       fontWeight: 600,

@@ -3,25 +3,25 @@ from django.utils import timezone
 
 
 class InvoiceCounter(models.Model):
-    prefix = models.CharField(max_length=20, default="1370")
+    prefix = models.CharField(max_length=20, default="1369")
     last_number = models.PositiveIntegerField(default=0)
 
     @classmethod
     def get_next_number(cls) -> str:
         with transaction.atomic():
             counter, _ = cls.objects.select_for_update().get_or_create(
-                prefix="1370",
+                prefix="1369",
                 defaults={"last_number": 0}
             )
             counter.last_number += 1
             counter.save()
-            return f"{counter.prefix} - {counter.last_number:04d}"
+            return f"{counter.prefix}-{counter.last_number:04d}"
 
     @classmethod
     def peek_next_number(cls) -> str:
-        counter = cls.objects.filter(prefix="1370").first()
+        counter = cls.objects.filter(prefix="1369").first()
         next_num = (counter.last_number + 1) if counter else 1
-        return f"1370 - {next_num:04d}"
+        return f"1369-{next_num:04d}"
 
 
 class Invoice(models.Model):
