@@ -127,12 +127,12 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
       {/* Header */}
       {pageNumber === 1 ? (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
-          <div style={{ flex: 1 }}>
-            <img src="/assets/invoice/skandan_logo.png" alt="Skandan Logo" style={{ height: '70px', objectFit: 'contain' }} />
-            <div style={{ marginTop: '5px', color: '#0B2C8C', fontSize: '10px', fontStyle: 'italic', display: 'flex', alignItems: 'center' }}>
-              <span style={{ flex: 1, height: '1px', backgroundColor: '#0B2C8C', marginRight: '5px' }}></span>
+          <div style={{ flex: 1.2 }}>
+            <img src="/assets/invoice/skandan_logo.png" alt="Skandan Logo" style={{ height: '90px', maxWidth: '360px', objectFit: 'contain', display: 'block' }} />
+            <div style={{ marginTop: '2px', color: '#0B2C8C', fontSize: '10px', fontStyle: 'italic', display: 'flex', alignItems: 'center', maxWidth: '250px' }}>
+              <span style={{ flex: 1, height: '1px', backgroundColor: '#0B2C8C', marginRight: '6px' }}></span>
               Strive for service.
-              <span style={{ flex: 1, height: '1px', backgroundColor: '#0B2C8C', marginLeft: '5px' }}></span>
+              <span style={{ flex: 1, height: '1px', backgroundColor: '#0B2C8C', marginLeft: '6px' }}></span>
             </div>
           </div>
           <div style={{ flex: 1, textAlign: 'right' }}>
@@ -361,22 +361,8 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
       {/* Payment Info / Signatures (Only on last page) */}
       {isLastPage && (
         <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
-          {data.invoiceType === 'SCHOOL' ? (
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '40px', padding: '0 40px' }}>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ borderBottom: '1px solid #000', width: '150px', marginBottom: '8px' }}></div>
-                <div style={{ fontSize: '12px', fontWeight: 'bold' }}>Principal Signature</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ borderBottom: '1px solid #000', width: '150px', marginBottom: '8px' }}></div>
-                <div style={{ fontSize: '12px', fontWeight: 'bold' }}>AO Signature</div>
-              </div>
-              <div style={{ textAlign: 'center' }}>
-                <div style={{ borderBottom: '1px solid #000', width: '150px', marginBottom: '8px' }}></div>
-                <div style={{ fontSize: '12px', fontWeight: 'bold' }}>AGM Signature</div>
-              </div>
-            </div>
-          ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+            {/* Bank Details, UPI & Seal (Always present for all templates) */}
             <div style={{ display: 'flex', gap: '15px', border: '1px solid #DCE7FF', borderRadius: '6px', padding: '15px', backgroundColor: '#F7F9FC' }}>
               {/* Bank Details */}
               <div style={{ flex: 1.5, borderRight: '1px solid #DCE7FF', paddingRight: '15px' }}>
@@ -402,7 +388,6 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
                 <div style={{ fontWeight: 'bold', color: '#0B2C8C', fontSize: '12px', marginBottom: '5px' }}>UPI PAYMENT</div>
                 <img src="/assets/invoice/payment_qr_clean.png" alt="UPI QR" style={{ height: '80px', width: '80px', objectFit: 'contain' }} />
                 <div style={{ fontSize: '10px', marginTop: '5px' }}><strong>UPI ID:</strong> 9866613699@hdfcbank</div>
-                <img src="/assets/invoice/payment_methods.png" alt="Payment Methods" style={{ height: '15px', marginTop: '5px', objectFit: 'contain' }} />
               </div>
 
               {/* Seal */}
@@ -410,7 +395,25 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
                 <img src="/assets/invoice/skandan_verified_seal.png" alt="Verified Seal" style={{ height: '100px', objectFit: 'contain' }} />
               </div>
             </div>
-          )}
+
+            {/* Additional 3 Signatures Block for SCHOOL / College Invoice */}
+            {data.invoiceType === 'SCHOOL' && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '10px', marginBottom: '15px', padding: '0 40px' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ borderBottom: '1px solid #0B2C8C', width: '130px', marginBottom: '4px' }}></div>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#0B2C8C' }}>Principal Signature</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ borderBottom: '1px solid #0B2C8C', width: '130px', marginBottom: '4px' }}></div>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#0B2C8C' }}>AO Signature</div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ borderBottom: '1px solid #0B2C8C', width: '130px', marginBottom: '4px' }}></div>
+                  <div style={{ fontSize: '10px', fontWeight: 'bold', color: '#0B2C8C' }}>AGM Signature</div>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
