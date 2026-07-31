@@ -59,9 +59,8 @@ def generate_invoice_pdf(invoice) -> bytes:
     bg_multi_p1 = os.path.join(assets_dir, "template_multi_p1.png")
     bg_multi_p2 = os.path.join(assets_dir, "template_multi_p2.png")
 
-    inv_type = getattr(invoice, "invoice_type", "REGULAR")
-    services = getattr(invoice, "services_data", []) or []
-    is_multi_page = inv_type == "MULTI_SERVICE" or len(services) > 8
+    page1_limit = 2 if inv_type == "SCHOOL" else 3
+    is_multi_page = inv_type == "MULTI_SERVICE" or len(services) > page1_limit
 
     inv_num_str = str(getattr(invoice, "invoice_number", "1370 - 0001"))
     inv_num_clean = inv_num_str.replace(" ", "")
@@ -136,7 +135,7 @@ def generate_invoice_pdf(invoice) -> bytes:
     c.setFillColor(colors.HexColor("#1A1A1A"))
 
     # 5. Dynamic Service Details Table Rows
-    page1_items = services[:8] if is_multi_page else services
+    page1_items = services[:10] if is_multi_page else services
     y_pos = 405
     for idx, item in enumerate(page1_items, 1):
         s_no = item.get("s_no", idx)
@@ -202,7 +201,7 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.setFillColor(colors.HexColor("#102A71"))
         c.drawString(345, 180, amt_words)
 
-    # --- PAGE 2 DRAWING (FOR MULTI-PAGE > 8 ITEMS) ---
+    # --- PAGE 2 DRAWING (FOR MULTI-PAGE > 3 ITEMS) ---
     if is_multi_page:
         c.showPage()
 
@@ -222,10 +221,10 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.setFillColor(colors.HexColor("#102A71"))
         c.drawRightString(550, 770, f"Verification ID : {disp_hash}")
 
-        # Page 2 Service Rows (Items 9+)
-        page2_items = services[8:]
+        # Page 2 Service Rows
+        page2_items = services[10:]
         y_pos = 665
-        for idx, item in enumerate(page2_items, 9):
+        for idx, item in enumerate(page2_items, 11):
             s_no = item.get("s_no", idx)
             name = item.get("service_name", "")
             desc = item.get("description", "")

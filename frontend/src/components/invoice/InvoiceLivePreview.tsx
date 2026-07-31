@@ -91,7 +91,7 @@ function numToWords(amount: number): string {
   return str.trim() + ' Rupees Only';
 }
 
-const ROWS_PER_PAGE = 8;
+const ROWS_PER_PAGE = 3;
 
 export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zoom }) => {
   const subtotal = data.services.reduce((acc, curr) => acc + curr.total, 0);
@@ -100,12 +100,25 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
   const grandTotal = totalAfterGst;
   const amountInWords = numToWords(grandTotal);
 
-  const pages = [];
-  const totalPages = Math.ceil(data.services.length / ROWS_PER_PAGE) || 1;
+  const isMultiPage = data.invoiceType === 'MULTI_SERVICE' || data.services.length > 3;
+  const pages: ServiceItem[][] = [];
 
-  for (let i = 0; i < totalPages; i++) {
-    pages.push(data.services.slice(i * ROWS_PER_PAGE, (i + 1) * ROWS_PER_PAGE));
+  if (!isMultiPage) {
+    pages.push(data.services);
+  } else {
+    // On Page 1 of multi-page, Bank & Totals move to Page 2, so Page 1 table can fill up to 10 rows
+    pages.push(data.services.slice(0, 10));
+    let remaining = data.services.slice(10);
+    while (remaining.length > 0) {
+      pages.push(remaining.slice(0, 8));
+      remaining = remaining.slice(8);
+    }
+    // Force Page 2 so Remarks, Financial Summary, Bank Details & Stamp move to Page 2 when 4th row is created
+    if (pages.length === 1) {
+      pages.push([]);
+    }
   }
+  const totalPages = pages.length;
 
   const PageTemplate = ({ pageServices, pageNumber, isLastPage }: { pageServices: ServiceItem[], pageNumber: number, isLastPage: boolean }) => (
     <div 
@@ -300,7 +313,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
 
       {/* Financials & Remarks (Only on last page) */}
       {isLastPage && (
-        <div style={{ display: 'flex', gap: '20px', marginBottom: '20px' }}>
+        <div style={{ display: 'flex', gap: '20px', marginBottom: '10px' }}>
           {/* Remarks */}
           <div style={{ flex: 1.5 }}>
             <div style={{ border: '1px solid #DCE7FF', borderRadius: '4px', height: '100%', display: 'flex', flexDirection: 'column' }}>
@@ -360,7 +373,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
 
       {/* Payment Info / Signatures (Only on last page) */}
       {isLastPage && (
-        <div style={{ marginTop: 'auto', paddingTop: '20px' }}>
+        <div style={{ marginTop: '5px', paddingTop: '0px' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
             {/* Bank Details, UPI & Seal (Always present for all templates) */}
             <div style={{ display: 'flex', gap: '15px', border: '1px solid #DCE7FF', borderRadius: '6px', padding: '15px', backgroundColor: '#F7F9FC' }}>
@@ -419,9 +432,11 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
 
       {/* Footer (Always at bottom) */}
       <div style={{ position: 'absolute', bottom: '20px', left: '30px', right: '30px' }}>
-        <div style={{ textAlign: 'center', color: '#d32f2f', fontSize: '10px', fontStyle: 'italic', marginBottom: '10px' }}>
-          This invoice is system generated. No signature is required.
-        </div>
+        {isLastPage && (
+          <div style={{ textAlign: 'center', color: '#d32f2f', fontSize: '10px', fontStyle: 'italic', marginBottom: '10px' }}>
+            This invoice is system generated. No signature is required.
+          </div>
+        )}
         
         <div style={{ borderTop: '2px solid #0B2C8C', paddingTop: '10px' }}>
           <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', color: '#0B2C8C', marginBottom: '8px', letterSpacing: '1px' }}>
