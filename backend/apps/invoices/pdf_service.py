@@ -70,7 +70,7 @@ def generate_invoice_pdf(invoice) -> bytes:
     start_date_str = invoice.start_date.strftime("%d-%b-%Y") if getattr(invoice, "start_date", None) else ""
     billing_period_str = str(getattr(invoice, "billing_period_text", "")) or "Monthly"
 
-    # Select Template Image
+    # Select Background Template PNG
     if is_multi_page:
         bg_p1 = bg_multi_p1 if os.path.exists(bg_multi_p1) else bg_regular
     elif inv_type == "SCHOOL":
@@ -78,21 +78,17 @@ def generate_invoice_pdf(invoice) -> bytes:
     else:
         bg_p1 = bg_regular
 
-    # 1. Draw 300 DPI Ultra-Crisp Background Template Image
+    # 1. Draw 300 DPI Background Template Image
     if os.path.exists(bg_p1):
         c.drawImage(bg_p1, 0, 0, width=width, height=height)
 
-    # 2. Draw Clean Professional Code-128 Barcode (Black bars on white)
-    try:
-        barcode_obj = code128.Code128(inv_num_clean, barHeight=18, barWidth=0.85, fillColor=colors.black)
-        barcode_obj.drawOn(c, 440, 772)
-        c.setFont("Helvetica-Bold", 7)
-        c.setFillColor(colors.black)
-        c.drawCentredString(507, 762, inv_num_clean)
-    except Exception:
-        pass
+    # 2. Draw Verification ID below INVOICE
+    disp_hash = getattr(invoice, "display_hash", None) or (getattr(invoice, "verification_hash", "")[:16] if getattr(invoice, "verification_hash", None) else "8A0D4C6E6E7F91C2")
+    c.setFont("Helvetica-Bold", 8)
+    c.setFillColor(colors.HexColor("#102A71"))
+    c.drawRightString(550, 770, f"Verification ID : {disp_hash}")
 
-    # 3. Draw Top Right Header Meta Values (Aligned after colon)
+    # 3. Draw Top Right Header Meta Values (Aligned right after colon :)
     c.setFont("Helvetica-Bold", 8)
     c.setFillColor(colors.HexColor("#102A71"))
     c.drawString(475, 743, inv_num_str)
@@ -100,7 +96,7 @@ def generate_invoice_pdf(invoice) -> bytes:
     c.drawString(475, 707, billing_period_str)
     c.drawString(475, 689, start_date_str)
 
-    # 4. Draw Profile Grid
+    # 4. Draw Profile Grid Values
     c.setFont("Helvetica-Bold", 8)
     c.setFillColor(colors.HexColor("#1A1A1A"))
     if inv_type == "SCHOOL":
@@ -179,7 +175,7 @@ def generate_invoice_pdf(invoice) -> bytes:
         rem_text = str(getattr(invoice, "remarks", "") or "Invoice for the service period. Kindly process the due amount at the earliest.")
         c.drawString(35, 235, rem_text[:65])
 
-        # Financial Summary Totals (Aligned right on top of blank lines)
+        # Financial Summary Totals
         subtotal = float(getattr(invoice, "subtotal", 0) or 0)
         gst = float(getattr(invoice, "gst", 0) or 0)
         discount = float(getattr(invoice, "discount", 0) or 0)
@@ -221,15 +217,10 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.drawString(330, 735, billing_period_str)
         c.drawString(515, 735, "2 of 2")
 
-        # Page 2 Barcode
-        try:
-            barcode_obj = code128.Code128(inv_num_clean, barHeight=18, barWidth=0.85, fillColor=colors.black)
-            barcode_obj.drawOn(c, 440, 772)
-            c.setFont("Helvetica-Bold", 7)
-            c.setFillColor(colors.black)
-            c.drawCentredString(507, 762, inv_num_clean)
-        except Exception:
-            pass
+        # Page 2 Verification ID
+        c.setFont("Helvetica-Bold", 8)
+        c.setFillColor(colors.HexColor("#102A71"))
+        c.drawRightString(550, 770, f"Verification ID : {disp_hash}")
 
         # Page 2 Service Rows (Items 9+)
         page2_items = services[8:]

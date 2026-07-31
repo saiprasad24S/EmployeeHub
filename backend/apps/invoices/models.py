@@ -4,7 +4,7 @@ from django.utils import timezone
 
 class InvoiceCounter(models.Model):
     prefix = models.CharField(max_length=20, default="1370")
-    last_number = models.PositiveIntegerField(default=0)  # Next generated will be last_number + 1
+    last_number = models.PositiveIntegerField(default=0)
 
     @classmethod
     def get_next_number(cls) -> str:
@@ -38,8 +38,12 @@ class Invoice(models.Model):
 
     invoice_number = models.CharField(max_length=50, unique=True, db_index=True)
     invoice_type = models.CharField(max_length=30, choices=InvoiceType.choices, default=InvoiceType.REGULAR)
-    barcode_value = models.CharField(max_length=100, blank=True)
     
+    # SHA-256 Verification Hashes
+    verification_hash = models.CharField(max_length=64, blank=True, db_index=True)
+    display_hash = models.CharField(max_length=16, blank=True)
+    barcode_value = models.CharField(max_length=100, blank=True)
+
     invoice_date = models.DateField(default=timezone.now)
     billing_period_start = models.DateField(null=True, blank=True)
     billing_period_end = models.DateField(null=True, blank=True)
@@ -52,7 +56,7 @@ class Invoice(models.Model):
     client_address = models.TextField(blank=True)
     client_gst = models.CharField(max_length=50, blank=True)
 
-    # Patient / Service Profile (Regular & Multi-Service)
+    # Patient / Service Profile
     patient_name = models.CharField(max_length=200, blank=True)
     patient_age_gender = models.CharField(max_length=100, blank=True)
     service_type = models.CharField(max_length=200, blank=True)
@@ -61,7 +65,7 @@ class Invoice(models.Model):
     service_end_date = models.DateField(null=True, blank=True)
     rendered_days = models.CharField(max_length=100, blank=True)
 
-    # School / College Specific Fields
+    # School / College Specific
     school_branch = models.CharField(max_length=200, blank=True)
     contact_person = models.CharField(max_length=200, blank=True)
     contact_person_designation = models.CharField(max_length=200, blank=True)
@@ -82,7 +86,6 @@ class Invoice(models.Model):
     remarks = models.TextField(blank=True)
 
     # Service Table JSON Data
-    # Format: [{"s_no": 1, "service_name": "...", "description": "...", "rate": 32000, "days": 30, "amount": 32000, "other_expenses": 0, "total": 32000}]
     services_data = models.JSONField(default=list, blank=True)
 
     # Saved PDF path

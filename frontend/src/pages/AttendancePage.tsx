@@ -16,6 +16,7 @@ type Employee = {
   session_logout_time: string | null
   session_duration_seconds: number
   active_session: boolean
+  is_present: boolean
   presence_status: string
 }
 
@@ -59,8 +60,8 @@ export function AttendancePage() {
   }
 
   // Filter present and absent employees
-  const presentEmployees = employees.filter((e) => e.active_session || e.session_login_time !== null)
-  const absentEmployees = employees.filter((e) => !e.active_session && e.session_login_time === null)
+  const presentEmployees = employees.filter((e) => e.is_present || e.active_session)
+  const absentEmployees = employees.filter((e) => !e.is_present && !e.active_session)
 
   const triggerExportDownload = async () => {
     if (!startDate || !endDate) {

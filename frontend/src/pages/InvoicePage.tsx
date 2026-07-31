@@ -1,23 +1,24 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
+import { motion, AnimatePresence } from 'framer-motion'
+import { InvoiceDashboardHeader } from '../components/invoice/InvoiceDashboardHeader'
+import { InvoiceLivePreview } from '../components/invoice/InvoiceLivePreview'
+import type { InvoicePreviewData, ServiceItem } from '../components/invoice/InvoiceLivePreview'
+import { InvoiceFormAccordion } from '../components/invoice/InvoiceFormAccordion'
+import {
+  FileText, Building, Plus, Search, ShieldCheck, Download, Eye, Trash2, CheckCircle2,
+  AlertTriangle, RefreshCw, DollarSign, TrendingUp, Clock, Layers, ArrowRight,
+  ZoomIn, ZoomOut, Maximize2, Minimize2
+} from 'lucide-react'
 
-interface ServiceItem {
-  s_no: number
-  service_name: string
-  description: string
-  rate: number
-  days: number
-  amount: number
-  other_expenses: number
-  total: number
-}
-
-interface Invoice {
+export interface Invoice {
   id: number
   invoice_number: string
   invoice_type: 'REGULAR' | 'SCHOOL' | 'MULTI_SERVICE'
+  verification_hash?: string
+  display_hash?: string
   invoice_date: string
   billing_period_text: string
   start_date: string
@@ -29,7 +30,7 @@ interface Invoice {
   patient_age_gender?: string
   service_type?: string
   consultant?: string
-  renderedDays?: string
+  rendered_days?: string
   school_branch?: string
   contact_person?: string
   contact_person_designation?: string
@@ -46,118 +47,87 @@ interface Invoice {
   amount_in_words: string
   payment_status: string
   remarks?: string
-  services_data: ServiceItem[]
-  pdf_file?: string
+  services_data: any[]
+  pdf_path?: string
+  generated_by: string
   created_at: string
 }
 
-// Convert Number to Words (Rupees)
-const UNITS = ['', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten',
-  'Eleven', 'Twelve', 'Thirteen', 'Fourteen', 'Fifteen', 'Sixteen', 'Seventeen', 'Eighteen', 'Nineteen']
-const TENS = ['', '', 'Twenty', 'Thirty', 'Forty', 'Fifty', 'Sixty', 'Seventy', 'Eighty', 'Ninety']
-
-function numToWords(n: number): string {
-  if (n === 0) return 'Zero'
-  if (n < 0) return 'Minus ' + numToWords(Math.abs(n))
-  let words = ''
-  if (n >= 10000000) {
-    words += numToWords(Math.floor(n / 10000000)) + ' Crore '
-    n %= 10000000
-  }
-  if (n >= 100000) {
-    words += numToWords(Math.floor(n / 100000)) + ' Lakh '
-    n %= 100000
-  }
-  if (n >= 1000) {
-    words += numToWords(Math.floor(n / 1000)) + ' Thousand '
-    n %= 1000
-  }
-  if (n >= 100) {
-    words += numToWords(Math.floor(n / 100)) + ' Hundred '
-    n %= 100
-  }
-  if (n > 0) {
-    if (n < 20) {
-      words += UNITS[n] + ' '
-    } else {
-      words += TENS[Math.floor(n / 10)] + ' ' + UNITS[n % 10] + ' '
-    }
-  }
-  return words.trim()
-}
-
-function getAmountInWords(amountVal: number): string {
-  const val = Math.round(Number(amountVal) || 0)
-  if (val <= 0) return 'Zero Rupees Only'
-  return `${numToWords(val)} Rupees Only`
+const defaultInvoiceData: InvoicePreviewData = {
+  invoiceNumber: '1370 - 0001',
+  invoiceType: 'REGULAR',
+  invoiceDate: new Date().toISOString().split('T')[0],
+  billingPeriodText: '',
+  startDateText: '',
+  clientName: '',
+  clientContact: '',
+  clientAddress: '',
+  clientGst: '',
+  patientName: '',
+  patientAgeGender: '',
+  serviceType: '',
+  consultant: '',
+  renderedDays: '',
+  serviceStarted: '',
+  serviceEnd: '',
+  schoolBranch: '',
+  contactPerson: '',
+  perDayCharges: 0,
+  advanceReceived: 0,
+  paymentStatus: 'Pending',
+  remarks: '',
+  gstAmount: 0,
+  discountAmount: 0,
+  services: [
+    {
+      s_no: 1,
+      service_name: '',
+      description: '',
+      rate: 0,
+      days: 0,
+      amount: 0,
+      other_expenses: 0,
+      total: 0,
+    },
+  ],
 }
 
 export function InvoicePage() {
   const { getToken } = useAuth()
   const queryClient = useQueryClient()
 
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'FORM' | 'PREVIEW' | 'HISTORY' | 'SEARCH' | 'VERIFY'>('DASHBOARD')
-  const [formType, setFormType] = useState<'REGULAR' | 'SCHOOL' | 'MULTI_SERVICE'>('REGULAR')
-  
-  // Search & Verification state
+  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'EDITOR' | 'SEARCH' | 'VERIFY'>('DASHBOARD')
   const [searchQuery, setSearchQuery] = useState('')
   const [verifyInput, setVerifyInput] = useState('')
-  const [verifyResult, setVerifyResult] = useState<{ found: boolean; invoice?: Invoice; message?: string } | null>(null)
+  const [verifyResult, setVerifyResult] = useState<{
+    found: boolean
+    verified?: boolean
+    status_text?: string
+    invoice?: Invoice
+    recalculated_hash?: string
+    stored_hash?: string
+    message?: string
+  } | null>(null)
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null)
 
-  // Form State - Empty by Default
-  const [invoiceNumber, setInvoiceNumber] = useState('1370 - 0001')
-  const [invoiceDate, setInvoiceDate] = useState(() => new Date().toISOString().split('T')[0])
-  const [billingPeriodText, setBillingPeriodText] = useState('')
-  const [startDateText, setStartDateText] = useState('')
-  
-  // Client & Service Profile
-  const [clientName, setClientName] = useState('')
-  const [clientContact, setClientContact] = useState('')
-  const [clientAddress, setClientAddress] = useState('')
-  const [clientGst, setClientGst] = useState('')
+  // Auto-save state
+  const [isAutoSaving, setIsAutoSaving] = useState(false)
+  const [lastSavedTime, setLastSavedTime] = useState('Just now')
 
-  const [patientName, setPatientName] = useState('')
-  const [patientAgeGender, setPatientAgeGender] = useState('')
-  const [serviceType, setServiceType] = useState('')
-  const [consultant, setConsultant] = useState('')
-  const [renderedDays, setRenderedDays] = useState('')
+  // Zoom
+  const [zoom, setZoom] = useState(80)
+  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false)
 
-  // School Specific
-  const [schoolBranch, setSchoolBranch] = useState('')
-  const [contactPerson, setContactPerson] = useState('')
-  const [contactPersonDesignation, setContactPersonDesignation] = useState('')
-  const [noOfNurses, setNoOfNurses] = useState(0)
-  const [noOfStudents, setNoOfStudents] = useState(0)
-
-  // Financials
-  const [perDayCharges, setPerDayCharges] = useState(0)
-  const [gstAmount, setGstAmount] = useState(0)
-  const [discountAmount, setDiscountAmount] = useState(0)
-  const [advanceReceived, setAdvanceReceived] = useState(0)
-  const [paymentStatus, setPaymentStatus] = useState('Pending')
-  const [remarks, setRemarks] = useState('')
-
-  // Dynamic Service Table Rows - Empty by Default
-  const [services, setServices] = useState<ServiceItem[]>([
-    {
-      s_no: 1,
-      service_name: '',
-      description: '',
-      rate: 0,
-      days: 1,
-      amount: 0,
-      other_expenses: 0,
-      total: 0,
-    },
-  ])
-
-  // Computed Totals
-  const subtotal = useMemo(() => services.reduce((acc, s) => acc + (s.total || 0), 0), [services])
-  const totalAfterGst = useMemo(() => subtotal + Number(gstAmount) - Number(discountAmount), [subtotal, gstAmount, discountAmount])
-  const balanceDue = useMemo(() => totalAfterGst - Number(advanceReceived), [totalAfterGst, advanceReceived])
-  const grandTotal = useMemo(() => Math.max(0, balanceDue), [balanceDue])
-  const amountInWords = useMemo(() => getAmountInWords(grandTotal), [grandTotal])
+  // Invoice Data
+  const [invoiceData, setInvoiceData] = useState<InvoicePreviewData>(() => {
+    const savedDraft = localStorage.getItem('skandan_direct_invoice_draft')
+    if (savedDraft) {
+      try {
+        return JSON.parse(savedDraft)
+      } catch (_e) { /* ignore */ }
+    }
+    return defaultInvoiceData
+  })
 
   // Queries
   const nextNumQuery = useQuery({
@@ -170,25 +140,36 @@ export function InvoicePage() {
     },
   })
 
-  const historyQuery = useQuery({
+  const invoicesQuery = useQuery({
     queryKey: ['invoices-list', searchQuery],
     queryFn: async () => {
       const token = (await getToken()) || ''
-      const url = searchQuery ? `/api/invoices/?search=${encodeURIComponent(searchQuery)}` : '/api/invoices/'
+      const url = searchQuery
+        ? `/api/invoices/?search=${encodeURIComponent(searchQuery)}`
+        : '/api/invoices/'
       const res = await authedFetch(url, token)
       if (!res.ok) return []
       return (await res.json()) as Invoice[]
     },
   })
 
-  // Mutations
+  // Analytics
+  const statsMetrics = useMemo(() => {
+    const list = invoicesQuery.data || []
+    const totalRev = list.reduce((acc, inv) => acc + (inv.grand_total || 0), 0)
+    const paidCount = list.filter((i) => i.payment_status === 'Paid').length
+    const pendingCount = list.filter((i) => i.payment_status === 'Pending').length
+    return { totalInvoices: list.length, totalRevenue: totalRev, paidCount, pendingCount }
+  }, [invoicesQuery.data])
+
+  // Save Mutation
   const saveMutation = useMutation({
-    mutationFn: async (invoicePayload: any) => {
+    mutationFn: async (payload: any) => {
       const token = (await getToken()) || ''
       const res = await authedFetch('/api/invoices/', token, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(invoicePayload),
+        body: JSON.stringify(payload),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -207,6 +188,7 @@ export function InvoicePage() {
     },
   })
 
+  // Delete Mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
       const token = (await getToken()) || ''
@@ -219,1002 +201,1100 @@ export function InvoicePage() {
     },
   })
 
-  // Open creation flow with clean empty state
-  const openForm = (type: 'REGULAR' | 'SCHOOL' | 'MULTI_SERVICE') => {
-    setFormType(type)
-    if (nextNumQuery.data?.next_invoice_number) {
-      setInvoiceNumber(nextNumQuery.data.next_invoice_number)
-    }
+  // Auto-Save Draft
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setIsAutoSaving(true)
+      localStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceData))
+      setTimeout(() => {
+        setIsAutoSaving(false)
+        setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
+      }, 600)
+    }, 5000)
+    return () => clearInterval(interval)
+  }, [invoiceData])
 
-    // Reset all form inputs to empty
-    setClientName('')
-    setClientContact('')
-    setClientAddress('')
-    setClientGst('')
-    setPatientName('')
-    setPatientAgeGender('')
-    setServiceType('')
-    setConsultant('')
-    setRenderedDays('')
-    setSchoolBranch('')
-    setContactPerson('')
-    setContactPersonDesignation('')
-    setNoOfNurses(0)
-    setNoOfStudents(0)
-    setPerDayCharges(0)
-    setGstAmount(0)
-    setDiscountAmount(0)
-    setAdvanceReceived(0)
-    setPaymentStatus('Pending')
-    setRemarks('')
-    setBillingPeriodText('')
-    setStartDateText('')
-
-    setServices([
-      {
-        s_no: 1,
-        service_name: '',
-        description: '',
-        rate: 0,
-        days: 1,
-        amount: 0,
-        other_expenses: 0,
-        total: 0,
-      },
-    ])
-
-    setActiveTab('FORM')
-  }
-
-  // Add / Delete dynamic service rows
-  const addServiceRow = () => {
-    setServices((prev) => [
-      ...prev,
-      {
-        s_no: prev.length + 1,
-        service_name: '',
-        description: '',
-        rate: 0,
-        days: 1,
-        amount: 0,
-        other_expenses: 0,
-        total: 0,
-      },
-    ])
-  }
-
-  const deleteServiceRow = (index: number) => {
-    setServices((prev) => prev.filter((_, i) => i !== index).map((s, idx) => ({ ...s, s_no: idx + 1 })))
-  }
-
-  const updateServiceRow = (index: number, key: keyof ServiceItem, value: any) => {
-    setServices((prev) => {
-      const updated = [...prev]
-      const item = { ...updated[index], [key]: value }
-      if (key === 'rate' || key === 'days' || key === 'other_expenses') {
-        const r = Number(item.rate || 0)
-        const d = Number(item.days || 0)
-        const o = Number(item.other_expenses || 0)
-        item.amount = r * d
-        item.total = item.amount + o
-      }
-      updated[index] = item
-      return updated
+  const handleOpenEditor = (type: 'REGULAR' | 'SCHOOL' | 'MULTI_SERVICE') => {
+    const nextNum = nextNumQuery.data?.next_invoice_number || '1370 - 0001'
+    setInvoiceData({
+      ...defaultInvoiceData,
+      invoiceNumber: nextNum,
+      invoiceType: type,
+      invoiceDate: new Date().toISOString().split('T')[0],
     })
+    setSelectedInvoice(null)
+    setActiveTab('EDITOR')
   }
 
-  // Handle Save
   const handleSaveInvoice = () => {
+    const subtotal = invoiceData.services.reduce((a, b) => a + (b.total || 0), 0)
+    const totalAfterGst = subtotal + (Number(invoiceData.gstAmount) || 0) - (Number(invoiceData.discountAmount) || 0)
+    const balanceDue = totalAfterGst - (Number(invoiceData.advanceReceived) || 0)
+    const grandTotal = Math.max(0, balanceDue)
+
     const payload = {
-      invoice_number: invoiceNumber,
-      invoice_type: formType,
-      invoice_date: invoiceDate,
-      billing_period_text: billingPeriodText,
-      start_date: startDateText || invoiceDate,
-      client_name: clientName,
-      client_contact: clientContact,
-      client_address: clientAddress,
-      client_gst: clientGst,
-      patient_name: patientName,
-      patient_age_gender: patientAgeGender,
-      service_type: serviceType,
-      consultant: consultant,
-      rendered_days: renderedDays,
-      school_branch: schoolBranch,
-      contact_person: contactPerson,
-      contact_person_designation: contactPersonDesignation,
-      no_of_nurses: noOfNurses,
-      no_of_students: noOfStudents,
-      per_day_charges: perDayCharges,
-      subtotal: subtotal,
-      gst: gstAmount,
-      discount: discountAmount,
+      invoice_number: invoiceData.invoiceNumber,
+      invoice_type: invoiceData.invoiceType,
+      invoice_date: invoiceData.invoiceDate,
+      billing_period_text: invoiceData.billingPeriodText,
+      start_date: invoiceData.startDateText,
+      client_name: invoiceData.clientName,
+      client_contact: invoiceData.clientContact,
+      client_address: invoiceData.clientAddress,
+      client_gst: invoiceData.clientGst,
+      patient_name: invoiceData.patientName,
+      patient_age_gender: invoiceData.patientAgeGender,
+      service_type: invoiceData.serviceType,
+      consultant: invoiceData.consultant,
+      rendered_days: invoiceData.renderedDays,
+      school_branch: invoiceData.schoolBranch,
+      contact_person: invoiceData.contactPerson,
+      per_day_charges: invoiceData.perDayCharges,
+      subtotal,
+      gst: invoiceData.gstAmount,
+      discount: invoiceData.discountAmount,
       total_after_gst: totalAfterGst,
-      advance_received: advanceReceived,
+      advance_received: invoiceData.advanceReceived,
       balance_due: balanceDue,
       grand_total: grandTotal,
-      amount_in_words: amountInWords,
-      payment_status: paymentStatus,
-      remarks: remarks,
-      services_data: services,
+      payment_status: invoiceData.paymentStatus,
+      remarks: invoiceData.remarks,
+      services_data: invoiceData.services,
     }
     saveMutation.mutate(payload)
   }
 
-  // Download PDF API helper
-  const handleDownloadPdf = async (inv: Invoice | null) => {
-    const invId = inv?.id || selectedInvoice?.id || invoiceNumber
-    const token = (await getToken()) || ''
-    const res = await authedFetch(`/api/invoices/${invId}/download`, token)
-    if (!res.ok) {
-      alert('Failed to download PDF.')
-      return
+  const handleDownloadPDF = async (inv?: Invoice) => {
+    const target = inv || selectedInvoice
+    if (target) {
+      try {
+        const token = (await getToken()) || ''
+        const res = await authedFetch(`/api/invoices/${target.id}/pdf/`, token)
+        if (!res.ok) throw new Error('PDF download failed.')
+        const blob = await res.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `Invoice_${target.invoice_number.replace(/\s+/g, '_')}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+      } catch (err: any) {
+        alert(`Download Error: ${err.message}`)
+      }
+    } else {
+      handleSaveInvoice()
     }
-    const blob = await res.blob()
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `Invoice_${inv?.invoice_number || invoiceNumber}.pdf`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    window.URL.revokeObjectURL(url)
   }
 
-  // Verification Search
   const handleVerify = async () => {
     if (!verifyInput.trim()) return
-    const token = (await getToken()) || ''
-    const res = await authedFetch(`/api/invoices/verify?number=${encodeURIComponent(verifyInput)}`, token)
-    if (!res.ok) {
-      setVerifyResult({ found: false, message: 'Invoice Not Found' })
-      return
+    try {
+      const token = (await getToken()) || ''
+      const res = await authedFetch(
+        `/api/invoices/verify/?q=${encodeURIComponent(verifyInput.trim())}`,
+        token
+      )
+      const data = await res.json()
+      setVerifyResult(data)
+    } catch (e: any) {
+      setVerifyResult({ found: false, message: e.message || 'Verification error.' })
     }
-    const data = await res.json()
-    setVerifyResult(data)
+  }
+
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const handleLoadInvoice = (inv: Invoice) => {
+    setSelectedInvoice(inv)
+    setInvoiceData({
+      invoiceNumber: inv.invoice_number,
+      invoiceType: inv.invoice_type,
+      invoiceDate: inv.invoice_date,
+      billingPeriodText: inv.billing_period_text,
+      startDateText: inv.start_date,
+      clientName: inv.client_name,
+      clientContact: inv.client_contact,
+      clientAddress: inv.client_address,
+      clientGst: inv.client_gst,
+      patientName: inv.patient_name,
+      patientAgeGender: inv.patient_age_gender,
+      serviceType: inv.service_type,
+      consultant: inv.consultant,
+      renderedDays: inv.rendered_days,
+      schoolBranch: inv.school_branch,
+      contactPerson: inv.contact_person,
+      perDayCharges: inv.per_day_charges,
+      gstAmount: inv.gst,
+      discountAmount: inv.discount,
+      advanceReceived: inv.advance_received,
+      paymentStatus: inv.payment_status,
+      remarks: inv.remarks || '',
+      services: inv.services_data || defaultInvoiceData.services,
+    })
+    setActiveTab('EDITOR')
+  }
+
+  // ---- RENDER ----
+  const containerStyle: React.CSSProperties = {
+    fontFamily: "'Poppins', 'Inter', sans-serif",
+    background: '#F7F9FC',
+    minHeight: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem', paddingBottom: '3rem' }}>
-      
-      {/* Top Header Navigation Tabs */}
-      <div className="glass-card card-soft" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <span className="eyebrow">Finance & Billing Management</span>
-          <h3 style={{ margin: '0.2rem 0' }}>Skandan Invoice Portal</h3>
-        </div>
+    <div style={containerStyle} className="no-print-container">
+      {/* Sticky Header Toolbar */}
+      <InvoiceDashboardHeader
+        activeTab={activeTab}
+        setActiveTab={setActiveTab}
+        isAutoSaving={isAutoSaving}
+        lastSavedTime={lastSavedTime}
+        onDownloadPDF={() => handleDownloadPDF()}
+        onSaveDraft={() => {
+          localStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceData))
+          alert('Draft saved successfully!')
+        }}
+        onSaveInvoice={handleSaveInvoice}
+        onVerifyModal={() => setActiveTab('VERIFY')}
+        onPrint={handlePrint}
+        invoiceNumber={invoiceData.invoiceNumber}
+        templateType={invoiceData.invoiceType}
+        isSaving={saveMutation.isPending}
+      />
 
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className={`btn-secondary ${activeTab === 'DASHBOARD' ? 'active-tab-btn' : ''}`}
-            onClick={() => setActiveTab('DASHBOARD')}
-            style={{ fontWeight: 600, padding: '0.5rem 1rem' }}
-          >
-            Dashboard
-          </button>
-          <button
-            type="button"
-            className={`btn-secondary ${activeTab === 'HISTORY' ? 'active-tab-btn' : ''}`}
-            onClick={() => setActiveTab('HISTORY')}
-            style={{ fontWeight: 600, padding: '0.5rem 1rem' }}
-          >
-            Invoice History
-          </button>
-          <button
-            type="button"
-            className={`btn-secondary ${activeTab === 'SEARCH' ? 'active-tab-btn' : ''}`}
-            onClick={() => setActiveTab('SEARCH')}
-            style={{ fontWeight: 600, padding: '0.5rem 1rem' }}
-          >
-            Search Invoice
-          </button>
-          <button
-            type="button"
-            className={`btn-secondary ${activeTab === 'VERIFY' ? 'active-tab-btn' : ''}`}
-            onClick={() => setActiveTab('VERIFY')}
-            style={{ fontWeight: 600, padding: '0.5rem 1rem' }}
-          >
-            Verify Invoice
-          </button>
-        </div>
-      </div>
-
-      {/* DASHBOARD TAB - 6 CARDS */}
-      {activeTab === 'DASHBOARD' && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1.25rem' }}>
-          
-          {/* Card 1: Generate Invoice Regular */}
-          <div
-            className="glass-card invoice-dash-card"
-            onClick={() => openForm('REGULAR')}
-            style={{ cursor: 'pointer', padding: '1.5rem', borderLeft: '5px solid #6B2FA0', transition: 'transform 0.2s ease' }}
-          >
-            <h4 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem 0', color: 'var(--text)' }}>Generate Invoice (Regular)</h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-              Standard healthcare invoice for patient caretaker, nursing, doctor visits, and home services.
-            </p>
-            <div style={{ marginTop: '1rem', color: '#6B2FA0', fontWeight: 700, fontSize: '0.85rem' }}>Create Invoice &rarr;</div>
-          </div>
-
-          {/* Card 2: Generate Invoice School / College */}
-          <div
-            className="glass-card invoice-dash-card"
-            onClick={() => openForm('SCHOOL')}
-            style={{ cursor: 'pointer', padding: '1.5rem', borderLeft: '5px solid #10B981', transition: 'transform 0.2s ease' }}
-          >
-            <h4 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem 0', color: 'var(--text)' }}>Generate Invoice (School / College)</h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-              Specialized billing template for educational institutions, school nurses, and campus health.
-            </p>
-            <div style={{ marginTop: '1rem', color: '#10B981', fontWeight: 700, fontSize: '0.85rem' }}>Create Invoice &rarr;</div>
-          </div>
-
-          {/* Card 3: Generate Invoice Multi-Service */}
-          <div
-            className="glass-card invoice-dash-card"
-            onClick={() => openForm('MULTI_SERVICE')}
-            style={{ cursor: 'pointer', padding: '1.5rem', borderLeft: '5px solid #3B82F6', transition: 'transform 0.2s ease' }}
-          >
-            <h4 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem 0', color: 'var(--text)' }}>Generate Invoice (Multi-Service)</h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-              Two-page template for multi-service medical care with auto-pagination and total summary.
-            </p>
-            <div style={{ marginTop: '1rem', color: '#3B82F6', fontWeight: 700, fontSize: '0.85rem' }}>Create Invoice &rarr;</div>
-          </div>
-
-          {/* Card 4: Search Invoice */}
-          <div
-            className="glass-card invoice-dash-card"
-            onClick={() => setActiveTab('SEARCH')}
-            style={{ cursor: 'pointer', padding: '1.5rem', borderLeft: '5px solid #F59E0B', transition: 'transform 0.2s ease' }}
-          >
-            <h4 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem 0', color: 'var(--text)' }}>Search Invoice</h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-              Find invoices by Invoice Number, Client Name, Patient Name, Date, or Billing Period.
-            </p>
-            <div style={{ marginTop: '1rem', color: '#F59E0B', fontWeight: 700, fontSize: '0.85rem' }}>Search Now &rarr;</div>
-          </div>
-
-          {/* Card 5: Verify Invoice */}
-          <div
-            className="glass-card invoice-dash-card"
-            onClick={() => setActiveTab('VERIFY')}
-            style={{ cursor: 'pointer', padding: '1.5rem', borderLeft: '5px solid #8B5CF6', transition: 'transform 0.2s ease' }}
-          >
-            <h4 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem 0', color: 'var(--text)' }}>Verify Invoice</h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-              Verify invoice authenticity by barcode scanning or entering invoice serial number.
-            </p>
-            <div style={{ marginTop: '1rem', color: '#8B5CF6', fontWeight: 700, fontSize: '0.85rem' }}>Verify Authenticity &rarr;</div>
-          </div>
-
-          {/* Card 6: Invoice History */}
-          <div
-            className="glass-card invoice-dash-card"
-            onClick={() => setActiveTab('HISTORY')}
-            style={{ cursor: 'pointer', padding: '1.5rem', borderLeft: '5px solid #EC4899', transition: 'transform 0.2s ease' }}
-          >
-            <h4 style={{ fontSize: '1.1rem', margin: '0 0 0.5rem 0', color: 'var(--text)' }}>Invoice History</h4>
-            <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-              View, print, download, or manage all generated invoices stored in database.
-            </p>
-            <div style={{ marginTop: '1rem', color: '#EC4899', fontWeight: 700, fontSize: '0.85rem' }}>View History &rarr;</div>
-          </div>
-
-        </div>
-      )}
-
-      {/* FORM TAB - INVOICE GENERATOR FORM */}
-      {activeTab === 'FORM' && (
-        <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-            <h3 style={{ margin: 0, color: 'var(--primary)' }}>
-              Generate {formType === 'REGULAR' ? 'Regular Invoice' : formType === 'SCHOOL' ? 'School / College Invoice' : 'Multi-Service Invoice'}
-            </h3>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button type="button" className="btn-secondary" onClick={() => setActiveTab('DASHBOARD')}>Back</button>
-              <button type="button" className="btn-primary" onClick={() => setActiveTab('PREVIEW')}>Preview Invoice</button>
-            </div>
-          </div>
-
-          <form onSubmit={(e) => { e.preventDefault(); setActiveTab('PREVIEW'); }} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
-            
-            {/* Section 1: Header / Invoice Information */}
-            <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
-              <h4 style={{ margin: '0 0 0.75rem 0', color: 'var(--primary)', fontSize: '0.95rem' }}>Invoice Information</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.9rem' }}>
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Invoice Number (Auto Sequence)</label>
-                  <input type="text" value={invoiceNumber} onChange={(e) => setInvoiceNumber(e.target.value)} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', fontWeight: 700 }} />
-                </div>
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Invoice Date</label>
-                  <input type="date" value={invoiceDate} onChange={(e) => setInvoiceDate(e.target.value)} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                </div>
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Billing Period Text</label>
-                  <input type="text" value={billingPeriodText} onChange={(e) => setBillingPeriodText(e.target.value)} placeholder="e.g. 01-June-2026 to 30-June-2026" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                </div>
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Service Start Date</label>
-                  <input type="text" value={startDateText} onChange={(e) => setStartDateText(e.target.value)} placeholder="e.g. 22-Sep-2025" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                </div>
-              </div>
-            </div>
-
-            {/* Section 2: Client & Service Profile */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1rem' }}>
-              
-              {/* Billed To (Client) */}
-              <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                <h4 style={{ margin: 0, color: 'var(--primary)', fontSize: '0.95rem' }}>BILLED TO (CLIENT DETAILS)</h4>
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Client Name</label>
-                  <input type="text" value={clientName} onChange={(e) => setClientName(e.target.value)} placeholder="Enter client name" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                </div>
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Contact Number</label>
-                  <input type="text" value={clientContact} onChange={(e) => setClientContact(e.target.value)} placeholder="Enter contact number" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                </div>
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Client Address</label>
-                  <textarea value={clientAddress} onChange={(e) => setClientAddress(e.target.value)} placeholder="Enter client address" rows={2} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                </div>
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>GST Number (Optional)</label>
-                  <input type="text" value={clientGst} onChange={(e) => setClientGst(e.target.value)} placeholder="Enter GST number" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                </div>
-              </div>
-
-              {/* Service Profile or School Profile */}
-              {formType === 'SCHOOL' ? (
-                <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <h4 style={{ margin: 0, color: 'var(--primary)', fontSize: '0.95rem' }}>INSTITUTION DETAILS</h4>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>School / College Name & Branch</label>
-                    <input type="text" value={schoolBranch} onChange={(e) => setSchoolBranch(e.target.value)} placeholder="Enter school / college name" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                  </div>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Contact Person</label>
-                    <input type="text" value={contactPerson} onChange={(e) => setContactPerson(e.target.value)} placeholder="Enter contact person" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                  </div>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Designation</label>
-                    <input type="text" value={contactPersonDesignation} onChange={(e) => setContactPersonDesignation(e.target.value)} placeholder="e.g. Principal / Administrator" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                  </div>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                    <div className="stack" style={{ gap: '0.3rem' }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>No. of Nurses</label>
-                      <input type="number" value={noOfNurses} onChange={(e) => setNoOfNurses(Number(e.target.value))} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
+      {/* Main Content */}
+      <main style={{ flex: 1 }}>
+        <AnimatePresence mode="wait">
+          {/* ===== DASHBOARD TAB ===== */}
+          {activeTab === 'DASHBOARD' && (
+            <motion.div
+              key="dashboard"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              style={{ padding: 24, maxWidth: 1600, margin: '0 auto' }}
+            >
+              {/* Stats Cards */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+                  gap: 16,
+                  marginBottom: 24,
+                }}
+              >
+                {[
+                  {
+                    label: 'Total Invoices',
+                    value: statsMetrics.totalInvoices,
+                    icon: FileText,
+                    color: '#0B2C8C',
+                    bg: '#EDF2FF',
+                    sub: 'All generated invoices',
+                  },
+                  {
+                    label: 'Total Revenue',
+                    value: `Rs. ${statsMetrics.totalRevenue.toLocaleString('en-IN')}`,
+                    icon: TrendingUp,
+                    color: '#2E7D32',
+                    bg: '#E8F5E9',
+                    sub: 'Across all invoices',
+                  },
+                  {
+                    label: 'Paid',
+                    value: statsMetrics.paidCount,
+                    icon: CheckCircle2,
+                    color: '#2E7D32',
+                    bg: '#E8F5E9',
+                    sub: 'Settled accounts',
+                  },
+                  {
+                    label: 'Pending',
+                    value: statsMetrics.pendingCount,
+                    icon: Clock,
+                    color: '#ED6C02',
+                    bg: '#FFF3E0',
+                    sub: 'Awaiting payment',
+                  },
+                ].map((stat, i) => (
+                  <motion.div
+                    key={stat.label}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.08, duration: 0.35 }}
+                    whileHover={{ y: -4, boxShadow: '0 8px 30px rgba(11,44,140,0.12)' }}
+                    style={{
+                      background: '#fff',
+                      borderRadius: 14,
+                      padding: 20,
+                      border: '1px solid #D8E3F5',
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                      position: 'relative',
+                      overflow: 'hidden',
+                      cursor: 'default',
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: 'absolute',
+                        top: -10,
+                        right: -10,
+                        width: 60,
+                        height: 60,
+                        borderRadius: '50%',
+                        background: stat.bg,
+                        opacity: 0.5,
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      <div>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 600,
+                            color: '#616161',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                          }}
+                        >
+                          {stat.label}
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 22,
+                            fontWeight: 700,
+                            color: stat.color,
+                            marginTop: 4,
+                            fontFamily: 'Poppins, sans-serif',
+                          }}
+                        >
+                          {stat.value}
+                        </div>
+                      </div>
+                      <div
+                        style={{
+                          width: 38,
+                          height: 38,
+                          borderRadius: 10,
+                          background: stat.bg,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <stat.icon style={{ width: 18, height: 18, color: stat.color }} />
+                      </div>
                     </div>
-                    <div className="stack" style={{ gap: '0.3rem' }}>
-                      <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>No. of Students</label>
-                      <input type="number" value={noOfStudents} onChange={(e) => setNoOfStudents(Number(e.target.value))} style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
+                    <div style={{ fontSize: 10, color: '#9CA3AF', marginTop: 10, fontWeight: 500 }}>
+                      {stat.sub}
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <h4 style={{ margin: 0, color: 'var(--primary)', fontSize: '0.95rem' }}>SERVICE PROFILE</h4>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Patient Name</label>
-                    <input type="text" value={patientName} onChange={(e) => setPatientName(e.target.value)} placeholder="Enter patient name" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                  </div>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Age / Gender</label>
-                    <input type="text" value={patientAgeGender} onChange={(e) => setPatientAgeGender(e.target.value)} placeholder="e.g. 65 Years / Male" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                  </div>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Service Type</label>
-                    <input type="text" value={serviceType} onChange={(e) => setServiceType(e.target.value)} placeholder="e.g. Caretaker Services (12 Hours)" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                  </div>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.8rem', fontWeight: 600 }}>Consultant Doctor</label>
-                    <input type="text" value={consultant} onChange={(e) => setConsultant(e.target.value)} placeholder="Enter consultant doctor" style={{ padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }} />
-                  </div>
-                </div>
-              )}
-
-            </div>
-
-            {/* Section 3: Dynamic Service Details Table */}
-            <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem' }}>
-                <h4 style={{ margin: 0, color: 'var(--primary)', fontSize: '0.95rem' }}>SERVICE DETAILS</h4>
-                <button type="button" className="btn-secondary" onClick={addServiceRow} style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}>
-                  + Add Service Row
-                </button>
+                  </motion.div>
+                ))}
               </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-                  <thead>
-                    <tr style={{ background: 'var(--bg)', color: 'var(--text)', borderBottom: '2px solid var(--border)' }}>
-                      <th style={{ padding: '0.6rem', textAlign: 'center' }}>S.No.</th>
-                      <th style={{ padding: '0.6rem', textAlign: 'left' }}>Particulars / Service Details</th>
-                      <th style={{ padding: '0.6rem', textAlign: 'center' }}>Per Day Rate (₹)</th>
-                      <th style={{ padding: '0.6rem', textAlign: 'center' }}>No. of Days</th>
-                      <th style={{ padding: '0.6rem', textAlign: 'center' }}>Amount (₹)</th>
-                      <th style={{ padding: '0.6rem', textAlign: 'center' }}>Other Expenses (₹)</th>
-                      <th style={{ padding: '0.6rem', textAlign: 'center' }}>Total (₹)</th>
-                      <th style={{ padding: '0.6rem', textAlign: 'center' }}>Action</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {services.map((item, idx) => (
-                      <tr key={idx} style={{ borderBottom: '1px solid var(--border)' }}>
-                        <td style={{ padding: '0.5rem', textAlign: 'center', fontWeight: 700 }}>{idx + 1}</td>
-                        <td style={{ padding: '0.5rem' }}>
-                          <input
-                            type="text"
-                            value={item.service_name}
-                            onChange={(e) => updateServiceRow(idx, 'service_name', e.target.value)}
-                            placeholder="Service title"
-                            style={{ width: '100%', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', marginBottom: '0.3rem' }}
-                          />
-                          <input
-                            type="text"
-                            value={item.description}
-                            onChange={(e) => updateServiceRow(idx, 'description', e.target.value)}
-                            placeholder="Description"
-                            style={{ width: '100%', padding: '0.3rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--muted)', fontSize: '0.75rem' }}
-                          />
-                        </td>
-                        <td style={{ padding: '0.5rem' }}>
-                          <input
-                            type="number"
-                            value={item.rate}
-                            onChange={(e) => updateServiceRow(idx, 'rate', Number(e.target.value))}
-                            style={{ width: '90px', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', textAlign: 'right' }}
-                          />
-                        </td>
-                        <td style={{ padding: '0.5rem' }}>
-                          <input
-                            type="number"
-                            value={item.days}
-                            onChange={(e) => updateServiceRow(idx, 'days', Number(e.target.value))}
-                            style={{ width: '70px', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', textAlign: 'center' }}
-                          />
-                        </td>
-                        <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 600 }}>
-                          ₹ {(item.amount || 0).toLocaleString()}
-                        </td>
-                        <td style={{ padding: '0.5rem' }}>
-                          <input
-                            type="number"
-                            value={item.other_expenses}
-                            onChange={(e) => updateServiceRow(idx, 'other_expenses', Number(e.target.value))}
-                            style={{ width: '80px', padding: '0.4rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', textAlign: 'right' }}
-                          />
-                        </td>
-                        <td style={{ padding: '0.5rem', textAlign: 'right', fontWeight: 700, color: 'var(--primary)' }}>
-                          ₹ {(item.total || 0).toLocaleString()}
-                        </td>
-                        <td style={{ padding: '0.5rem', textAlign: 'center' }}>
-                          {services.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => deleteServiceRow(idx)}
-                              style={{ background: 'transparent', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontWeight: 700 }}
+              {/* Quick Actions */}
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+                  gap: 16,
+                  marginBottom: 24,
+                }}
+              >
+                {[
+                  {
+                    type: 'REGULAR' as const,
+                    title: 'Regular Invoice',
+                    desc: 'Standard patient / caretaker healthcare services',
+                    icon: FileText,
+                    color: '#0B2C8C',
+                    bg: '#EDF2FF',
+                  },
+                  {
+                    type: 'SCHOOL' as const,
+                    title: 'School / College Invoice',
+                    desc: 'Institutional healthcare, nursing & campus wellness',
+                    icon: Building,
+                    color: '#6B2FA0',
+                    bg: '#F3E8FF',
+                  },
+                  {
+                    type: 'MULTI_SERVICE' as const,
+                    title: 'Multi-Service Invoice',
+                    desc: 'Multiple line items with automatic multi-page overflow',
+                    icon: Layers,
+                    color: '#1A4DD8',
+                    bg: '#EDF2FF',
+                  },
+                ].map((action, i) => (
+                  <motion.div
+                    key={action.type}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 + i * 0.08, duration: 0.35 }}
+                    whileHover={{ y: -3, boxShadow: '0 8px 30px rgba(11,44,140,0.10)' }}
+                    onClick={() => handleOpenEditor(action.type)}
+                    style={{
+                      background: '#fff',
+                      borderRadius: 14,
+                      padding: 22,
+                      border: '1px solid #D8E3F5',
+                      boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 14,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 12,
+                        background: action.bg,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <action.icon style={{ width: 20, height: 20, color: action.color }} />
+                    </div>
+                    <div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: '#1A1A1A' }}>{action.title}</div>
+                      <div style={{ fontSize: 11, color: '#616161', marginTop: 3 }}>{action.desc}</div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 700,
+                          color: action.color,
+                          marginTop: 10,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 4,
+                        }}
+                      >
+                        Create Invoice <ArrowRight style={{ width: 13, height: 13 }} />
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+
+              {/* Recent Invoices */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.35 }}
+                style={{
+                  background: '#fff',
+                  borderRadius: 14,
+                  border: '1px solid #D8E3F5',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                  overflow: 'hidden',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '16px 20px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: '1px solid #F0F4FA',
+                  }}
+                >
+                  <div style={{ fontSize: 14, fontWeight: 700, color: '#0B2C8C' }}>Recent Invoices</div>
+                  <button
+                    onClick={() => setActiveTab('SEARCH')}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      color: '#1A4DD8',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    View All
+                  </button>
+                </div>
+
+                {invoicesQuery.isLoading ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 12 }}>
+                    Loading invoices...
+                  </div>
+                ) : (invoicesQuery.data || []).length === 0 ? (
+                  <div style={{ padding: 40, textAlign: 'center', color: '#9CA3AF', fontSize: 12 }}>
+                    No invoices created yet. Click a template above to get started.
+                  </div>
+                ) : (
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                      <thead>
+                        <tr
+                          style={{
+                            background: '#0B2C8C',
+                            color: '#fff',
+                            fontSize: 11,
+                            fontWeight: 600,
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.04em',
+                          }}
+                        >
+                          <th style={{ padding: '10px 16px', textAlign: 'left' }}>Invoice No</th>
+                          <th style={{ padding: '10px 16px', textAlign: 'left' }}>Client</th>
+                          <th style={{ padding: '10px 16px', textAlign: 'left' }}>Type</th>
+                          <th style={{ padding: '10px 16px', textAlign: 'left' }}>Hash</th>
+                          <th style={{ padding: '10px 16px', textAlign: 'right' }}>Amount</th>
+                          <th style={{ padding: '10px 16px', textAlign: 'left' }}>Date</th>
+                          <th style={{ padding: '10px 16px', textAlign: 'right' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(invoicesQuery.data || []).slice(0, 10).map((inv) => (
+                          <tr
+                            key={inv.id}
+                            style={{
+                              borderBottom: '1px solid #F0F4FA',
+                              transition: 'background 0.15s',
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = '#FAFBFE')}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = '')}
+                          >
+                            <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0B2C8C' }}>
+                              {inv.invoice_number}
+                            </td>
+                            <td style={{ padding: '12px 16px', fontWeight: 600, color: '#1A1A1A' }}>
+                              {inv.client_name}
+                            </td>
+                            <td style={{ padding: '12px 16px' }}>
+                              <span
+                                style={{
+                                  padding: '3px 8px',
+                                  borderRadius: 6,
+                                  fontSize: 10,
+                                  fontWeight: 600,
+                                  background: '#EDF2FF',
+                                  color: '#0B2C8C',
+                                  border: '1px solid #DCE7FF',
+                                }}
+                              >
+                                {inv.invoice_type}
+                              </span>
+                            </td>
+                            <td
+                              style={{
+                                padding: '12px 16px',
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: '#616161',
+                              }}
                             >
-                              Delete
-                            </button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                              {inv.display_hash || inv.verification_hash?.slice(0, 16) || '-'}
+                            </td>
+                            <td
+                              style={{
+                                padding: '12px 16px',
+                                textAlign: 'right',
+                                fontWeight: 700,
+                                color: '#1A1A1A',
+                              }}
+                            >
+                              Rs. {inv.grand_total.toLocaleString('en-IN')}
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#616161' }}>{inv.invoice_date}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                                <button
+                                  onClick={() => handleLoadInvoice(inv)}
+                                  title="Edit"
+                                  style={{
+                                    padding: 6,
+                                    borderRadius: 6,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    color: '#1A4DD8',
+                                  }}
+                                >
+                                  <Eye style={{ width: 15, height: 15 }} />
+                                </button>
+                                <button
+                                  onClick={() => handleDownloadPDF(inv)}
+                                  title="Download PDF"
+                                  style={{
+                                    padding: 6,
+                                    borderRadius: 6,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    color: '#2E7D32',
+                                  }}
+                                >
+                                  <Download style={{ width: 15, height: 15 }} />
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    if (confirm(`Delete invoice ${inv.invoice_number}?`))
+                                      deleteMutation.mutate(inv.id)
+                                  }}
+                                  title="Delete"
+                                  style={{
+                                    padding: 6,
+                                    borderRadius: 6,
+                                    border: 'none',
+                                    background: 'transparent',
+                                    cursor: 'pointer',
+                                    color: '#D32F2F',
+                                  }}
+                                >
+                                  <Trash2 style={{ width: 15, height: 15 }} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </motion.div>
+            </motion.div>
+          )}
 
-            {/* Section 4: Totals & Remarks */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1rem' }}>
-              
-              {/* Remarks */}
-              <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                <h4 style={{ margin: 0, color: 'var(--primary)', fontSize: '0.95rem' }}>REMARKS</h4>
-                <textarea
-                  value={remarks}
-                  onChange={(e) => setRemarks(e.target.value)}
-                  placeholder="Enter remarks or payment instructions..."
-                  rows={4}
-                  style={{ width: '100%', padding: '0.5rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
+          {/* ===== EDITOR TAB - SPLIT SCREEN ===== */}
+          {activeTab === 'EDITOR' && (
+            <motion.div
+              key="editor"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isPreviewFullscreen ? '0px 1fr' : '380px 1fr',
+                height: 'calc(100vh - 56px)',
+                overflow: 'hidden',
+                transition: 'grid-template-columns 0.3s ease',
+              }}
+            >
+              {/* LEFT PANEL: Form */}
+              <div
+                style={{
+                  borderRight: '1px solid #D8E3F5',
+                  background: '#F7F9FC',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  padding: isPreviewFullscreen ? 0 : '16px',
+                  display: isPreviewFullscreen ? 'none' : 'block',
+                }}
+              >
+                <InvoiceFormAccordion
+                  data={invoiceData}
+                  onChange={setInvoiceData}
                 />
               </div>
 
-              {/* Financial Calculations */}
-              <div style={{ background: 'var(--panel)', padding: '1rem', borderRadius: '12px', border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
-                <h4 style={{ margin: 0, color: 'var(--primary)', fontSize: '0.95rem' }}>FINANCIAL SUMMARY</h4>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem' }}>
-                  <span>Subtotal:</span>
-                  <span>₹ {subtotal.toLocaleString()}</span>
-                </div>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                  <span>GST Amount (₹):</span>
-                  <input type="number" value={gstAmount} onChange={(e) => setGstAmount(Number(e.target.value))} style={{ width: '100px', padding: '0.3rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', textAlign: 'right' }} />
-                </div>
-                
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                  <span>Discount Amount (₹):</span>
-                  <input type="number" value={discountAmount} onChange={(e) => setDiscountAmount(Number(e.target.value))} style={{ width: '100px', padding: '0.3rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', textAlign: 'right' }} />
+              {/* RIGHT PANEL: Live Preview */}
+              <div
+                style={{
+                  background: '#E8ECF4',
+                  overflowY: 'auto',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  position: 'relative',
+                }}
+              >
+                {/* Preview Toolbar */}
+                <div
+                  style={{
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 20,
+                    background: 'rgba(232,236,244,0.92)',
+                    backdropFilter: 'blur(8px)',
+                    padding: '8px 16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    borderBottom: '1px solid #D8E3F5',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span
+                      style={{
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: '#616161',
+                        fontFamily: 'Poppins, sans-serif',
+                      }}
+                    >
+                      Live Preview
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 600,
+                        color: '#0B2C8C',
+                        background: '#EDF2FF',
+                        padding: '2px 8px',
+                        borderRadius: 4,
+                      }}
+                    >
+                      {zoom}%
+                    </span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <button
+                      onClick={() => setZoom(Math.max(40, zoom - 10))}
+                      style={{
+                        padding: 5,
+                        borderRadius: 6,
+                        border: '1px solid #D8E3F5',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                      }}
+                    >
+                      <ZoomOut style={{ width: 14, height: 14, color: '#616161' }} />
+                    </button>
+                    {[50, 75, 100].map((z) => (
+                      <button
+                        key={z}
+                        onClick={() => setZoom(z)}
+                        style={{
+                          padding: '4px 8px',
+                          borderRadius: 6,
+                          border: '1px solid #D8E3F5',
+                          background: zoom === z ? '#0B2C8C' : '#fff',
+                          color: zoom === z ? '#fff' : '#616161',
+                          cursor: 'pointer',
+                          fontSize: 10,
+                          fontWeight: 600,
+                        }}
+                      >
+                        {z}%
+                      </button>
+                    ))}
+                    <button
+                      onClick={() => setZoom(Math.min(150, zoom + 10))}
+                      style={{
+                        padding: 5,
+                        borderRadius: 6,
+                        border: '1px solid #D8E3F5',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                      }}
+                    >
+                      <ZoomIn style={{ width: 14, height: 14, color: '#616161' }} />
+                    </button>
+                    <button
+                      onClick={() => setIsPreviewFullscreen(!isPreviewFullscreen)}
+                      style={{
+                        padding: 5,
+                        borderRadius: 6,
+                        border: '1px solid #D8E3F5',
+                        background: '#fff',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        marginLeft: 4,
+                      }}
+                    >
+                      {isPreviewFullscreen ? (
+                        <Minimize2 style={{ width: 14, height: 14, color: '#616161' }} />
+                      ) : (
+                        <Maximize2 style={{ width: 14, height: 14, color: '#616161' }} />
+                      )}
+                    </button>
+                  </div>
                 </div>
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                  <span>Advance Received (₹):</span>
-                  <input type="number" value={advanceReceived} onChange={(e) => setAdvanceReceived(Number(e.target.value))} style={{ width: '100px', padding: '0.3rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', textAlign: 'right' }} />
-                </div>
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem' }}>
-                  <span>Payment Status:</span>
-                  <select value={paymentStatus} onChange={(e) => setPaymentStatus(e.target.value)} style={{ padding: '0.3rem 0.5rem', borderRadius: '6px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}>
-                    <option value="Pending">Pending</option>
-                    <option value="Paid">Paid</option>
-                    <option value="Partially Paid">Partially Paid</option>
-                  </select>
-                </div>
-
-                <div style={{ borderTop: '1px solid var(--border)', paddingTop: '0.6rem', marginTop: '0.4rem', display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: '1rem', color: 'var(--primary)' }}>
-                  <span>Grand Total:</span>
-                  <span>₹ {grandTotal.toLocaleString()}</span>
-                </div>
-
-                <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontStyle: 'italic', marginTop: '0.2rem' }}>
-                  {amountInWords}
+                {/* Preview Content */}
+                <div
+                  style={{
+                    flex: 1,
+                    display: 'flex',
+                    justifyContent: 'center',
+                    padding: '20px 16px',
+                  }}
+                >
+                  <InvoiceLivePreview data={invoiceData} zoom={zoom} />
                 </div>
               </div>
+            </motion.div>
+          )}
 
-            </div>
-
-            {/* Form Action Footer */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
-              <button type="button" className="btn-secondary" onClick={() => setActiveTab('DASHBOARD')}>Back</button>
-              <button type="button" className="btn-primary" onClick={() => setActiveTab('PREVIEW')}>Preview & Print Invoice</button>
-            </div>
-
-          </form>
-        </div>
-      )}
-
-      {/* PREVIEW TAB - DOCUMENT PREVIEW */}
-      {activeTab === 'PREVIEW' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          
-          {/* Action Bar */}
-          <div className="glass-card" style={{ padding: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
-            <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-              <button type="button" className="btn-secondary" onClick={() => setActiveTab('FORM')}>Back to Edit</button>
-              <button type="button" className="btn-secondary" onClick={() => setActiveTab('DASHBOARD')}>Back to Dashboard</button>
-            </div>
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
-              <button type="button" className="btn-secondary" onClick={() => window.print()}>Print Invoice</button>
-              <button type="button" className="btn-primary" onClick={handleSaveInvoice} disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? 'Saving...' : 'Save Invoice'}
-              </button>
-              <button type="button" className="btn-primary" style={{ background: '#10B981' }} onClick={() => handleDownloadPdf(null)}>
-                Download PDF
-              </button>
-            </div>
-          </div>
-
-          {/* Printable Invoice Container using 300 DPI Background Template Image */}
-          <div
-            className="invoice-print-container"
-            style={{
-              position: 'relative',
-              width: '100%',
-              maxWidth: '850px',
-              aspectRatio: '682 / 1024',
-              backgroundImage: `url(${
-                formType === 'SCHOOL'
-                  ? '/assets/invoice/template_school.png'
-                  : formType === 'MULTI_SERVICE'
-                  ? '/assets/invoice/template_multi_p1.png'
-                  : '/assets/invoice/template_regular.png'
-              })`,
-              backgroundSize: '100% 100%',
-              backgroundRepeat: 'no-repeat',
-              margin: '0 auto',
-              borderRadius: '8px',
-              boxShadow: '0 10px 30px rgba(0,0,0,0.15)',
-              fontFamily: 'Arial, sans-serif',
-              color: '#102A71',
-              fontSize: '0.8rem',
-            }}
-          >
-            {/* Market-Standard Code-128 Barcode Top Right Box */}
-            <div
-              style={{
-                position: 'absolute',
-                top: '4.8%',
-                right: '4.8%',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-              }}
+          {/* ===== SEARCH TAB ===== */}
+          {activeTab === 'SEARCH' && (
+            <motion.div
+              key="search"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}
             >
               <div
                 style={{
                   background: '#fff',
-                  color: '#000',
-                  padding: '2px 8px',
-                  fontFamily: 'monospace',
-                  letterSpacing: '2px',
-                  fontSize: '0.85rem',
-                  fontWeight: 'bold',
-                  border: '1px solid #CBD5E1',
-                  borderRadius: '2px',
+                  borderRadius: 14,
+                  border: '1px solid #D8E3F5',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                  overflow: 'hidden',
                 }}
               >
-                |||||| ||| |||| || |||||||| ||||
-              </div>
-              <div style={{ fontSize: '0.65rem', fontWeight: 700, color: '#000', marginTop: '1px' }}>
-                {invoiceNumber.replace(/\s+/g, '')}
-              </div>
-            </div>
-
-            {/* Top Right Header Meta Values (Aligned right after colon :) */}
-            <div style={{ position: 'absolute', top: '11.8%', left: '79.5%', fontWeight: 700, fontSize: '0.78rem' }}>
-              {invoiceNumber}
-            </div>
-            <div style={{ position: 'absolute', top: '13.9%', left: '79.5%', fontWeight: 700, fontSize: '0.78rem' }}>
-              {invoiceDate}
-            </div>
-            <div style={{ position: 'absolute', top: '16.0%', left: '79.5%', fontWeight: 700, fontSize: '0.78rem' }}>
-              {billingPeriodText || 'Monthly'}
-            </div>
-            <div style={{ position: 'absolute', top: '18.1%', left: '79.5%', fontWeight: 700, fontSize: '0.78rem' }}>
-              {startDateText || 'N/A'}
-            </div>
-
-            {/* Profile Section Box 1 (Billed To) */}
-            <div style={{ position: 'absolute', top: '26.8%', left: '19.5%', fontWeight: 700, fontSize: '0.78rem' }}>
-              {formType === 'SCHOOL' ? schoolBranch || clientName || 'N/A' : clientName || 'N/A'}
-            </div>
-            <div style={{ position: 'absolute', top: '30.0%', left: '19.5%', fontWeight: 600, fontSize: '0.78rem' }}>
-              {formType === 'SCHOOL' ? contactPerson || clientContact || 'N/A' : clientContact || 'N/A'}
-            </div>
-            <div style={{ position: 'absolute', top: '33.2%', left: '19.5%', fontSize: '0.75rem', width: '28%', lineHeight: 1.3 }}>
-              {clientAddress || 'N/A'}
-            </div>
-            {clientGst && (
-              <div style={{ position: 'absolute', top: '36.4%', left: '19.5%', fontSize: '0.75rem' }}>
-                {clientGst}
-              </div>
-            )}
-
-            {/* Profile Section Box 2 (Service Profile) */}
-            {formType !== 'SCHOOL' && (
-              <>
-                <div style={{ position: 'absolute', top: '26.8%', left: '47.5%', fontWeight: 700, fontSize: '0.78rem' }}>
-                  {patientName || 'N/A'}
-                </div>
-                <div style={{ position: 'absolute', top: '29.3%', left: '47.5%', fontSize: '0.78rem' }}>
-                  {patientAgeGender || 'N/A'}
-                </div>
-                <div style={{ position: 'absolute', top: '31.8%', left: '47.5%', fontSize: '0.78rem' }}>
-                  {serviceType || 'N/A'}
-                </div>
-                <div style={{ position: 'absolute', top: '34.3%', left: '47.5%', fontSize: '0.78rem' }}>
-                  {consultant || 'N/A'}
-                </div>
-                <div style={{ position: 'absolute', top: '36.8%', left: '47.5%', fontSize: '0.78rem' }}>
-                  {startDateText || 'N/A'}
-                </div>
-                <div style={{ position: 'absolute', top: '39.3%', left: '47.5%', fontSize: '0.78rem' }}>
-                  In Process
-                </div>
-                <div style={{ position: 'absolute', top: '41.8%', left: '47.5%', fontSize: '0.78rem' }}>
-                  {renderedDays || 'N/A'}
-                </div>
-              </>
-            )}
-
-            {/* Profile Section Box 3 (Other Information) */}
-            <div style={{ position: 'absolute', top: '26.8%', left: '81.5%', fontWeight: 700, fontSize: '0.78rem' }}>
-              ₹ {perDayCharges.toLocaleString()}
-            </div>
-            <div style={{ position: 'absolute', top: '30.0%', left: '81.5%', fontSize: '0.78rem' }}>
-              ₹ {advanceReceived.toLocaleString()}
-            </div>
-            <div style={{ position: 'absolute', top: '33.2%', left: '81.5%', fontWeight: 700, color: '#102A71', fontSize: '0.78rem' }}>
-              {paymentStatus}
-            </div>
-
-            {/* Dynamic Service Table Overlay Rows */}
-            <div style={{ position: 'absolute', top: '48.5%', left: '2.5%', width: '95.0%' }}>
-              {services.map((item, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '5% 36% 12% 10% 12% 12% 13%',
-                    padding: '0.2rem 0',
-                    fontSize: '0.74rem',
-                    alignItems: 'center',
-                    minHeight: '26px',
-                    color: '#1A1A1A',
-                  }}
-                >
-                  <div style={{ textAlign: 'center', fontWeight: 700 }}>{idx + 1}</div>
-                  <div>
-                    <div style={{ fontWeight: 700 }}>{item.service_name}</div>
-                    {item.description && <div style={{ fontSize: '0.65rem', color: '#555' }}>{item.description}</div>}
+                <div style={{ padding: '16px 20px', borderBottom: '1px solid #F0F4FA' }}>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      fontWeight: 700,
+                      color: '#0B2C8C',
+                      marginBottom: 12,
+                    }}
+                  >
+                    Search Invoices
                   </div>
-                  <div style={{ textAlign: 'right' }}>₹ {(item.rate || 0).toLocaleString()}</div>
-                  <div style={{ textAlign: 'center' }}>{item.days}</div>
-                  <div style={{ textAlign: 'right' }}>₹ {(item.amount || 0).toLocaleString()}</div>
-                  <div style={{ textAlign: 'center' }}>
-                    {item.other_expenses > 0 ? `₹ ${item.other_expenses.toLocaleString()}` : 'Not Applicable'}
+                  <div style={{ position: 'relative' }}>
+                    <Search
+                      style={{
+                        position: 'absolute',
+                        left: 12,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 16,
+                        height: 16,
+                        color: '#9CA3AF',
+                      }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Search by Invoice Number, Organization, Patient, or Hash..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px 14px 10px 38px',
+                        borderRadius: 10,
+                        border: '1px solid #D8E3F5',
+                        fontSize: 12,
+                        fontFamily: 'Poppins, sans-serif',
+                        outline: 'none',
+                        transition: 'border-color 0.2s, box-shadow 0.2s',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = '#0B2C8C'
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(11,44,140,0.1)'
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = '#D8E3F5'
+                        e.currentTarget.style.boxShadow = 'none'
+                      }}
+                    />
                   </div>
-                  <div style={{ textAlign: 'right', fontWeight: 700 }}>₹ {(item.total || 0).toLocaleString()}</div>
                 </div>
-              ))}
-            </div>
 
-            {/* Remarks Overlay */}
-            <div style={{ position: 'absolute', top: '67.0%', left: '5.5%', width: '33.0%', fontSize: '0.74rem', color: '#334155', lineHeight: 1.4 }}>
-              {remarks || 'Invoice for the service period. Kindly process the due amount at the earliest.'}
-            </div>
-
-            {/* Financial Summary Totals Overlay (Aligned on top of exact blank lines) */}
-            <div style={{ position: 'absolute', top: '64.2%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
-              ₹ {gstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div style={{ position: 'absolute', top: '66.3%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
-              ₹ {discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div style={{ position: 'absolute', top: '68.4%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#102A71' }}>
-              ₹ {totalAfterGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div style={{ position: 'absolute', top: '70.5%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#1A1A1A' }}>
-              ₹ {advanceReceived.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-            <div style={{ position: 'absolute', top: '72.6%', right: '5.5%', textAlign: 'right', fontWeight: 700, fontSize: '0.78rem', color: '#102A71' }}>
-              ₹ {balanceDue.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-
-            {/* GRAND TOTAL Overlay (Inside Dark Navy Bar) */}
-            <div style={{ position: 'absolute', top: '75.2%', right: '5.5%', textAlign: 'right', fontWeight: 800, color: '#ffffff', fontSize: '0.9rem' }}>
-              ₹ {grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </div>
-
-            {/* Amount In Words Overlay (Directly on top of Amount In Words: line) */}
-            <div style={{ position: 'absolute', top: '78.5%', left: '51.0%', fontWeight: 700, color: '#102A71', fontSize: '0.75rem', width: '45.0%' }}>
-              {amountInWords}
-            </div>
-
-          </div>
-        </div>
-      )}
-
-      {/* HISTORY TAB - INVOICE LIST TABLE */}
-      {activeTab === 'HISTORY' && (
-        <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ margin: 0 }}>Invoice History</h3>
-            <button type="button" className="btn-secondary" onClick={() => setActiveTab('DASHBOARD')}>Back</button>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg)', color: 'var(--text)', borderBottom: '2px solid var(--border)' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Invoice No</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Type</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Client / Patient</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Date</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Grand Total</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Status</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historyQuery.isLoading ? (
-                  <tr>
-                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center' }}>Loading invoices...</td>
-                  </tr>
-                ) : historyQuery.data && historyQuery.data.length > 0 ? (
-                  historyQuery.data.map((inv) => (
-                    <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '0.75rem', fontWeight: 700, color: 'var(--primary)' }}>{inv.invoice_number}</td>
-                      <td style={{ padding: '0.75rem' }}>{inv.invoice_type}</td>
-                      <td style={{ padding: '0.75rem' }}>
-                        <div style={{ fontWeight: 600 }}>{inv.client_name}</div>
-                        {inv.patient_name && <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Patient: {inv.patient_name}</div>}
-                      </td>
-                      <td style={{ padding: '0.75rem' }}>{inv.invoice_date}</td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700 }}>
-                        ₹ {Number(inv.grand_total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        <span className="status-pill active">{inv.payment_status}</span>
-                      </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'center' }}>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => {
-                              setSelectedInvoice(inv)
-                              setInvoiceNumber(inv.invoice_number)
-                              setFormType(inv.invoice_type)
-                              setClientName(inv.client_name)
-                              setClientContact(inv.client_contact)
-                              setClientAddress(inv.client_address)
-                              setPatientName(inv.patient_name || '')
-                              setServices(inv.services_data || [])
-                              setActiveTab('PREVIEW')
-                            }}
-                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem' }}
-                          >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-primary"
-                            onClick={() => handleDownloadPdf(inv)}
-                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', background: '#10B981' }}
-                          >
-                            PDF
-                          </button>
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => {
-                              if (confirm(`Are you sure you want to delete invoice ${inv.invoice_number}?`)) {
-                                deleteMutation.mutate(inv.id)
-                              }
-                            }}
-                            style={{ padding: '0.3rem 0.6rem', fontSize: '0.75rem', color: 'var(--danger)' }}
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={7} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-                      No invoices found. Generate a new invoice above!
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* SEARCH TAB */}
-      {activeTab === 'SEARCH' && (
-        <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ margin: 0 }}>Search Invoices</h3>
-            <button type="button" className="btn-secondary" onClick={() => setActiveTab('DASHBOARD')}>Back</button>
-          </div>
-
-          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by Invoice #, Client Name, Patient Name, Date..."
-              style={{ flex: 1, padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
-            />
-            <button type="button" className="btn-primary" onClick={() => historyQuery.refetch()} style={{ width: 'auto', padding: '0.6rem 1.5rem' }}>
-              Search
-            </button>
-          </div>
-
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.85rem' }}>
-              <thead>
-                <tr style={{ background: 'var(--bg)', color: 'var(--text)', borderBottom: '2px solid var(--border)' }}>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Invoice No</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Client / Patient</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'left' }}>Date</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'right' }}>Grand Total</th>
-                  <th style={{ padding: '0.75rem', textAlign: 'center' }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {historyQuery.data && historyQuery.data.length > 0 ? (
-                  historyQuery.data.map((inv) => (
-                    <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                      <td style={{ padding: '0.75rem', fontWeight: 700, color: 'var(--primary)' }}>{inv.invoice_number}</td>
-                      <td style={{ padding: '0.75rem' }}>{inv.client_name} {inv.patient_name ? `(${inv.patient_name})` : ''}</td>
-                      <td style={{ padding: '0.75rem' }}>{inv.invoice_date}</td>
-                      <td style={{ padding: '0.75rem', textAlign: 'right', fontWeight: 700 }}>
-                        ₹ {Number(inv.grand_total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </td>
-                      <td style={{ padding: '0.75rem', textAlign: 'center' }}>
-                        <button
-                          type="button"
-                          className="btn-primary"
-                          onClick={() => handleDownloadPdf(inv)}
-                          style={{ padding: '0.3rem 0.8rem', fontSize: '0.75rem', background: '#10B981' }}
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <thead>
+                      <tr
+                        style={{
+                          background: '#0B2C8C',
+                          color: '#fff',
+                          fontSize: 11,
+                          fontWeight: 600,
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        <th style={{ padding: '10px 16px', textAlign: 'left' }}>Invoice No</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'left' }}>Client</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'left' }}>Type</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'left' }}>Hash</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right' }}>Amount</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'left' }}>Date</th>
+                        <th style={{ padding: '10px 16px', textAlign: 'right' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {(invoicesQuery.data || []).map((inv) => (
+                        <tr
+                          key={inv.id}
+                          style={{ borderBottom: '1px solid #F0F4FA' }}
+                          onMouseEnter={(e) => (e.currentTarget.style.background = '#FAFBFE')}
+                          onMouseLeave={(e) => (e.currentTarget.style.background = '')}
                         >
-                          Download PDF
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={5} style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>
-                      No matching invoices found.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
+                          <td style={{ padding: '12px 16px', fontWeight: 700, color: '#0B2C8C' }}>
+                            {inv.invoice_number}
+                          </td>
+                          <td style={{ padding: '12px 16px', fontWeight: 600 }}>{inv.client_name}</td>
+                          <td style={{ padding: '12px 16px' }}>
+                            <span
+                              style={{
+                                padding: '3px 8px',
+                                borderRadius: 6,
+                                fontSize: 10,
+                                fontWeight: 600,
+                                background: '#EDF2FF',
+                                color: '#0B2C8C',
+                              }}
+                            >
+                              {inv.invoice_type}
+                            </span>
+                          </td>
+                          <td
+                            style={{
+                              padding: '12px 16px',
+                              fontFamily: 'monospace',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              color: '#616161',
+                            }}
+                          >
+                            {inv.display_hash || '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700 }}>
+                            Rs. {inv.grand_total.toLocaleString('en-IN')}
+                          </td>
+                          <td style={{ padding: '12px 16px', color: '#616161' }}>{inv.invoice_date}</td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
+                              <button
+                                onClick={() => handleLoadInvoice(inv)}
+                                style={{
+                                  padding: 6,
+                                  borderRadius: 6,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  color: '#1A4DD8',
+                                }}
+                              >
+                                <Eye style={{ width: 15, height: 15 }} />
+                              </button>
+                              <button
+                                onClick={() => handleDownloadPDF(inv)}
+                                style={{
+                                  padding: 6,
+                                  borderRadius: 6,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  color: '#2E7D32',
+                                }}
+                              >
+                                <Download style={{ width: 15, height: 15 }} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  if (confirm(`Delete invoice ${inv.invoice_number}?`))
+                                    deleteMutation.mutate(inv.id)
+                                }}
+                                style={{
+                                  padding: 6,
+                                  borderRadius: 6,
+                                  border: 'none',
+                                  background: 'transparent',
+                                  cursor: 'pointer',
+                                  color: '#D32F2F',
+                                }}
+                              >
+                                <Trash2 style={{ width: 15, height: 15 }} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </motion.div>
+          )}
 
-      {/* VERIFY TAB */}
-      {activeTab === 'VERIFY' && (
-        <div className="glass-card card-soft" style={{ padding: '1.5rem', maxWidth: '600px', margin: '0 auto', width: '100%' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
-            <h3 style={{ margin: 0 }}>Verify Invoice Authenticity</h3>
-            <button type="button" className="btn-secondary" onClick={() => setActiveTab('DASHBOARD')}>Back</button>
-          </div>
-
-          <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginBottom: '1.25rem' }}>
-            Enter the Invoice Serial Number or scan the barcode to verify whether this invoice was issued by Skandan Home Care Clinic LLP.
-          </p>
-
-          <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1.5rem' }}>
-            <input
-              type="text"
-              value={verifyInput}
-              onChange={(e) => setVerifyInput(e.target.value)}
-              placeholder="e.g. 1370 - 0001"
-              style={{ flex: 1, padding: '0.6rem 1rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', fontWeight: 700 }}
-            />
-            <button type="button" className="btn-primary" onClick={handleVerify} style={{ width: 'auto', padding: '0.6rem 1.5rem' }}>
-              Verify
-            </button>
-          </div>
-
-          {verifyResult && (
-            <div
-              style={{
-                padding: '1.25rem',
-                borderRadius: '10px',
-                border: verifyResult.found ? '2px solid #10B981' : '2px solid #EF4444',
-                background: verifyResult.found ? 'rgba(16, 185, 129, 0.08)' : 'rgba(239, 68, 68, 0.08)',
-              }}
+          {/* ===== VERIFY TAB ===== */}
+          {activeTab === 'VERIFY' && (
+            <motion.div
+              key="verify"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.25 }}
+              style={{ padding: 24, maxWidth: 700, margin: '0 auto' }}
             >
-              {verifyResult.found && verifyResult.invoice ? (
-                <div>
-                  <h4 style={{ color: '#10B981', margin: '0 0 0.5rem 0' }}>Authentic Invoice Verified</h4>
-                  <div style={{ fontSize: '0.85rem', lineHeight: 1.6 }}>
-                    <div><strong>Invoice No:</strong> {verifyResult.invoice.invoice_number}</div>
-                    <div><strong>Client Name:</strong> {verifyResult.invoice.client_name}</div>
-                    <div><strong>Invoice Date:</strong> {verifyResult.invoice.invoice_date}</div>
-                    <div><strong>Grand Total:</strong> ₹ {Number(verifyResult.invoice.grand_total).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-                    <div><strong>Status:</strong> <span style={{ color: '#10B981', fontWeight: 700 }}>{verifyResult.invoice.payment_status}</span></div>
+              <div
+                style={{
+                  background: '#fff',
+                  borderRadius: 14,
+                  border: '1px solid #D8E3F5',
+                  boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+                  padding: 24,
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                  <div
+                    style={{
+                      width: 38,
+                      height: 38,
+                      borderRadius: 10,
+                      background: '#E8F5E9',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <ShieldCheck style={{ width: 20, height: 20, color: '#2E7D32' }} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: '#0B2C8C' }}>
+                      Verify Invoice Authenticity
+                    </div>
+                    <div style={{ fontSize: 11, color: '#616161' }}>
+                      Enter an Invoice Number or SHA-256 Hash to verify.
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <div>
-                  <h4 style={{ color: '#EF4444', margin: '0 0 0.5rem 0' }}>Invalid / Unverified Invoice</h4>
-                  <p style={{ margin: 0, fontSize: '0.85rem' }}>
-                    {verifyResult.message || 'No matching official invoice was found in the Skandan database.'}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      )}
 
+                <div style={{ display: 'flex', gap: 10, marginTop: 18 }}>
+                  <input
+                    type="text"
+                    placeholder="Enter Invoice Number or Verification Hash..."
+                    value={verifyInput}
+                    onChange={(e) => setVerifyInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+                    style={{
+                      flex: 1,
+                      padding: '10px 14px',
+                      borderRadius: 10,
+                      border: '1px solid #D8E3F5',
+                      fontSize: 12,
+                      fontFamily: 'monospace',
+                      fontWeight: 600,
+                      outline: 'none',
+                    }}
+                  />
+                  <button
+                    onClick={handleVerify}
+                    style={{
+                      padding: '10px 20px',
+                      borderRadius: 10,
+                      border: 'none',
+                      background: 'linear-gradient(135deg, #2E7D32, #43A047)',
+                      color: '#fff',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      fontFamily: 'Poppins, sans-serif',
+                      boxShadow: '0 2px 8px rgba(46,125,50,0.25)',
+                    }}
+                  >
+                    <ShieldCheck style={{ width: 14, height: 14 }} />
+                    Verify
+                  </button>
+                </div>
+
+                {verifyResult && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    style={{ marginTop: 20 }}
+                  >
+                    {!verifyResult.found ? (
+                      <div
+                        style={{
+                          padding: 16,
+                          borderRadius: 10,
+                          background: '#FFF3F3',
+                          border: '1px solid #FFCDD2',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 10,
+                          color: '#D32F2F',
+                          fontSize: 12,
+                          fontWeight: 600,
+                        }}
+                      >
+                        <AlertTriangle style={{ width: 18, height: 18 }} />
+                        {verifyResult.message || 'Invoice not found in database.'}
+                      </div>
+                    ) : (
+                      <div>
+                        <div
+                          style={{
+                            padding: 16,
+                            borderRadius: 10,
+                            background: '#E8F5E9',
+                            border: '1px solid #A5D6A7',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: 10,
+                            color: '#2E7D32',
+                            fontSize: 13,
+                            fontWeight: 700,
+                            marginBottom: 14,
+                          }}
+                        >
+                          <CheckCircle2 style={{ width: 20, height: 20 }} />
+                          Invoice Verified - Cryptographic Hash Match Confirmed
+                        </div>
+
+                        {verifyResult.invoice && (
+                          <div
+                            style={{
+                              display: 'grid',
+                              gridTemplateColumns: '1fr 1fr',
+                              gap: 10,
+                              padding: 16,
+                              borderRadius: 10,
+                              background: '#FAFBFE',
+                              border: '1px solid #D8E3F5',
+                              fontSize: 12,
+                            }}
+                          >
+                            {[
+                              ['Invoice Number', verifyResult.invoice.invoice_number, '#0B2C8C'],
+                              ['Client', verifyResult.invoice.client_name, '#1A1A1A'],
+                              ['Invoice Date', verifyResult.invoice.invoice_date, '#1A1A1A'],
+                              ['Generated By', verifyResult.invoice.generated_by, '#1A1A1A'],
+                              [
+                                'Stored Hash',
+                                verifyResult.stored_hash || verifyResult.invoice.display_hash || '-',
+                                '#2E7D32',
+                              ],
+                              [
+                                'Grand Total',
+                                `Rs. ${verifyResult.invoice.grand_total.toLocaleString('en-IN')}`,
+                                '#0B2C8C',
+                              ],
+                            ].map(([label, val, color]) => (
+                              <div key={label as string}>
+                                <div style={{ fontSize: 10, color: '#9CA3AF', fontWeight: 600, marginBottom: 2 }}>
+                                  {label}
+                                </div>
+                                <div style={{ fontWeight: 700, color: color as string, fontFamily: label === 'Stored Hash' ? 'monospace' : 'Poppins, sans-serif' }}>
+                                  {val}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                )}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
     </div>
   )
 }

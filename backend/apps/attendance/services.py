@@ -157,9 +157,11 @@ def upload_profile_photo(image_file, *, employee_id: str, employee_name: str | N
 
 def get_employee_presence_summary(employee: Employee, *, reference_time: datetime | None = None) -> dict[str, Any]:
     reference_time = reference_time or timezone.now()
-    session = Session.objects.filter(employee=employee, is_active=True).order_by('-login_time').first()
+    today = reference_time.date()
+    
+    session = Session.objects.filter(employee=employee, is_active=True, login_time__date=today).order_by('-login_time').first()
     if not session:
-        session = Session.objects.filter(employee=employee).order_by('-login_time').first()
+        session = Session.objects.filter(employee=employee, login_time__date=today).order_by('-login_time').first()
     if not session:
         return {
             'is_present': False,
@@ -185,7 +187,7 @@ def get_employee_presence_summary(employee: Employee, *, reference_time: datetim
     duration_seconds = max(int((logout_time - session.login_time).total_seconds()), 0)
     return {
         'is_present': False,
-        'status': 'Absent',
+        'status': 'Checked Out',
         'check_in_time': session.login_time,
         'check_out_time': logout_time,
         'session_duration_seconds': duration_seconds,

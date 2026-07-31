@@ -1,4 +1,6 @@
 import os
+import json
+import hashlib
 from django.conf import settings
 from django.http import HttpResponse
 from django.db.models import Q
@@ -10,6 +12,22 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from apps.invoices.models import Invoice, InvoiceCounter
 from apps.invoices.serializers import InvoiceSerializer
 from apps.invoices.pdf_service import generate_invoice_pdf, amount_in_rupees_words
+
+
+def compute_invoice_sha256(data_dict: dict) -> tuple[str, str]:
+    canonical_dict = {
+        "invoice_number": str(data_dict.get("invoice_number", "")),
+        "invoice_type": str(data_dict.get("invoice_type", "")),
+        "invoice_date": str(data_dict.get("invoice_date", "")),
+        "billing_period_text": str(data_dict.get("billing_period_text", "")),
+        "client_name": str(data_dict.get("client_name", "")),
+        "grand_total": str(data_dict.get("grand_total", 0)),
+        "services_data": data_dict.get("services_data", []),
+    }
+    canonical_json = json.dumps(canonical_dict, sort_keys=True)
+    full_hash = hashlib.sha256(canonical_json.encode('utf-8')).hexdigest().upper()
+    display_hash = full_hash[:16]
+    return full_hash, display_hash
 
 
 class InvoiceNextNumberView(APIView):
@@ -26,7 +44,6 @@ class InvoiceListCreateView(APIView):
     def get(self, request):
         queryset = Invoice.objects.all()
         
-        # Search parameters
         search_query = request.query_params.get("search") or request.query_params.get("q")
         if search_query:
             queryset = queryset.filter(
@@ -35,7 +52,8 @@ class InvoiceListCreateView(APIView):
                 Q(patient_name__icontains=search_query) |
                 Q(billing_period_text__icontains=search_query) |
                 Q(invoice_type__icontains=search_query) |
-                Q(barcode_value__icontains=search_query)
+                Q(verification_hash__icontains=search_query) |
+                Q(display_hash__icontains=search_query)
             )
 
         invoice_type = request.query_params.get("invoice_type")
@@ -52,19 +70,19 @@ class InvoiceListCreateView(APIView):
     def post(self, request):
         data = request.data.copy()
         
-        # Generate next invoice number if not provided or empty
         if not data.get("invoice_number"):
             data["invoice_number"] = InvoiceCounter.get_next_number()
         else:
-            # Check uniqueness
             existing = Invoice.objects.filter(invoice_number=data["invoice_number"]).first()
             if existing:
                 data["invoice_number"] = InvoiceCounter.get_next_number()
 
-        # Set barcode value
-        data["barcode_value"] = str(data["invoice_number"]).replace(" ", "")
+        # Compute SHA-256 Hash
+        full_hash, display_hash = compute_invoice_sha256(data)
+        data["verification_hash"] = full_hash
+        data["display_hash"] = display_hash
+        data["barcode_value"] = display_hash
 
-        # Compute Amount In Words if not present
         grand_total = data.get("grand_total") or 0
         if not data.get("amount_in_words"):
             data["amount_in_words"] = amount_in_rupees_words(grand_total)
@@ -73,7 +91,7 @@ class InvoiceListCreateView(APIView):
         if serializer.is_valid():
             invoice = serializer.save(generated_by=getattr(request.user, "name", "Admin"))
             
-            # Generate and store PDF file
+            # Generate 100% Vector PDF
             try:
                 pdf_bytes = generate_invoice_pdf(invoice)
                 pdf_dir = os.path.join(settings.BASE_DIR, "media", "invoices")
@@ -108,10 +126,15 @@ class InvoiceDetailView(APIView):
         invoice = Invoice.objects.filter(pk=pk).first()
         if not invoice:
             return Response({"detail": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
-        serializer = InvoiceSerializer(invoice, data=request.data, partial=True)
+        
+        data = request.data.copy()
+        full_hash, display_hash = compute_invoice_sha256(data)
+        data["verification_hash"] = full_hash
+        data["display_hash"] = display_hash
+
+        serializer = InvoiceSerializer(invoice, data=data, partial=True)
         if serializer.is_valid():
             invoice = serializer.save()
-            # Regenerate PDF
             try:
                 pdf_bytes = generate_invoice_pdf(invoice)
                 pdf_dir = os.path.join(settings.BASE_DIR, "media", "invoices")
@@ -134,7 +157,7 @@ class InvoiceDetailView(APIView):
         if not invoice:
             return Response({"detail": "Invoice not found."}, status=status.HTTP_404_NOT_FOUND)
         
-        # Deleting does NOT reset sequence numbering (per spec requirement)
+        # Deleting does NOT reset sequence numbering (never reuse deleted numbers)
         invoice.delete()
         return Response({"detail": "Invoice deleted successfully."}, status=status.HTTP_200_OK)
 
@@ -160,21 +183,40 @@ class InvoiceVerifyView(APIView):
     permission_classes = [AllowAny]
 
     def get(self, request):
-        query = request.query_params.get("number") or request.query_params.get("barcode") or request.query_params.get("q")
+        query = request.query_params.get("number") or request.query_params.get("hash") or request.query_params.get("q")
         if not query:
-            return Response({"found": False, "message": "Please provide an invoice number or scan barcode."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"found": False, "message": "Please enter an invoice number or verification hash."}, status=status.HTTP_400_BAD_REQUEST)
 
-        query_clean = str(query).strip()
+        query_clean = str(query).strip().upper()
+        
         invoice = Invoice.objects.filter(
             Q(invoice_number__iexact=query_clean) |
-            Q(barcode_value__iexact=query_clean.replace(" ", "")) |
+            Q(verification_hash__iexact=query_clean) |
+            Q(display_hash__iexact=query_clean) |
             Q(invoice_number__icontains=query_clean)
         ).first()
 
         if not invoice:
             return Response({"found": False, "message": "Invoice Not Found"}, status=status.HTTP_200_OK)
 
+        # Recalculate SHA-256 hash from stored invoice fields
+        canonical_data = {
+            "invoice_number": str(invoice.invoice_number),
+            "invoice_type": str(invoice.invoice_type),
+            "invoice_date": str(invoice.invoice_date),
+            "billing_period_text": str(invoice.billing_period_text),
+            "client_name": str(invoice.client_name),
+            "grand_total": str(invoice.grand_total),
+            "services_data": invoice.services_data,
+        }
+        full_hash, display_hash = compute_invoice_sha256(canonical_data)
+        is_verified = (full_hash == invoice.verification_hash)
+
         return Response({
             "found": True,
-            "invoice": InvoiceSerializer(invoice).data
+            "verified": is_verified,
+            "status_text": "✅ ORIGINAL INVOICE VERIFIED" if is_verified else "❌ INVOICE DATA MODIFIED",
+            "invoice": InvoiceSerializer(invoice).data,
+            "recalculated_hash": display_hash,
+            "stored_hash": invoice.display_hash,
         })
