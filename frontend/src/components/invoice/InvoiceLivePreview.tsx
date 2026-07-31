@@ -433,25 +433,27 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
       {/* Footer (Always at bottom) */}
       <div style={{ position: 'absolute', bottom: '20px', left: '30px', right: '30px' }}>
         {isLastPage && (
-          <div style={{ textAlign: 'center', color: '#d32f2f', fontSize: '10px', fontStyle: 'italic', marginBottom: '10px' }}>
+          <div style={{ textAlign: 'center', color: '#0B2C8C', fontSize: '11px', fontWeight: '600', fontStyle: 'italic', marginBottom: '10px' }}>
             This invoice is system generated. No signature is required.
           </div>
         )}
         
-        <div style={{ borderTop: '2px solid #0B2C8C', paddingTop: '10px' }}>
-          <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', color: '#0B2C8C', marginBottom: '8px', letterSpacing: '1px' }}>
+        <div style={{ paddingTop: '8px' }}>
+          <div style={{ textAlign: 'center', fontSize: '10px', fontWeight: 'bold', color: '#0B2C8C', marginBottom: '8px', letterSpacing: '0.8px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ flex: 1, height: '1px', backgroundColor: '#0B2C8C', marginRight: '15px' }}></span>
             OUR SERVICES
+            <span style={{ flex: 1, height: '1px', backgroundColor: '#0B2C8C', marginLeft: '15px' }}></span>
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#555' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><Activity size={14} color="#1A4DD8" /><span>ICU Care at Home</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><Stethoscope size={14} color="#1A4DD8" /><span>Doctor Visits</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><HeartPulse size={14} color="#1A4DD8" /><span>Nursing Care</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><UserCheck size={14} color="#1A4DD8" /><span>Caretaker Services</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><Accessibility size={14} color="#1A4DD8" /><span>Physiotherapy</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><TestTube size={14} color="#1A4DD8" /><span>Lab Tests at Home</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><PlusSquare size={14} color="#1A4DD8" /><span>Medical Equipment Rental</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><Pill size={14} color="#1A4DD8" /><span>Medicine Delivery</span></div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}><Truck size={14} color="#1A4DD8" /><span>Post-Operative Care</span></div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: '#0B2C8C', fontWeight: '500' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><Activity size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>ICU Care<br/>at Home</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><Stethoscope size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>Doctor<br/>Visits</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><HeartPulse size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>Nursing<br/>Care</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><UserCheck size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>Caretaker<br/>Services</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><Accessibility size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>Physiotherapy</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><TestTube size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>Lab Tests<br/>at Home</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><PlusSquare size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>Medical<br/>Equipment Rental</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><Pill size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>Medicine<br/>Delivery</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}><Truck size={14} color="#0B2C8C" /><span style={{ textAlign: 'center' }}>Post-Operative<br/>Care</span></div>
           </div>
         </div>
       </div>
