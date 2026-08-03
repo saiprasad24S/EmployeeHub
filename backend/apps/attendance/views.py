@@ -90,15 +90,15 @@ class CheckInView(APIView):
                 )
         except GeofenceValidationError as exc:
             return Response(
-                {"success": False, "status": "failed", "message": "Attendance not marked."},
+                {"detail": exc.message, "status": "failed"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         except ValidationError as exc:
             print("[CHECKIN ERROR]", exc)
-            return Response({"success": False, "status": "failed", "message": "Attendance not marked."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": str(exc.detail if hasattr(exc, "detail") else exc), "status": "failed"}, status=status.HTTP_400_BAD_REQUEST)
         except Exception as exc:
             print("[CHECKIN ERROR]", traceback.format_exc())
-            return Response({"success": False, "status": "failed", "message": "Attendance not marked."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return Response({"detail": str(exc), "status": "failed"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class CheckOutView(APIView):

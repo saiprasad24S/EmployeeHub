@@ -100,11 +100,11 @@ export function EmployeePortal() {
     if (typeof payload === 'string') return payload
     if (typeof payload === 'object' && payload !== null) {
       const record = payload as Record<string, unknown>
-      if ('message' in record && typeof record.message === 'string') {
-        return `Failed – ${record.message} You are not within your assigned work location.`
-      }
       if ('detail' in record && typeof record.detail === 'string') {
         return record.detail
+      }
+      if ('message' in record && typeof record.message === 'string') {
+        return record.message
       }
       if ('error' in record && typeof record.error === 'string') {
         return record.error

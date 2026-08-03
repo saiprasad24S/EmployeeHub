@@ -84,23 +84,27 @@ def validate_geofence(
     accuracy: float | None = None
 ) -> None:
     if assignment:
-        radius = float(assignment.radius or settings.DEFAULT_GEOFENCE_RADIUS_METERS)
+        raw_radius = float(assignment.radius or settings.DEFAULT_GEOFENCE_RADIUS_METERS)
+        radius = raw_radius * 1000 if raw_radius <= 10 else raw_radius
         target_lat = float(assignment.latitude)
         target_lon = float(assignment.longitude)
         location_label = assignment.patient_address or assignment.patient_name
     else:
         if employee.default_latitude is None or employee.default_longitude is None:
             if not employee.default_address or not ensure_default_coordinates(employee):
-                raise ValidationError({"detail": "No active assignment found and no default work location configured on your profile."})
+                logger.info("No active assignment or default work location for employee %s; skipping geofence validation.", employee.employee_id)
+                return
         target_lat = float(employee.default_latitude)
         target_lon = float(employee.default_longitude)
         raw_radius = float(employee.default_radius or 0.1)
         radius = raw_radius * 1000 if raw_radius <= 10 else raw_radius
         location_label = employee.default_address or "Default Profile Location"
 
+    effective_radius = max(500.0, radius)
     distance = distance_meters(float(latitude), float(longitude), target_lat, target_lon)
-    buffer = max(10.0, (accuracy or 0) * 1.5)
-    if distance > radius + buffer:
+    buffer = max(100.0, (accuracy or 0) * 2.0)
+
+    if distance > effective_radius + buffer:
         dist_diff_km = round(distance / 1000, 2)
         logger.warning(
             "\n================ [ADMIN GEOFENCE LOG] ================\n"
@@ -110,14 +114,15 @@ def validate_geofence(
             "Reason:\nOutside geofence (Allowed radius: %.0f meters)\n\n"
             "Timestamp:\n%s\n"
             "======================================================",
-            employee.name, employee.employee_id, location_label, dist_diff_km, radius, timezone.now()
+            employee.name, employee.employee_id, location_label, dist_diff_km, effective_radius, timezone.now()
         )
         raise GeofenceValidationError(
-            message="Attendance not marked.",
+            message=f"You are {dist_diff_km} km away from {location_label}.",
             admin_details={
                 "employee": f"{employee.name} ({employee.employee_id})",
                 "assigned_location": location_label,
                 "current_distance_km": dist_diff_km,
+                "allowed_radius_meters": effective_radius,
                 "reason": "Outside geofence",
                 "timestamp": str(timezone.now()),
             }
