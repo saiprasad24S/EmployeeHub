@@ -158,6 +158,30 @@ export function EmployeePortal() {
     return { matched: distance < threshold, distance }
   }
 
+  const requestCurrentPosition = async (): Promise<GeolocationPosition> => {
+    if (!('geolocation' in navigator)) {
+      throw new Error('Geolocation is not available on this browser.')
+    }
+    return new Promise<GeolocationPosition>((resolve, reject) => {
+      // First attempt: High accuracy with 6s timeout
+      navigator.geolocation.getCurrentPosition(
+        resolve,
+        (highAccErr) => {
+          console.warn('High accuracy location failed/timed out, falling back to standard accuracy:', highAccErr)
+          // Second attempt: Standard accuracy (Wi-Fi/IP/Cell fallback)
+          navigator.geolocation.getCurrentPosition(
+            resolve,
+            (lowAccErr) => {
+              reject(lowAccErr)
+            },
+            { enableHighAccuracy: false, timeout: 10000, maximumAge: 30000 }
+          )
+        },
+        { enableHighAccuracy: true, timeout: 6000, maximumAge: 10000 }
+      )
+    })
+  }
+
   const updatePermissionState = async () => {
     if (!('permissions' in navigator)) {
       return
@@ -177,12 +201,10 @@ export function EmployeePortal() {
           setLocationPermGranted(true)
         } else if (status.state === 'denied') {
           setLocationPermGranted(false)
-        } else {
-          setLocationPermGranted(null)
         }
       }
     } catch {
-      // Permissions API unsupported or inaccessible; rely on actual position checks.
+      // Permissions API unsupported or inaccessible
     }
   }
 
@@ -199,10 +221,11 @@ export function EmployeePortal() {
       setLocationPermGranted(true)
       setCurrentCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy ?? undefined })
     } catch (err: any) {
-      if (err?.code === 1 || err?.message?.toLowerCase().includes('permission')) {
+      if (err?.code === 1 || err?.message?.toLowerCase().includes('denied')) {
         setLocationPermGranted(false)
       } else {
-        setLocationPermGranted(null)
+        // If permission is not explicitly denied (e.g. timeout or unavailable), do not disable permission state
+        setLocationPermGranted((prev) => (prev === false ? false : true))
       }
     }
   }
@@ -358,9 +381,13 @@ export function EmployeePortal() {
         longitude: pos.coords.longitude,
         accuracy: pos.coords.accuracy ?? undefined,
       })
-    } catch (err) {
-      setLocationPermGranted(false)
-      setAttendanceError('Could not obtain precise location. Please enable GPS and try again.')
+    } catch (err: any) {
+      if (err?.code === 1 || err?.message?.toLowerCase().includes('denied')) {
+        setLocationPermGranted(false)
+        setAttendanceError('Location permission is denied. Please allow location access in your browser settings.')
+      } else {
+        console.warn('Location fetch delayed during camera startup:', err)
+      }
     }
 
     try {
@@ -380,20 +407,6 @@ export function EmployeePortal() {
       setIsCameraOpen(false)
       console.error('Camera access failed', err)
     }
-  }
-
-  const requestCurrentPosition = async () => {
-    return new Promise<GeolocationPosition>((resolve, reject) => {
-      if (!('geolocation' in navigator)) {
-        reject(new Error('Geolocation is not available.'))
-        return
-      }
-      navigator.geolocation.getCurrentPosition(
-        resolve,
-        reject,
-        { enableHighAccuracy: true, timeout: 15000 }
-      )
-    })
   }
 
   // Stop Camera stream
@@ -518,10 +531,18 @@ export function EmployeePortal() {
             accuracy: pos.coords.accuracy ?? undefined,
           }
           setCurrentCoords(latestCoords)
-        } catch (err) {
-          setAttendanceError('Unable to refresh location. Please ensure GPS is enabled and try again.')
-          setSubmitting(false)
-          return
+        } catch (err: any) {
+          console.warn('Could not refresh location on submission, checking for stored coordinates:', err)
+          if (!latestCoords) {
+            if (err?.code === 1 || err?.message?.toLowerCase().includes('denied')) {
+              setLocationPermGranted(false)
+              setAttendanceError('Location permission is denied. Please allow location access in your browser settings.')
+            } else {
+              setAttendanceError('Could not acquire GPS position. Please ensure device location is active and try again.')
+            }
+            setSubmitting(false)
+            return
+          }
         }
 
         if (!latestCoords) {
@@ -709,14 +730,38 @@ export function EmployeePortal() {
                         style={{
                           background: 'rgba(239, 68, 68, 0.08)',
                           color: 'var(--danger)',
-                          padding: '0.8rem',
+                          padding: '0.8rem 1rem',
                           borderRadius: '10px',
                           fontSize: '0.85rem',
                           marginBottom: '1rem',
                           fontWeight: 600,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          gap: '0.75rem',
+                          flexWrap: 'wrap',
                         }}
                       >
-                        ⚠️ Location permissions are disabled. Please enable GPS and allow location access to continue.
+                        <div>
+                          ⚠️ Location permissions are disabled or unavailable. Please enable GPS and allow location access to continue.
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => void ensureLocationPermission()}
+                          style={{
+                            background: '#0B2C8C',
+                            color: '#ffffff',
+                            border: 'none',
+                            borderRadius: '8px',
+                            padding: '0.4rem 0.85rem',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          🔄 Retry Location Access
+                        </button>
                       </div>
                     )}
 
