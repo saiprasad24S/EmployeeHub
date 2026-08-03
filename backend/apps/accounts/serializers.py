@@ -68,7 +68,11 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return get_employee_presence_summary(obj).get("session_duration_seconds", 0)
 
     def get_active_session(self, obj: Employee) -> bool:
-        return bool(Session.objects.filter(employee=obj, is_active=True).exists())
+        from django.utils import timezone
+        today = timezone.now().date()
+        return Session.objects.filter(
+            employee=obj, is_active=True, logout_time__isnull=True, login_time__date=today
+        ).exists()
 
     def get_profile_photo(self, obj: Employee) -> str:
         if not obj.profile_photo:

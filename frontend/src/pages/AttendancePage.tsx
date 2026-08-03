@@ -60,8 +60,8 @@ export function AttendancePage() {
   }
 
   // Filter present and absent employees
-  const presentEmployees = employees.filter((e) => e.is_present || e.active_session)
-  const absentEmployees = employees.filter((e) => !e.is_present && !e.active_session)
+  const presentEmployees = employees.filter((e) => e.is_present)
+  const absentEmployees = employees.filter((e) => !e.is_present)
 
   const triggerExportDownload = async () => {
     if (!startDate || !endDate) {
@@ -161,7 +161,7 @@ export function AttendancePage() {
                             {formatTimeStr(emp.session_login_time)}
                           </td>
                           <td style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                            {emp.active_session ? '🟢 Still Active' : formatDuration(emp.session_duration_seconds)}
+                            {emp.presence_status === 'Present' ? '🟢 Active' : formatDuration(emp.session_duration_seconds)}
                           </td>
                         </tr>
                       ))

@@ -24,6 +24,7 @@ type Employee = {
   session_logout_time: string | null
   session_duration_seconds: number
   active_session: boolean
+  is_present: boolean
   presence_status: string
 }
 
@@ -362,7 +363,7 @@ export function EmployeesPage() {
                   </tr>
                 ) : (
                   employees.map((employee) => {
-                    const isPresent = employee.active_session || employee.session_login_time !== null
+                    const isPresent = employee.is_present
                     const loginTime = formatTimeStr(employee.session_login_time)
                     const logoutTime = formatTimeStr(employee.session_logout_time)
 
@@ -468,9 +469,11 @@ export function EmployeesPage() {
 
                         {/* SESSION DETAILS */}
                         <td style={{ verticalAlign: 'middle', fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>
-                          {employee.active_session
+                          {employee.presence_status === 'Present'
                             ? `Active Session (${formatDuration(employee.session_duration_seconds)})`
-                            : `Inactive (${formatDuration(employee.session_duration_seconds)})`}
+                            : employee.presence_status === 'Checked Out'
+                              ? `Checked Out (${formatDuration(employee.session_duration_seconds)})`
+                              : 'Absent'}
                         </td>
 
                         {/* ACTIONS */}
@@ -508,7 +511,7 @@ export function EmployeesPage() {
             {employees.length === 0 ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)' }}>No employees registered.</div>
             ) : employees.map((employee) => {
-              const isPresent = employee.active_session || employee.session_login_time !== null
+              const isPresent = employee.is_present
               const loginTime = formatTimeStr(employee.session_login_time)
               const logoutTime = formatTimeStr(employee.session_logout_time)
               return (
