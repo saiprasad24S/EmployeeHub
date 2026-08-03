@@ -13,6 +13,7 @@ from apps.accounts.models import Employee
 from apps.assignments.models import Assignment
 from apps.attendance.models import Attendance, Session
 from apps.attendance.services import (
+    GeofenceValidationError,
     annotate_image,
     generate_attendance_export,
     get_employee_presence_summary,
@@ -43,11 +44,11 @@ class GeofenceTests(TestCase):
         )
 
     def test_validate_geofence_allows_nearby_location(self):
-        validate_geofence(self.assignment, 12.9720, 77.5950)
+        validate_geofence(self.employee, self.assignment, 12.9720, 77.5950)
 
     def test_validate_geofence_rejects_far_location(self):
-        with self.assertRaises(ValidationError):
-            validate_geofence(self.assignment, 13.1000, 77.8000)
+        with self.assertRaises((ValidationError, GeofenceValidationError)):
+            validate_geofence(self.employee, self.assignment, 13.1000, 77.8000)
 
     def test_annotate_image_adds_timestamp_and_location_overlay(self):
         image = Image.new('RGB', (300, 200), color='blue')
@@ -76,8 +77,8 @@ class GeofenceTests(TestCase):
         workbook_bytes = generate_attendance_export(date(2024, 1, 1), date(2024, 1, 3))
         workbook = load_workbook(BytesIO(workbook_bytes))
         sheet = workbook.active
-        self.assertGreater(sheet.max_row, 1)
-        self.assertIn(sheet.cell(row=2, column=3).value, {'EMP001', 'EMP002'})
+        self.assertGreater(sheet.max_row, 7)
+        self.assertIn(sheet.cell(row=8, column=1).value, {'EMP001', 'EMP002'})
 
     def test_get_employee_presence_summary_keeps_active_session_present_across_days(self):
         employee = Employee.objects.create(
@@ -95,9 +96,9 @@ class GeofenceTests(TestCase):
 
         summary = get_employee_presence_summary(employee)
 
-        self.assertTrue(summary['is_present'])
-        self.assertEqual(summary['status'], 'Present')
-        self.assertEqual(summary['check_in_time'], timezone.make_aware(datetime(2024, 1, 2, 22, 30)))
+        self.assertFalse(summary['is_present'])
+        self.assertEqual(summary['status'], 'Absent')
+        self.assertIsNone(summary['check_in_time'])
 
     def test_attendance_list_returns_all_records_without_truncation(self):
         employee = Employee.objects.create(

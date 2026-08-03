@@ -7,14 +7,13 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from django.utils import timezone
 from apps.accounts.models import Employee
 from apps.attendance.models import Session, Attendance
-from apps.attendance.services import end_session, get_employee_presence_summary, log_location, start_session
-from apps.common.permissions import IsAdminRole, IsEmployeeRole
+from apps.attendance.services import get_employee_presence_summary, log_location
+from apps.common.permissions import IsEmployeeRole
 from apps.tracking.models import LocationLog
 from apps.tracking.serializers import LocationLogSerializer
-from apps.tracking.services import get_active_session, get_employee_route, get_latest_location, get_today_distance, get_travel_history
+from apps.tracking.services import get_active_session, get_latest_location, get_travel_history
 
 
 def _serialize_location(source: object | None) -> dict | None:

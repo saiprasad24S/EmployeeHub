@@ -4,7 +4,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from django.core.exceptions import ValidationError
+
 
 from apps.accounts.authentication import ClerkJWTAuthentication
 from apps.accounts.models import Employee

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from datetime import date, datetime, timedelta
 from io import BytesIO
 from typing import Any
@@ -20,6 +21,7 @@ from apps.common.utils import distance_meters
 from apps.tracking.models import LocationLog
 from apps.vision.services import FaceService, LivenessService
 
+logger = logging.getLogger(__name__)
 
 face_service = FaceService()
 liveness_service = LivenessService()

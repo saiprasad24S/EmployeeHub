@@ -17,7 +17,6 @@ from apps.attendance.serializers import AttendanceSerializer
 from apps.attendance.services import (
     GeofenceValidationError,
     end_session,
-    ensure_default_coordinates,
     generate_attendance_export,
     get_active_assignment,
     log_location,
@@ -25,10 +24,8 @@ from apps.attendance.services import (
     start_session,
     upload_selfie,
     validate_geofence,
-    validate_liveness,
 )
 from apps.common.permissions import IsEmployeeRole
-from apps.common.utils import distance_meters
 
 
 class CheckInView(APIView):
