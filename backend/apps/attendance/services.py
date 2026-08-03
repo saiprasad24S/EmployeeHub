@@ -69,6 +69,38 @@ def ensure_default_coordinates(employee: Employee) -> bool:
     return True
 
 
+def reverse_geocode_coordinates(latitude: float, longitude: float) -> str | None:
+    if latitude is None or longitude is None:
+        return None
+    try:
+        response = requests.get(
+            "https://nominatim.openstreetmap.org/reverse",
+            params={"lat": latitude, "lon": longitude, "format": "jsonv2"},
+            headers={"User-Agent": "EmployeeHub/1.0"},
+            timeout=10,
+        )
+        response.raise_for_status()
+        data = response.json()
+        if data and "display_name" in data:
+            return data["display_name"]
+        return None
+    except Exception:
+        return None
+
+
+def ensure_default_address(employee: Employee) -> bool:
+    if employee.default_address and employee.default_address.strip():
+        return True
+    if employee.default_latitude is None or employee.default_longitude is None:
+        return False
+    address = reverse_geocode_coordinates(float(employee.default_latitude), float(employee.default_longitude))
+    if not address:
+        return False
+    employee.default_address = address
+    employee.save(update_fields=["default_address"])
+    return True
+
+
 class GeofenceValidationError(Exception):
     def __init__(self, message: str = "Attendance not marked.", admin_details: dict | None = None):
         super().__init__(message)

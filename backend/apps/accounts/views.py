@@ -102,6 +102,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
+        if employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
+            from apps.attendance.services import ensure_default_address
+            ensure_default_address(employee)
         if request.FILES.get("profile_photo_file"):
             photo_file = request.FILES["profile_photo_file"]
             photo_file.seek(0)
@@ -126,6 +129,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
+        if employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
+            from apps.attendance.services import ensure_default_address
+            ensure_default_address(employee)
         if request.FILES.get("profile_photo_file"):
             photo_file = request.FILES["profile_photo_file"]
             photo_file.seek(0)

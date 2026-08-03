@@ -215,38 +215,111 @@ export function EmployeesPage() {
   }
 
   const handleGeocode = async () => {
-    if (!defaultAddress.trim()) {
-      setErrorMsg('Please enter an address first to auto-detect coordinates.')
+    if (!defaultAddress.trim() && (!latitude || !longitude)) {
+      setErrorMsg('Please enter an address or enter latitude & longitude coordinates.')
       return
     }
     setIsGeocoding(true)
     setErrorMsg(null)
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(defaultAddress)}&limit=1`
-      )
-      if (!res.ok) throw new Error('Geocoding service unavailable.')
-      const data = await res.json()
-      if (data && data.length > 0) {
-        setLatitude(parseFloat(data[0].lat).toFixed(7))
-        setLongitude(parseFloat(data[0].lon).toFixed(7))
-      } else {
-        setErrorMsg('Could not find coordinates for this address. Please enter them manually.')
+      // Reverse geocoding: Coordinates -> Address
+      if (latitude && longitude && !defaultAddress.trim()) {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
+        )
+        if (!res.ok) throw new Error('Reverse geocoding service unavailable.')
+        const data = await res.json()
+        if (data && data.display_name) {
+          setDefaultAddress(data.display_name)
+        } else {
+          setErrorMsg('Could not find address for these coordinates.')
+        }
+      } else if (defaultAddress.trim()) {
+        // Forward geocoding: Address -> Coordinates
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(defaultAddress)}&limit=1`
+        )
+        if (!res.ok) throw new Error('Geocoding service unavailable.')
+        const data = await res.json()
+        if (data && data.length > 0) {
+          setLatitude(parseFloat(data[0].lat).toFixed(7))
+          setLongitude(parseFloat(data[0].lon).toFixed(7))
+        } else {
+          setErrorMsg('Could not find coordinates for this address. Please enter them manually.')
+        }
       }
     } catch (err: any) {
-      setErrorMsg(err.message || 'Failed to auto-detect coordinates.')
+      setErrorMsg(err.message || 'Failed to auto-detect location.')
     } finally {
       setIsGeocoding(false)
     }
   }
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleUseCurrentLocation = () => {
+    if (!('geolocation' in navigator)) {
+      setErrorMsg('Geolocation is not supported by your browser.')
+      return
+    }
+    setIsGeocoding(true)
+    setErrorMsg(null)
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const lat = pos.coords.latitude.toFixed(7)
+        const lon = pos.coords.longitude.toFixed(7)
+        setLatitude(lat)
+        setLongitude(lon)
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+          )
+          if (res.ok) {
+            const data = await res.json()
+            if (data && data.display_name) {
+              setDefaultAddress(data.display_name)
+            }
+          }
+        } catch {
+          // Ignore reverse geocode error
+        } finally {
+          setIsGeocoding(false)
+        }
+      },
+      (err) => {
+        setErrorMsg('Unable to retrieve current location: ' + err.message)
+        setIsGeocoding(false)
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    )
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setErrorMsg(null)
 
     if (!empId || !name || !email) {
       setErrorMsg('Employee ID, Name, and Email are required.')
       return
+    }
+
+    let finalAddress = defaultAddress
+    if (latitude && longitude && !finalAddress.trim()) {
+      setIsGeocoding(true)
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
+        )
+        if (res.ok) {
+          const data = await res.json()
+          if (data && data.display_name) {
+            finalAddress = data.display_name
+            setDefaultAddress(finalAddress)
+          }
+        }
+      } catch {
+        // Fall back to backend auto-reverse geocoding
+      } finally {
+        setIsGeocoding(false)
+      }
     }
 
     const formData = new FormData()
@@ -256,7 +329,7 @@ export function EmployeesPage() {
     formData.append('phone', phone)
     formData.append('department', department)
     formData.append('designation', designation)
-    formData.append('default_address', defaultAddress)
+    formData.append('default_address', finalAddress)
     if (latitude) formData.append('default_latitude', latitude)
     if (longitude) formData.append('default_longitude', longitude)
     formData.append('default_radius', radius)
@@ -716,9 +789,14 @@ export function EmployeesPage() {
               <div className="stack" style={{ gap: '0.35rem' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Default Address</label>
                 <textarea value={defaultAddress} onChange={(e) => setDefaultAddress(e.target.value)} placeholder="e.g. Madhapur, Hyderabad" rows={2} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', resize: 'vertical', width: '100%' }} />
-                <button type="button" onClick={handleGeocode} disabled={isGeocoding} style={{ alignSelf: 'flex-start', padding: '0.4rem 0.8rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(107, 47, 160, 0.08)', color: 'var(--primary)', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                  {isGeocoding ? 'Locating...' : 'Auto-detect Coordinates'}
-                </button>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <button type="button" onClick={handleGeocode} disabled={isGeocoding} style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(107, 47, 160, 0.08)', color: 'var(--primary)', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                    {isGeocoding ? 'Locating...' : '🔍 Fetch Address / Coordinates'}
+                  </button>
+                  <button type="button" onClick={handleUseCurrentLocation} disabled={isGeocoding} style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', color: '#10B981', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
+                    📍 Use Current GPS Location
+                  </button>
+                </div>
               </div>
 
               <div style={{ background: 'var(--accent-soft)', padding: '0.9rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
