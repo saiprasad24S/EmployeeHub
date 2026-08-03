@@ -198,9 +198,7 @@ def get_employee_presence_summary(employee: Employee, *, reference_time: datetim
     reference_time = reference_time or timezone.now()
     today = reference_time.date()
     
-    session = Session.objects.filter(employee=employee, is_active=True, login_time__date=today).order_by('-login_time').first()
-    if not session:
-        session = Session.objects.filter(employee=employee, login_time__date=today).order_by('-login_time').first()
+    session = Session.objects.filter(employee=employee, login_time__date=today).order_by('-login_time').first()
     if not session:
         return {
             'is_present': False,
@@ -211,7 +209,7 @@ def get_employee_presence_summary(employee: Employee, *, reference_time: datetim
             'session': None,
         }
 
-    if session.is_active:
+    if session.is_active or not session.logout_time:
         duration_seconds = max(int((reference_time - session.login_time).total_seconds()), 0)
         return {
             'is_present': True,
@@ -225,7 +223,7 @@ def get_employee_presence_summary(employee: Employee, *, reference_time: datetim
     logout_time = session.logout_time or session.login_time
     duration_seconds = max(int((logout_time - session.login_time).total_seconds()), 0)
     return {
-        'is_present': False,
+        'is_present': True,
         'status': 'Checked Out',
         'check_in_time': session.login_time,
         'check_out_time': logout_time,

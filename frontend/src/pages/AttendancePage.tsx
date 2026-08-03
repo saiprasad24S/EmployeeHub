@@ -37,7 +37,9 @@ export function AttendancePage() {
       const data = await response.json()
       return (Array.isArray(data) ? data : (data.results ?? [])) as Employee[]
     },
-    refetchInterval: 30000,
+    staleTime: 15000,
+    refetchInterval: 15000,
+    placeholderData: (previousData) => previousData,
   })
 
   const employees = employeesQuery.data ?? []
@@ -60,8 +62,12 @@ export function AttendancePage() {
   }
 
   // Filter present and absent employees
-  const presentEmployees = employees.filter((e) => e.is_present)
-  const absentEmployees = employees.filter((e) => !e.is_present)
+  const presentEmployees = employees.filter(
+    (e) => e.is_present || e.presence_status === 'Present' || e.presence_status === 'Checked Out' || e.session_login_time !== null
+  )
+  const absentEmployees = employees.filter(
+    (e) => !e.is_present && e.presence_status !== 'Present' && e.presence_status !== 'Checked Out' && e.session_login_time === null
+  )
 
   const triggerExportDownload = async () => {
     if (!startDate || !endDate) {
@@ -160,8 +166,12 @@ export function AttendancePage() {
                           <td style={{ fontSize: '0.8rem', color: '#10B981', fontWeight: 600 }}>
                             {formatTimeStr(emp.session_login_time)}
                           </td>
-                          <td style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                            {emp.presence_status === 'Present' ? '🟢 Active' : formatDuration(emp.session_duration_seconds)}
+                          <td style={{ fontSize: '0.75rem', fontWeight: 600 }}>
+                            {emp.presence_status === 'Present' ? (
+                              <span style={{ color: '#10B981' }}>🟢 Active ({formatDuration(emp.session_duration_seconds)})</span>
+                            ) : (
+                              <span style={{ color: '#F59E0B' }}>🔴 Checked Out ({formatDuration(emp.session_duration_seconds)})</span>
+                            )}
                           </td>
                         </tr>
                       ))

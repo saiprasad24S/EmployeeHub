@@ -49,30 +49,33 @@ class EmployeeSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = ["face_embedding", "created_at", "updated_at"]
 
+    def _get_summary(self, obj: Employee) -> dict:
+        if not hasattr(obj, "_cached_presence_summary"):
+            obj._cached_presence_summary = get_employee_presence_summary(obj)
+        return obj._cached_presence_summary
+
     def get_is_face_registered(self, obj: Employee) -> bool:
         return bool(obj.face_embedding or obj.profile_photo)
 
     def get_is_present(self, obj: Employee) -> bool:
-        return get_employee_presence_summary(obj).get("is_present", False)
+        summary = self._get_summary(obj)
+        return summary.get("is_present", False) or summary.get("status") in {"Present", "Checked Out"}
 
     def get_presence_status(self, obj: Employee) -> str:
-        return get_employee_presence_summary(obj).get("status", "Absent")
+        return self._get_summary(obj).get("status", "Absent")
 
     def get_session_login_time(self, obj: Employee):
-        return get_employee_presence_summary(obj).get("check_in_time")
+        return self._get_summary(obj).get("check_in_time")
 
     def get_session_logout_time(self, obj: Employee):
-        return get_employee_presence_summary(obj).get("check_out_time")
+        return self._get_summary(obj).get("check_out_time")
 
     def get_session_duration_seconds(self, obj: Employee):
-        return get_employee_presence_summary(obj).get("session_duration_seconds", 0)
+        return self._get_summary(obj).get("session_duration_seconds", 0)
 
     def get_active_session(self, obj: Employee) -> bool:
-        from django.utils import timezone
-        today = timezone.now().date()
-        return Session.objects.filter(
-            employee=obj, is_active=True, logout_time__isnull=True, login_time__date=today
-        ).exists()
+        summary = self._get_summary(obj)
+        return summary.get("status") == "Present"
 
     def get_profile_photo(self, obj: Employee) -> str:
         if not obj.profile_photo:
