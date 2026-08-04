@@ -172,8 +172,12 @@ def generate_invoice_pdf(invoice) -> bytes:
 
         # Financial Summary Totals
         subtotal = float(getattr(invoice, "subtotal", 0) or 0)
+        gst_rate = float(getattr(invoice, "gst_rate", 0) or 0)
         gst = float(getattr(invoice, "gst", 0) or 0)
-        tot_after_gst = subtotal + gst
+        if gst == 0 and gst_rate > 0:
+            gst = (subtotal * gst_rate) / 100.0
+        discount = float(getattr(invoice, "discount", 0) or 0)
+        tot_after_gst = subtotal + gst - discount
         balance_due = tot_after_gst - adv_amt
         grand_total = max(0.0, balance_due)
         amt_words = str(getattr(invoice, "amount_in_words", "") or amount_in_rupees_words(grand_total))
@@ -250,8 +254,12 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.drawString(35, 235, rem_text[:65])
 
         subtotal = float(getattr(invoice, "subtotal", 0) or 0)
+        gst_rate = float(getattr(invoice, "gst_rate", 0) or 0)
         gst = float(getattr(invoice, "gst", 0) or 0)
-        tot_after_gst = subtotal + gst
+        if gst == 0 and gst_rate > 0:
+            gst = (subtotal * gst_rate) / 100.0
+        discount = float(getattr(invoice, "discount", 0) or 0)
+        tot_after_gst = subtotal + gst - discount
         balance_due = tot_after_gst - adv_amt
         grand_total = max(0.0, balance_due)
         amt_words = str(getattr(invoice, "amount_in_words", "") or amount_in_rupees_words(grand_total))

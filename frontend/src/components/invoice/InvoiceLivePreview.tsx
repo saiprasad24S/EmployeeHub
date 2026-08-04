@@ -41,6 +41,7 @@ export interface InvoicePreviewData {
   paymentStatus: string;
   services: ServiceItem[];
   remarks: string;
+  gstRate?: number;
   gstAmount: number;
   discountAmount: number;
   displayHash?: string;
@@ -109,7 +110,9 @@ function generatePreviewHash(data: InvoicePreviewData): string {
 
 export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zoom }) => {
   const subtotal = data.services.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const totalAfterGst = subtotal + (data.gstAmount || 0);
+  const gstRate = data.gstRate ?? (subtotal > 0 && data.gstAmount ? (data.gstAmount / subtotal) * 100 : 0);
+  const gstAmount = (subtotal * gstRate) / 100;
+  const totalAfterGst = subtotal + gstAmount - (data.discountAmount || 0);
   const balanceDue = totalAfterGst - (data.advanceReceived || 0);
   const grandTotal = Math.max(0, balanceDue);
   const amountInWords = numToWords(grandTotal);
@@ -346,8 +349,8 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
                   <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right', fontWeight: '500' }}>₹ {subtotal.toFixed(2)}</td>
                 </tr>
                 <tr>
-                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>GST</td>
-                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {(data.gstAmount || 0).toFixed(2)}</td>
+                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>GST ({gstRate}%)</td>
+                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {gstAmount.toFixed(2)}</td>
                 </tr>
                 <tr style={{ backgroundColor: '#F7F9FC' }}>
                   <td style={{ padding: '8px 6px', borderBottom: '1px solid #DCE7FF', fontWeight: 'bold', color: '#0B2C8C' }}>Total After GST</td>

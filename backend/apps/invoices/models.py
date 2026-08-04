@@ -75,6 +75,7 @@ class Invoice(models.Model):
     # Calculations & Financials
     per_day_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    gst_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0)
     gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     discount = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_after_gst = models.DecimalField(max_digits=12, decimal_places=2, default=0)

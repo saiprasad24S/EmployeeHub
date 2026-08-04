@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   FileText, Calendar, Layers, Building, User, Phone, MapPin,
   Briefcase, UserCheck, Clock, Heart, DollarSign, CreditCard,
-  Plus, Trash2, ChevronDown, MessageSquare
+  Plus, Trash2, ChevronDown, MessageSquare, Percent
 } from 'lucide-react';
 import type { InvoicePreviewData, ServiceItem } from './InvoiceLivePreview';
 
@@ -66,8 +66,8 @@ const InputField: React.FC<{
   label: string; icon: React.ReactNode; type?: string;
   value: string | number; onChange: (v: string) => void;
   options?: { label: string; value: string }[];
-  isTextarea?: boolean; readOnly?: boolean;
-}> = ({ label, icon, type = 'text', value, onChange, options, isTextarea, readOnly }) => {
+  isTextarea?: boolean; readOnly?: boolean; placeholder?: string;
+}> = ({ label, icon, type = 'text', value, onChange, options, isTextarea, readOnly, placeholder }) => {
   const baseInputStyle: React.CSSProperties = {
     width: '100%', paddingLeft: 34, paddingRight: 10, paddingTop: 8, paddingBottom: 8,
     border: '1px solid var(--inv-border)', borderRadius: 8, fontSize: 12, fontFamily: 'Poppins, sans-serif',
@@ -118,6 +118,7 @@ const InputField: React.FC<{
           <input
             type={type}
             value={value}
+            placeholder={placeholder}
             onChange={e => onChange(e.target.value)}
             readOnly={readOnly}
             onFocus={handleFocus as any}
@@ -171,7 +172,10 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
 
   // Auto-calculated values
   const subtotal = useMemo(() => data.services.reduce((a, s) => a + (s.total || 0), 0), [data.services]);
-  const totalAfterGst = useMemo(() => subtotal + (Number(data.gstAmount) || 0), [subtotal, data.gstAmount]);
+  const gstRate = Number(data.gstRate) || 0;
+  const calculatedGstAmount = useMemo(() => (subtotal * gstRate) / 100, [subtotal, gstRate]);
+  const discountAmount = Number(data.discountAmount) || 0;
+  const totalAfterGst = useMemo(() => subtotal + calculatedGstAmount - discountAmount, [subtotal, calculatedGstAmount, discountAmount]);
   const balanceDue = useMemo(() => totalAfterGst - (Number(data.advanceReceived) || 0), [totalAfterGst, data.advanceReceived]);
   const grandTotal = useMemo(() => Math.max(0, balanceDue), [balanceDue]);
 
@@ -314,17 +318,32 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
           <div style={{ fontSize: 11, color: '#616161', fontWeight: 500, padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>Subtotal</div>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#1A1A1A', textAlign: 'right', padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>Rs. {subtotal.toLocaleString('en-IN')}</div>
         </div>
-        <InputField label="GST Amount" icon={<DollarSign style={iconSize} />} type="number" value={data.gstAmount} onChange={v => updateField('gstAmount', Number(v))} />
-        <InputField label="Discount" icon={<DollarSign style={iconSize} />} type="number" value={data.discountAmount} onChange={v => updateField('discountAmount', Number(v))} />
+        <InputField
+          label="GST (%)"
+          icon={<Percent style={iconSize} />}
+          type="number"
+          placeholder="e.g. 18"
+          value={data.gstRate ?? (subtotal > 0 && data.gstAmount ? (data.gstAmount / subtotal) * 100 : 0)}
+          onChange={v => {
+            const rate = Number(v) || 0;
+            const computedGst = (subtotal * rate) / 100;
+            onChange({ ...data, gstRate: rate, gstAmount: computedGst });
+          }}
+        />
+        <div style={{ fontSize: 11, color: '#0B2C8C', fontWeight: 600, marginTop: -4, marginBottom: 6, textAlign: 'right' }}>
+          Calculated GST Amount: ₹ {calculatedGstAmount.toFixed(2)}
+        </div>
+        <InputField label="Discount (Rs.)" icon={<DollarSign style={iconSize} />} type="number" value={data.discountAmount} onChange={v => updateField('discountAmount', Number(v))} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           {[
+            ['Calculated GST Amount', calculatedGstAmount, '#2E7D32'],
             ['Total After GST', totalAfterGst, '#0B2C8C'],
             ['Balance Due', balanceDue, '#D32F2F'],
             ['Grand Total', grandTotal, '#0B2C8C'],
           ].map(([label, val, color]) => (
             <React.Fragment key={label as string}>
               <div style={{ fontSize: 11, fontWeight: 600, color: '#616161', padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>{label as string}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: color as string, textAlign: 'right', padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>Rs. {(val as number).toLocaleString('en-IN')}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: color as string, textAlign: 'right', padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>Rs. {(val as number).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             </React.Fragment>
           ))}
         </div>

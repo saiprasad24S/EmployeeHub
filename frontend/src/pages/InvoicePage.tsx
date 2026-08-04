@@ -38,6 +38,7 @@ export interface Invoice {
   no_of_students?: number
   per_day_charges: number
   subtotal: number
+  gst_rate?: number
   gst: number
   discount: number
   total_after_gst: number
@@ -76,6 +77,7 @@ const defaultInvoiceData: InvoicePreviewData = {
   advanceReceived: 0,
   paymentStatus: 'Pending',
   remarks: '',
+  gstRate: 0,
   gstAmount: 0,
   discountAmount: 0,
   services: [
@@ -238,7 +240,10 @@ export function InvoicePage() {
 
   const handleSaveInvoice = () => {
     const subtotal = invoiceData.services.reduce((a, b) => a + (b.total || 0), 0)
-    const totalAfterGst = subtotal + (Number(invoiceData.gstAmount) || 0)
+    const gstRate = Number(invoiceData.gstRate) || 0
+    const computedGstAmount = (subtotal * gstRate) / 100
+    const discountAmount = Number(invoiceData.discountAmount) || 0
+    const totalAfterGst = subtotal + computedGstAmount - discountAmount
     const balanceDue = totalAfterGst - (Number(invoiceData.advanceReceived) || 0)
     const grandTotal = Math.max(0, balanceDue)
 
@@ -261,8 +266,9 @@ export function InvoicePage() {
       contact_person: invoiceData.contactPerson,
       per_day_charges: invoiceData.perDayCharges,
       subtotal,
-      gst: invoiceData.gstAmount,
-      discount: invoiceData.discountAmount,
+      gst_rate: gstRate,
+      gst: computedGstAmount,
+      discount: discountAmount,
       total_after_gst: totalAfterGst,
       advance_received: invoiceData.advanceReceived,
       balance_due: balanceDue,
@@ -336,6 +342,7 @@ export function InvoicePage() {
       schoolBranch: inv.school_branch,
       contactPerson: inv.contact_person,
       perDayCharges: inv.per_day_charges,
+      gstRate: inv.gst_rate ?? (inv.subtotal > 0 && inv.gst ? (inv.gst / inv.subtotal) * 100 : 0),
       gstAmount: inv.gst,
       discountAmount: inv.discount,
       advanceReceived: inv.advance_received,
