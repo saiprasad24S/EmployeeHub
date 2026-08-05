@@ -236,8 +236,12 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           fontSize: '11px'
         }}>
           <div style={{ flex: 1, display: 'flex', paddingRight: '10px', borderRight: '1px solid #DCE7FF' }}>
-            <MapPin size={16} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} />
-            <span>Plot No 13, SY NO 3,4, RR Plaza, Madhapur, Hyderabad, Telangana - 500081</span>
+            <MapPin size={16} color="#0B2C8C" style={{ marginRight: '8px', marginTop: '2px', flexShrink: 0 }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', lineHeight: '1.3' }}>
+              <span>Plot No 13, SY NO 3,4, RR Plaza,</span>
+              <span>Madhapur, Hyderabad, Telangana -</span>
+              <span>500081</span>
+            </div>
           </div>
           <div style={{ flex: 1, padding: '0 10px', borderRight: '1px solid #DCE7FF', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> +91 96609 66369</div>
