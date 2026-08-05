@@ -338,9 +338,32 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.setFont("Times-Bold", 9)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawString(38, fin_y + 96, "REMARKS / NOTES")
+            rem_raw = str(getattr(invoice, "remarks", "") or "Thank you for choosing Skandan Home Carre & Cclinic LLP.").strip()
             c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#444444"))
-            c.drawString(38, fin_y + 75, str(getattr(invoice, "remarks", "") or "Thank you for choosing Skandan Home Carre & Cclinic LLP.")[:65])
+            
+            rem_lines = []
+            for line in rem_raw.split('\n'):
+                line_str = line.strip()
+                if not line_str:
+                    rem_lines.append("")
+                    continue
+                words = line_str.split()
+                current_line = ""
+                for w in words:
+                    test_line = f"{current_line} {w}".strip() if current_line else w
+                    if c.stringWidth(test_line, "Times-Roman", 8.5) <= 235:
+                        current_line = test_line
+                    else:
+                        rem_lines.append(current_line)
+                        current_line = w
+                if current_line:
+                    rem_lines.append(current_line)
+
+            ry = fin_y + 75
+            for r_line in rem_lines[:7]:
+                c.drawString(38, ry, r_line)
+                ry -= 12
 
             # Financial Summary Table (Right)
             r_x = 300
