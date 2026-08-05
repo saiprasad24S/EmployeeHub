@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
 import { motion, AnimatePresence } from 'framer-motion'
 import { InvoiceDashboardHeader } from '../components/invoice/InvoiceDashboardHeader'
-import { InvoiceLivePreview } from '../components/invoice/InvoiceLivePreview'
+import { InvoiceLivePreview, formatDisplayDate, computeInvoiceTotals } from '../components/invoice/InvoiceLivePreview'
 import type { InvoicePreviewData, ServiceItem } from '../components/invoice/InvoiceLivePreview'
 import { InvoiceFormAccordion } from '../components/invoice/InvoiceFormAccordion'
 import {
@@ -239,13 +239,7 @@ export function InvoicePage() {
   }
 
   const handleSaveInvoice = async (): Promise<Invoice | null> => {
-    const subtotal = invoiceData.services.reduce((a, b) => a + (b.total || 0), 0)
-    const gstRate = Number(invoiceData.gstRate) || 0
-    const computedGstAmount = (subtotal * gstRate) / 100
-    const discountAmount = Number(invoiceData.discountAmount) || 0
-    const totalAfterGst = subtotal + computedGstAmount - discountAmount
-    const balanceDue = totalAfterGst - (Number(invoiceData.advanceReceived) || 0)
-    const grandTotal = Math.max(0, balanceDue)
+    const { subtotal, gstRate, gstAmount: computedGstAmount, discountAmount, totalAfterGst, balanceDue, grandTotal } = computeInvoiceTotals(invoiceData)
 
     const payload = {
       invoice_number: invoiceData.invoiceNumber,
@@ -740,7 +734,7 @@ export function InvoicePage() {
                             >
                               Rs. {inv.grand_total.toLocaleString('en-IN')}
                             </td>
-                            <td style={{ padding: '12px 16px', color: '#616161' }}>{inv.invoice_date}</td>
+                            <td style={{ padding: '12px 16px', color: '#616161' }}>{formatDisplayDate(inv.invoice_date)}</td>
                             <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                               <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                                 <button
@@ -1097,7 +1091,7 @@ export function InvoicePage() {
                           <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 700 }}>
                             Rs. {inv.grand_total.toLocaleString('en-IN')}
                           </td>
-                          <td style={{ padding: '12px 16px', color: '#616161' }}>{inv.invoice_date}</td>
+                          <td style={{ padding: '12px 16px', color: '#616161' }}>{formatDisplayDate(inv.invoice_date)}</td>
                           <td style={{ padding: '12px 16px', textAlign: 'right' }}>
                             <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end' }}>
                               <button

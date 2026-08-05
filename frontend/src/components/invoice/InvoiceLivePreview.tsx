@@ -47,6 +47,21 @@ export interface InvoicePreviewData {
   displayHash?: string;
 }
 
+/** Single source of truth for all invoice billing calculations */
+export function computeInvoiceTotals(data: InvoicePreviewData) {
+  const subtotal = data.services.reduce((acc, s) => acc + (Number(s.total) || 0), 0);
+  const gstRate = Number(data.gstRate) || 0;
+  const gstAmount = gstRate > 0
+    ? (subtotal * gstRate) / 100
+    : (Number(data.gstAmount) || 0);
+  const discountAmount = Number(data.discountAmount) || 0;
+  const totalAfterGst = subtotal + gstAmount - discountAmount;
+  const advanceReceived = Number(data.advanceReceived) || 0;
+  const balanceDue = totalAfterGst - advanceReceived;
+  const grandTotal = Math.max(0, balanceDue);
+  return { subtotal, gstRate, gstAmount, discountAmount, totalAfterGst, advanceReceived, balanceDue, grandTotal };
+}
+
 interface InvoiceLivePreviewProps {
   data: InvoicePreviewData;
   zoom: number;
@@ -92,6 +107,35 @@ function numToWords(amount: number): string {
   return str.trim() + ' Rupees Only';
 }
 
+export const formatDisplayDate = (dateStr: string | null | undefined): string => {
+  if (!dateStr || !dateStr.trim()) return '';
+  const str = dateStr.trim();
+  
+  if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(str)) {
+    return str.replace(/-/g, '/');
+  }
+  
+  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (ymdMatch) {
+    const [, yyyy, mm, dd] = ymdMatch;
+    return `${dd.padStart(2, '0')}/${mm.padStart(2, '0')}/${yyyy}`;
+  }
+
+  try {
+    const d = new Date(str);
+    if (!isNaN(d.getTime())) {
+      const dd = String(d.getDate()).padStart(2, '0');
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const yyyy = d.getFullYear();
+      return `${dd}/${mm}/${yyyy}`;
+    }
+  } catch {
+    // Ignore fallback errors
+  }
+
+  return str;
+};
+
 const ROWS_PER_PAGE = 3;
 
 function generatePreviewHash(data: InvoicePreviewData): string {
@@ -109,12 +153,7 @@ function generatePreviewHash(data: InvoicePreviewData): string {
 }
 
 export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zoom }) => {
-  const subtotal = data.services.reduce((acc, curr) => acc + (curr.total || 0), 0);
-  const gstRate = data.gstRate ?? (subtotal > 0 && data.gstAmount ? (data.gstAmount / subtotal) * 100 : 0);
-  const gstAmount = (subtotal * gstRate) / 100;
-  const totalAfterGst = subtotal + gstAmount - (data.discountAmount || 0);
-  const balanceDue = totalAfterGst - (data.advanceReceived || 0);
-  const grandTotal = Math.max(0, balanceDue);
+  const { subtotal, gstRate, gstAmount, totalAfterGst, balanceDue, grandTotal } = computeInvoiceTotals(data);
   const amountInWords = numToWords(grandTotal);
   const currentDisplayHash = generatePreviewHash(data);
 
@@ -207,9 +246,9 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           </div>
           <div style={{ flex: 1, paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: '500' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Invoice No.</span> <span>: {data.invoiceNumber}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Invoice Date</span> <span>: {data.invoiceDate}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Invoice Date</span> <span>: {formatDisplayDate(data.invoiceDate)}</span></div>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Billing Period</span> <span>: {data.billingPeriodText}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Start Date</span> <span>: {data.startDateText}</span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Start Date</span> <span>: {formatDisplayDate(data.startDateText)}</span></div>
           </div>
         </div>
       )}
@@ -264,7 +303,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
               )}
               {data.serviceType && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Service Type:</span> <span>{data.serviceType}</span></div>}
               {data.consultant && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Consultant:</span> <span>{data.consultant}</span></div>}
-              {data.serviceStarted && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Started On:</span> <span>{data.serviceStarted}</span></div>}
+              {data.serviceStarted && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Started On:</span> <span>{formatDisplayDate(data.serviceStarted)}</span></div>}
               {data.renderedDays && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Rendered:</span> <span>{data.renderedDays}</span></div>}
             </div>
           </div>

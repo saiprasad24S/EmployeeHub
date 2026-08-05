@@ -48,6 +48,22 @@ def amount_in_rupees_words(amount_val) -> str:
         return "Zero Rupees Only"
 
 
+def format_date_ddmmyyyy(val) -> str:
+    if not val:
+        return ""
+    if hasattr(val, "strftime"):
+        return val.strftime("%d/%m/%Y")
+    val_str = str(val).strip()
+    if not val_str:
+        return ""
+    import re
+    m = re.match(r"^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})", val_str)
+    if m:
+        yyyy, mm, dd = m.groups()
+        return f"{int(dd):02d}/{int(mm):02d}/{yyyy}"
+    return val_str
+
+
 def generate_invoice_pdf(invoice) -> bytes:
     buffer = BytesIO()
     c = canvas.Canvas(buffer, pagesize=A4)
@@ -68,8 +84,8 @@ def generate_invoice_pdf(invoice) -> bytes:
     inv_num_str = str(getattr(invoice, "invoice_number", "1369-0001"))
     inv_num_clean = inv_num_str.replace(" ", "")
 
-    inv_date_str = invoice.invoice_date.strftime("%d-%b-%Y") if getattr(invoice, "invoice_date", None) else ""
-    start_date_str = invoice.start_date.strftime("%d-%b-%Y") if getattr(invoice, "start_date", None) else ""
+    inv_date_str = format_date_ddmmyyyy(getattr(invoice, "invoice_date", None))
+    start_date_str = format_date_ddmmyyyy(getattr(invoice, "start_date", None))
     billing_period_str = str(getattr(invoice, "billing_period_text", "")) or "Monthly"
 
     # Select Background Template PNG
