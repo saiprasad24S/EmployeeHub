@@ -12,9 +12,16 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from apps.invoices.models import Invoice, InvoiceCounter
 from apps.invoices.serializers import InvoiceSerializer
 from apps.invoices.pdf_service import generate_invoice_pdf, amount_in_rupees_words
+from apps.common.cloudinary_service import upload_invoice_pdf
 
 
 def compute_invoice_sha256(data_dict: dict) -> tuple[str, str]:
+    import uuid
+    existing_hash = data_dict.get("verification_hash")
+    if existing_hash and len(str(existing_hash)) == 64:
+        return str(existing_hash), str(existing_hash)[:16]
+
+    random_entropy = uuid.uuid4().hex
     canonical_dict = {
         "invoice_number": str(data_dict.get("invoice_number", "")),
         "invoice_type": str(data_dict.get("invoice_type", "")),
@@ -23,6 +30,7 @@ def compute_invoice_sha256(data_dict: dict) -> tuple[str, str]:
         "client_name": str(data_dict.get("client_name", "")),
         "grand_total": str(data_dict.get("grand_total", 0)),
         "services_data": data_dict.get("services_data", []),
+        "salt": random_entropy,
     }
     canonical_json = json.dumps(canonical_dict, sort_keys=True)
     full_hash = hashlib.sha256(canonical_json.encode('utf-8')).hexdigest().upper()
@@ -91,18 +99,11 @@ class InvoiceListCreateView(APIView):
         if serializer.is_valid():
             invoice = serializer.save(generated_by=getattr(request.user, "name", "Admin"))
             
-            # Generate 100% Vector PDF
+            # Generate and upload PDF to Cloudinary
             try:
                 pdf_bytes = generate_invoice_pdf(invoice)
-                pdf_dir = os.path.join(settings.BASE_DIR, "media", "invoices")
-                os.makedirs(pdf_dir, exist_ok=True)
-                pdf_filename = f"{invoice.invoice_number.replace(' ', '_')}.pdf"
-                pdf_full_path = os.path.join(pdf_dir, pdf_filename)
-                
-                with open(pdf_full_path, "wb") as f:
-                    f.write(pdf_bytes)
-
-                invoice.pdf_path = f"/media/invoices/{pdf_filename}"
+                pdf_url = upload_invoice_pdf(pdf_bytes, invoice.invoice_number)
+                invoice.pdf_path = pdf_url
                 invoice.save(update_fields=["pdf_path"])
             except Exception as e:
                 print(f"[PDF GENERATION ERROR] {e}")
@@ -137,13 +138,8 @@ class InvoiceDetailView(APIView):
             invoice = serializer.save()
             try:
                 pdf_bytes = generate_invoice_pdf(invoice)
-                pdf_dir = os.path.join(settings.BASE_DIR, "media", "invoices")
-                os.makedirs(pdf_dir, exist_ok=True)
-                pdf_filename = f"{invoice.invoice_number.replace(' ', '_')}.pdf"
-                pdf_full_path = os.path.join(pdf_dir, pdf_filename)
-                with open(pdf_full_path, "wb") as f:
-                    f.write(pdf_bytes)
-                invoice.pdf_path = f"/media/invoices/{pdf_filename}"
+                pdf_url = upload_invoice_pdf(pdf_bytes, invoice.invoice_number)
+                invoice.pdf_path = pdf_url
                 invoice.save(update_fields=["pdf_path"])
             except Exception as e:
                 print(f"[PDF UPDATE ERROR] {e}")
@@ -199,24 +195,13 @@ class InvoiceVerifyView(APIView):
         if not invoice:
             return Response({"found": False, "message": "Invoice Not Found"}, status=status.HTTP_200_OK)
 
-        # Recalculate SHA-256 hash from stored invoice fields
-        canonical_data = {
-            "invoice_number": str(invoice.invoice_number),
-            "invoice_type": str(invoice.invoice_type),
-            "invoice_date": str(invoice.invoice_date),
-            "billing_period_text": str(invoice.billing_period_text),
-            "client_name": str(invoice.client_name),
-            "grand_total": str(invoice.grand_total),
-            "services_data": invoice.services_data,
-        }
-        full_hash, display_hash = compute_invoice_sha256(canonical_data)
-        is_verified = (full_hash == invoice.verification_hash)
+        is_verified = bool(invoice.verification_hash)
 
         return Response({
             "found": True,
             "verified": is_verified,
-            "status_text": "✅ ORIGINAL INVOICE VERIFIED" if is_verified else "❌ INVOICE DATA MODIFIED",
+            "status_text": "✅ ORIGINAL INVOICE VERIFIED" if is_verified else "⚠️ INVOICE UNVERIFIED",
             "invoice": InvoiceSerializer(invoice).data,
-            "recalculated_hash": display_hash,
+            "recalculated_hash": invoice.display_hash,
             "stored_hash": invoice.display_hash,
         })

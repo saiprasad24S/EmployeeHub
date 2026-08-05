@@ -48,10 +48,10 @@ class Invoice(models.Model):
     billing_period_start = models.DateField(null=True, blank=True)
     billing_period_end = models.DateField(null=True, blank=True)
     billing_period_text = models.CharField(max_length=150, blank=True)
-    start_date = models.DateField(null=True, blank=True)
+    start_date = models.CharField(max_length=150, blank=True, null=True, default="")
 
     # Client Info
-    client_name = models.CharField(max_length=200)
+    client_name = models.CharField(max_length=200, blank=True, default="")
     client_contact = models.CharField(max_length=50, blank=True)
     client_address = models.TextField(blank=True)
     client_gst = models.CharField(max_length=50, blank=True)
@@ -61,8 +61,8 @@ class Invoice(models.Model):
     patient_age_gender = models.CharField(max_length=100, blank=True)
     service_type = models.CharField(max_length=200, blank=True)
     consultant = models.CharField(max_length=200, blank=True)
-    service_start_date = models.DateField(null=True, blank=True)
-    service_end_date = models.DateField(null=True, blank=True)
+    service_start_date = models.CharField(max_length=150, blank=True, null=True, default="")
+    service_end_date = models.CharField(max_length=150, blank=True, null=True, default="")
     rendered_days = models.CharField(max_length=100, blank=True)
 
     # School / College Specific
@@ -83,7 +83,7 @@ class Invoice(models.Model):
     balance_due = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     amount_in_words = models.CharField(max_length=300, blank=True)
-    payment_status = models.CharField(max_length=50, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID)
+    payment_status = models.CharField(max_length=50, default="Pending", blank=True)
     remarks = models.TextField(blank=True)
 
     # Service Table JSON Data

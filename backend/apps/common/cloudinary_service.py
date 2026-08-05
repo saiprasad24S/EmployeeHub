@@ -305,3 +305,34 @@ def get_image_url(public_id: str) -> str:
     if not public_id:
         return ""
     return cloudinary.CloudinaryImage(public_id).build_url(secure=True)
+
+
+def upload_invoice_pdf(pdf_bytes: bytes, invoice_number: str) -> str:
+    import io
+    clean_num = invoice_number.replace(" ", "_")
+    base_folder = _env("CLOUDINARY_FOLDER", default=getattr(settings, "CLOUDINARY_FOLDER", "skandan"))
+    folder = f"{base_folder}/invoices"
+    try:
+        if initialize_cloudinary():
+            res = cloudinary.uploader.upload(
+                io.BytesIO(pdf_bytes),
+                folder=folder,
+                public_id=f"Invoice_{clean_num}",
+                resource_type="raw",
+                overwrite=True,
+            )
+            url = res.get("secure_url") or res.get("url") or ""
+            if url:
+                return url
+    except Exception as exc:
+        logger.warning("Cloudinary invoice PDF upload warning: %s", exc)
+
+    # Fallback to local storage if Cloudinary upload fails
+    pdf_dir = os.path.join(settings.BASE_DIR, "media", "invoices")
+    os.makedirs(pdf_dir, exist_ok=True)
+    pdf_filename = f"Invoice_{clean_num}.pdf"
+    pdf_full_path = os.path.join(pdf_dir, pdf_filename)
+    with open(pdf_full_path, "wb") as f:
+        f.write(pdf_bytes)
+    return f"/media/invoices/{pdf_filename}"
+

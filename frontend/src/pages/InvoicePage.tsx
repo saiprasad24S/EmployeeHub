@@ -174,7 +174,14 @@ export function InvoicePage() {
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.detail || 'Failed to save invoice.')
+        let msg = err.detail
+        if (!msg && typeof err === 'object' && Object.keys(err).length > 0) {
+          const fieldErrs = Object.entries(err)
+            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
+            .join('; ')
+          if (fieldErrs) msg = fieldErrs
+        }
+        throw new Error(msg || 'Failed to save invoice.')
       }
       return res.json() as Promise<Invoice>
     },
