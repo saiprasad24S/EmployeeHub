@@ -84,6 +84,20 @@ class InvoiceListCreateView(APIView):
             existing = Invoice.objects.filter(invoice_number=data["invoice_number"]).first()
             if existing:
                 data["invoice_number"] = InvoiceCounter.get_next_number()
+            else:
+                try:
+                    from django.db import transaction
+                    num_part = int(str(data["invoice_number"]).split("-")[-1])
+                    with transaction.atomic():
+                        counter, _ = InvoiceCounter.objects.select_for_update().get_or_create(
+                            prefix="1369",
+                            defaults={"last_number": 0}
+                        )
+                        if counter.last_number < num_part:
+                            counter.last_number = num_part
+                            counter.save()
+                except Exception:
+                    pass
 
         # Compute SHA-256 Hash
         full_hash, display_hash = compute_invoice_sha256(data)
