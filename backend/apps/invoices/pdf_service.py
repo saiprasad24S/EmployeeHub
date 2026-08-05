@@ -118,16 +118,16 @@ def generate_invoice_pdf(invoice) -> bytes:
         # 1. Header (Using Times New Roman font family to match Live Preview)
         if page_idx == 1:
             if os.path.exists(logo_path):
-                c.drawImage(logo_path, 30, height - 85, width=220, height=55, preserveAspectRatio=True, mask='auto')
+                c.drawImage(logo_path, 30, height - 95, width=240, height=65, preserveAspectRatio=True, mask='auto')
             
             # Tagline
-            c.setFont("Times-Italic", 9)
+            c.setFont("Times-Italic", 9.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.setStrokeColor(colors.HexColor("#0B2C8C"))
             c.setLineWidth(0.5)
-            c.line(30, height - 92, 70, height - 92)
-            c.drawString(75, height - 95, "Strive for service.")
-            c.line(145, height - 92, 185, height - 92)
+            c.line(30, height - 103, 80, height - 103)
+            c.drawString(85, height - 106, "Strive for service.")
+            c.line(165, height - 103, 215, height - 103)
 
             # INVOICE Title
             c.setFont("Times-BoldItalic", 30)
@@ -140,7 +140,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.drawRightString(width - 30, height - 74, f"Verification ID : {disp_hash}")
 
             # 2. Contact Bar
-            bar_y = height - 158
+            bar_y = height - 168
             c.setFillColor(colors.HexColor("#F7F9FC"))
             c.setStrokeColor(colors.HexColor("#DCE7FF"))
             c.setLineWidth(1)
@@ -172,7 +172,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.drawString(390, bar_y + 2,  f"Start Date       : {start_date_str}")
 
             # 3. Three Profile Cards
-            cards_y = height - 265
+            cards_y = height - 275
             card_w = (width - 80) / 3.0
             
             # Card 1: BILLED TO
@@ -187,19 +187,58 @@ def generate_invoice_pdf(invoice) -> bytes:
             
             c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#444444"))
+            card1_y = cards_y + 62
+            
+            client_n = str(getattr(invoice, 'client_name', '') or '').strip()
+            contact_p = str(getattr(invoice, 'contact_person', '') or '').strip()
+            contact_no = str(getattr(invoice, 'client_contact', '') or '').strip()
+            address_str = str(getattr(invoice, 'client_address', '') or '').strip()
+            gst_no = str(getattr(invoice, 'client_gst', '') or '').strip()
+            school_br = str(getattr(invoice, 'school_branch', '') or '').strip()
+
             if inv_type == "SCHOOL":
-                c.drawString(x1 + 10, cards_y + 60, f"School : {getattr(invoice, 'client_name', '')}")
-                c.drawString(x1 + 10, cards_y + 46, f"Branch : {getattr(invoice, 'school_branch', '')}")
-                c.drawString(x1 + 10, cards_y + 32, f"Contact : {getattr(invoice, 'client_contact', '')}")
-                c.drawString(x1 + 10, cards_y + 18, f"Address : {str(getattr(invoice, 'client_address', ''))[:28]}")
+                c.drawString(x1 + 10, card1_y, f"School : {client_n}")
+                card1_y -= 13
+                if school_br:
+                    c.drawString(x1 + 10, card1_y, f"Branch : {school_br}")
+                    card1_y -= 13
+                if contact_no:
+                    c.drawString(x1 + 10, card1_y, f"Contact : {contact_no}")
+                    card1_y -= 13
             else:
-                c.drawString(x1 + 10, cards_y + 60, f"Name : {getattr(invoice, 'client_name', '')}")
-                if getattr(invoice, 'contact_person', None):
-                    c.drawString(x1 + 10, cards_y + 46, f"Contact Person : {getattr(invoice, 'contact_person', '')}")
-                c.drawString(x1 + 10, cards_y + 32, f"Contact No : {getattr(invoice, 'client_contact', '')}")
-                c.drawString(x1 + 10, cards_y + 18, f"Address : {str(getattr(invoice, 'client_address', ''))[:28]}")
-                if getattr(invoice, 'client_gst', None):
-                    c.drawString(x1 + 10, cards_y + 4, f"GST No : {getattr(invoice, 'client_gst', '')}")
+                c.drawString(x1 + 10, card1_y, f"Name : {client_n}")
+                card1_y -= 13
+                if contact_p:
+                    c.drawString(x1 + 10, card1_y, f"Contact Person : {contact_p}")
+                    card1_y -= 13
+                if contact_no:
+                    c.drawString(x1 + 10, card1_y, f"Contact No : {contact_no}")
+                    card1_y -= 13
+
+            # Multiline Address Rendering
+            if address_str:
+                addr_words = address_str.replace('\n', ' ').split()
+                addr_lines = []
+                curr_l = ""
+                for w in addr_words:
+                    t_line = f"{curr_l} {w}".strip() if curr_l else w
+                    if c.stringWidth(t_line, "Times-Roman", 8.5) <= (card_w - 55):
+                        curr_l = t_line
+                    else:
+                        addr_lines.append(curr_l)
+                        curr_l = w
+                if curr_l:
+                    addr_lines.append(curr_l)
+
+                if addr_lines:
+                    c.drawString(x1 + 10, card1_y, f"Address : {addr_lines[0]}")
+                    card1_y -= 12
+                    for sub_l in addr_lines[1:3]:
+                        c.drawString(x1 + 48, card1_y, sub_l)
+                        card1_y -= 12
+
+            if gst_no and card1_y >= cards_y + 4:
+                c.drawString(x1 + 10, card1_y, f"GST No : {gst_no}")
 
             # Card 2: SERVICE PROFILE
             x2 = 30 + card_w + 10
