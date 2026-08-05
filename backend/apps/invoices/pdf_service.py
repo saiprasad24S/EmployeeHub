@@ -115,13 +115,13 @@ def generate_invoice_pdf(invoice) -> bytes:
     total_pages = len(pages)
 
     for page_idx, (page_services, is_last_page) in enumerate(pages, 1):
-        # 1. Header
+        # 1. Header (Using Times New Roman font family to match Live Preview)
         if page_idx == 1:
             if os.path.exists(logo_path):
                 c.drawImage(logo_path, 30, height - 85, width=220, height=55, preserveAspectRatio=True, mask='auto')
             
             # Tagline
-            c.setFont("Helvetica-Oblique", 8)
+            c.setFont("Times-Italic", 9)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.setStrokeColor(colors.HexColor("#0B2C8C"))
             c.setLineWidth(0.5)
@@ -130,49 +130,49 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.line(145, height - 92, 185, height - 92)
 
             # INVOICE Title
-            c.setFont("Helvetica-BoldOblique", 26)
+            c.setFont("Times-BoldItalic", 30)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawRightString(width - 30, height - 55, "INVOICE")
 
             # Verification ID
-            c.setFont("Helvetica-Bold", 9)
+            c.setFont("Times-Bold", 10)
             c.setFillColor(colors.HexColor("#0B2C8C"))
-            c.drawRightString(width - 30, height - 72, f"Verification ID : {disp_hash}")
+            c.drawRightString(width - 30, height - 74, f"Verification ID : {disp_hash}")
 
             # 2. Contact Bar
-            bar_y = height - 155
+            bar_y = height - 158
             c.setFillColor(colors.HexColor("#F7F9FC"))
             c.setStrokeColor(colors.HexColor("#DCE7FF"))
             c.setLineWidth(1)
-            c.roundRect(30, bar_y, width - 60, 50, radius=4, fill=1, stroke=1)
+            c.roundRect(30, bar_y, width - 60, 52, radius=4, fill=1, stroke=1)
 
             c.setFillColor(colors.HexColor("#1A1A1A"))
-            c.setFont("Helvetica", 8)
+            c.setFont("Times-Roman", 9)
 
             # Col 1: Address
-            c.drawString(40, bar_y + 36, "Plot No 13, SY NO 3,4, RR Plaza,")
-            c.drawString(40, bar_y + 24, "Madhapur, Hyderabad, Telangana -")
-            c.drawString(40, bar_y + 12, "500081")
+            c.drawString(40, bar_y + 37, "Plot No 13, SY NO 3,4, RR Plaza,")
+            c.drawString(40, bar_y + 25, "Madhapur, Hyderabad, Telangana -")
+            c.drawString(40, bar_y + 13, "500081")
 
             # Divider line 1
-            c.line(220, bar_y + 5, 220, bar_y + 45)
+            c.line(220, bar_y + 5, 220, bar_y + 47)
 
             # Col 2: Phone, Email, Website
-            c.drawString(230, bar_y + 36, "+91 96609 66369")
-            c.drawString(230, bar_y + 24, "skandanhomecarre@gmail.com")
-            c.drawString(230, bar_y + 12, "www.skandanhomecarre.com")
+            c.drawString(230, bar_y + 37, "+91 96609 66369")
+            c.drawString(230, bar_y + 25, "skandanhomecarre@gmail.com")
+            c.drawString(230, bar_y + 13, "www.skandanhomecarre.com")
 
             # Divider line 2
-            c.line(380, bar_y + 5, 380, bar_y + 45)
+            c.line(380, bar_y + 5, 380, bar_y + 47)
 
             # Col 3: Invoice Meta
-            c.drawString(390, bar_y + 36, f"Invoice No.      : {inv_num_str}")
-            c.drawString(390, bar_y + 24, f"Invoice Date   : {inv_date_str}")
-            c.drawString(390, bar_y + 12, f"Billing Period  : {billing_period_str}")
+            c.drawString(390, bar_y + 37, f"Invoice No.      : {inv_num_str}")
+            c.drawString(390, bar_y + 25, f"Invoice Date   : {inv_date_str}")
+            c.drawString(390, bar_y + 13, f"Billing Period  : {billing_period_str}")
             c.drawString(390, bar_y + 2,  f"Start Date       : {start_date_str}")
 
             # 3. Three Profile Cards
-            cards_y = height - 260
+            cards_y = height - 265
             card_w = (width - 80) / 3.0
             
             # Card 1: BILLED TO
@@ -182,10 +182,10 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.roundRect(x1, cards_y, card_w, 95, radius=4, fill=1, stroke=1)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.rect(x1, cards_y + 92, card_w, 3, fill=1, stroke=0)
-            c.setFont("Helvetica-Bold", 9)
+            c.setFont("Times-Bold", 9.5)
             c.drawString(x1 + 10, cards_y + 78, "BILLED TO")
             
-            c.setFont("Helvetica", 8)
+            c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#444444"))
             if inv_type == "SCHOOL":
                 c.drawString(x1 + 10, cards_y + 60, f"School : {getattr(invoice, 'client_name', '')}")
@@ -208,17 +208,38 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.roundRect(x2, cards_y, card_w, 95, radius=4, fill=1, stroke=1)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.rect(x2, cards_y + 92, card_w, 3, fill=1, stroke=0)
-            c.setFont("Helvetica-Bold", 9)
+            c.setFont("Times-Bold", 9.5)
             c.drawString(x2 + 10, cards_y + 78, "SERVICE PROFILE")
 
-            c.setFont("Helvetica", 8)
+            pat_name = str(getattr(invoice, 'patient_name', '') or '').strip()
+            pat_age = str(getattr(invoice, 'patient_age_gender', '') or '').strip()
+            srv_type = str(getattr(invoice, 'service_type', '') or '').strip()
+            consult = str(getattr(invoice, 'consultant', '') or '').strip()
+            rend_days = str(getattr(invoice, 'rendered_days', '') or '').strip()
+
+            c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#444444"))
-            c.drawString(x2 + 10, cards_y + 60, f"Patient : {getattr(invoice, 'patient_name', '')}")
-            if getattr(invoice, 'patient_age_gender', None):
-                c.drawString(x2 + 10, cards_y + 46, f"Age/Gender : {getattr(invoice, 'patient_age_gender', '')}")
-            c.drawString(x2 + 10, cards_y + 32, f"Service Type : {getattr(invoice, 'service_type', '')}")
-            c.drawString(x2 + 10, cards_y + 18, f"Consultant : {getattr(invoice, 'consultant', '')}")
-            c.drawString(x2 + 10, cards_y + 4, f"Started On : {start_date_str}")
+            card2_y = cards_y + 60
+            
+            # Patient Name is ONLY rendered if non-empty (matching Live Preview)
+            if (inv_type in ["MULTI_SERVICE", "REGULAR"]) and pat_name:
+                c.drawString(x2 + 10, card2_y, f"Patient : {pat_name}")
+                card2_y -= 14
+                if pat_age:
+                    c.drawString(x2 + 10, card2_y, f"Age/Gender : {pat_age}")
+                    card2_y -= 14
+
+            if srv_type:
+                c.drawString(x2 + 10, card2_y, f"Service Type : {srv_type}")
+                card2_y -= 14
+            if consult:
+                c.drawString(x2 + 10, card2_y, f"Consultant : {consult}")
+                card2_y -= 14
+            if start_date_str:
+                c.drawString(x2 + 10, card2_y, f"Started On : {start_date_str}")
+                card2_y -= 14
+            if rend_days:
+                c.drawString(x2 + 10, card2_y, f"Rendered : {rend_days}")
 
             # Card 3: OTHER INFORMATION
             x3 = 30 + (card_w + 10) * 2
@@ -227,30 +248,30 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.roundRect(x3, cards_y, card_w, 95, radius=4, fill=1, stroke=1)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.rect(x3, cards_y + 92, card_w, 3, fill=1, stroke=0)
-            c.setFont("Helvetica-Bold", 9)
+            c.setFont("Times-Bold", 9.5)
             c.drawString(x3 + 10, cards_y + 78, "OTHER INFORMATION")
 
-            c.setFont("Helvetica", 8)
+            c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#444444"))
             per_day = float(getattr(invoice, "per_day_charges", 0) or 0)
             c.drawString(x3 + 10, cards_y + 60, f"Per Day Chg : Rs. {per_day:,.2f}")
             c.drawString(x3 + 10, cards_y + 44, f"Adv. Amount : Rs. {advance_received:,.2f}")
-            c.setFont("Helvetica-Bold", 8)
+            c.setFont("Times-Bold", 8.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawString(x3 + 10, cards_y + 28, f"Payment Status : {getattr(invoice, 'payment_status', 'Pending')}")
 
-            table_start_y = height - 280
+            table_start_y = height - 285
         else:
             # Header for page 2
             if os.path.exists(logo_path):
                 c.drawImage(logo_path, 30, height - 55, width=140, height=35, preserveAspectRatio=True, mask='auto')
-            c.setFont("Helvetica-BoldOblique", 16)
+            c.setFont("Times-BoldItalic", 18)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawRightString(width - 30, height - 40, "INVOICE")
-            c.setFont("Helvetica-Bold", 8)
+            c.setFont("Times-Bold", 8.5)
             c.drawRightString(width - 30, height - 52, f"Verification ID : {disp_hash}")
 
-            c.setFont("Helvetica", 8)
+            c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#444444"))
             c.drawString(30, height - 70, f"Invoice No: {inv_num_str}  |  Client: {getattr(invoice, 'client_name', '')}  |  Page {page_idx} of {total_pages}")
             c.setStrokeColor(colors.HexColor("#0B2C8C"))
@@ -260,7 +281,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             table_start_y = height - 90
 
         # 4. Service Details Table
-        c.setFont("Helvetica-Bold", 10)
+        c.setFont("Times-Bold", 11)
         c.setFillColor(colors.HexColor("#0B2C8C"))
         c.drawString(30, table_start_y, "SERVICE DETAILS" if page_idx == 1 else "SERVICE DETAILS (CONTINUED)")
 
@@ -268,7 +289,7 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.setFillColor(colors.HexColor("#0B2C8C"))
         c.rect(30, tbl_header_y, width - 60, 18, fill=1, stroke=0)
 
-        c.setFont("Helvetica-Bold", 8)
+        c.setFont("Times-Bold", 9)
         c.setFillColor(colors.white)
         c.drawString(35, tbl_header_y + 5, "S.No")
         c.drawString(75, tbl_header_y + 5, "Service Details")
@@ -277,7 +298,7 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.drawRightString(560, tbl_header_y + 5, "Total (Rs.)")
 
         row_y = tbl_header_y - 20
-        c.setFont("Helvetica", 8)
+        c.setFont("Times-Roman", 8.5)
         c.setFillColor(colors.HexColor("#1A1A1A"))
 
         for idx, item in enumerate(page_services, 1 if page_idx == 1 else 11):
@@ -300,7 +321,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             row_y -= 18
 
         if not is_last_page:
-            c.setFont("Helvetica-Oblique", 8)
+            c.setFont("Times-Italic", 8.5)
             c.setFillColor(colors.HexColor("#666666"))
             c.drawRightString(width - 30, row_y - 10, "Continued on Next Page →")
 
@@ -314,16 +335,16 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.roundRect(30, fin_y, 250, 110, radius=4, fill=1, stroke=1)
             c.setFillColor(colors.HexColor("#F7F9FC"))
             c.rect(30, fin_y + 90, 250, 20, fill=1, stroke=0)
-            c.setFont("Helvetica-Bold", 8)
+            c.setFont("Times-Bold", 9)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawString(38, fin_y + 96, "REMARKS / NOTES")
-            c.setFont("Helvetica", 7.5)
+            c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#444444"))
             c.drawString(38, fin_y + 75, str(getattr(invoice, "remarks", "") or "Thank you for choosing Skandan Home Carre & Cclinic LLP.")[:65])
 
             # Financial Summary Table (Right)
             r_x = 300
-            c.setFont("Helvetica", 8)
+            c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#555555"))
             
             c.drawString(r_x, fin_y + 95, "Sub Total")
@@ -344,19 +365,19 @@ def generate_invoice_pdf(invoice) -> bytes:
                 c.line(r_x, curr_y + 10, width - 30, curr_y + 10)
 
             if gst_amount > 0:
-                c.setFont("Helvetica-Bold", 8)
+                c.setFont("Times-Bold", 9)
                 c.setFillColor(colors.HexColor("#0B2C8C"))
                 c.drawString(r_x, curr_y, "Total After GST")
                 c.drawRightString(width - 30, curr_y, f"Rs. {total_after_gst:,.2f}")
                 curr_y -= 15
 
-            c.setFont("Helvetica", 8)
+            c.setFont("Times-Roman", 8.5)
             c.setFillColor(colors.HexColor("#555555"))
             c.drawString(r_x, curr_y, "Advance Received")
             c.drawRightString(width - 30, curr_y, f"Rs. {advance_received:,.2f}")
             curr_y -= 15
 
-            c.setFont("Helvetica-Bold", 8)
+            c.setFont("Times-Bold", 9)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawString(r_x, curr_y, "Balance Due")
             c.drawRightString(width - 30, curr_y, f"Rs. {balance_due:,.2f}")
@@ -365,53 +386,97 @@ def generate_invoice_pdf(invoice) -> bytes:
             # GRAND TOTAL Solid Navy Bar
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.rect(r_x, curr_y, width - 30 - r_x, 22, fill=1, stroke=0)
-            c.setFont("Helvetica-Bold", 10)
+            c.setFont("Times-Bold", 11)
             c.setFillColor(colors.white)
-            c.drawString(r_x + 8, curr_y + 7, "GRAND TOTAL")
-            c.drawRightString(width - 38, curr_y + 7, f"Rs. {grand_total:,.2f}")
+            c.drawString(r_x + 8, curr_y + 6, "GRAND TOTAL")
+            c.drawRightString(width - 38, curr_y + 6, f"Rs. {grand_total:,.2f}")
 
             # Amount in Words
-            c.setFont("Helvetica-Oblique", 7.5)
+            c.setFont("Times-Italic", 8)
             c.setFillColor(colors.HexColor("#555555"))
             c.drawRightString(width - 30, curr_y - 12, f"Amount in words: {amt_words}")
 
             # 6. Bank Details + UPI + Seal Box
-            bank_y = 115
+            bank_y = 110
+            bank_h = 85
             c.setFillColor(colors.HexColor("#F7F9FC"))
             c.setStrokeColor(colors.HexColor("#DCE7FF"))
-            c.roundRect(30, bank_y, width - 60, 80, radius=4, fill=1, stroke=1)
+            c.roundRect(30, bank_y, width - 60, bank_h, radius=4, fill=1, stroke=1)
 
-            # Bank Col
-            c.setFont("Helvetica-Bold", 8)
+            # Bank Transfer Column (Left)
+            c.setFont("Times-Bold", 8.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
-            c.drawString(40, bank_y + 66, "BANK TRANSFER (NEFT/RTGS)")
-            if os.path.exists(hdfc_logo_path):
-                c.drawImage(hdfc_logo_path, 40, bank_y + 35, width=60, height=20, preserveAspectRatio=True, mask='auto')
+            c.drawString(40, bank_y + bank_h - 15, "BANK TRANSFER (NEFT/RTGS)")
             
-            c.setFont("Helvetica", 7.5)
-            c.setFillColor(colors.HexColor("#333333"))
-            c.drawString(105, bank_y + 52, "Beneficiary: SKANDAN HOME CARRE CCLINIC LLP")
-            c.drawString(105, bank_y + 40, "Account: 50200090644327  |  Type: Current Account")
-            c.drawString(105, bank_y + 28, "IFSC: HDFC0004211  |  MICR: 500240078")
+            if os.path.exists(hdfc_logo_path):
+                c.drawImage(hdfc_logo_path, 40, bank_y + bank_h - 45, width=50, height=22, preserveAspectRatio=True, mask='auto')
 
+            # 5 separate lines for bank info matching Live Preview
+            bx = 100
+            by = bank_y + bank_h - 25
+            c.setFont("Times-Roman", 7.5)
+            c.setFillColor(colors.HexColor("#666666"))
+            c.drawString(bx, by, "Beneficiary:")
+            c.setFont("Times-Bold", 7.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(bx + 55, by, "SKANDAN HOME CARRE CCLINIC LLP")
+
+            by -= 11
+            c.setFont("Times-Roman", 7.5)
+            c.setFillColor(colors.HexColor("#666666"))
+            c.drawString(bx, by, "Account:")
+            c.setFont("Times-Bold", 7.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(bx + 55, by, "50200090644327")
+
+            by -= 11
+            c.setFont("Times-Roman", 7.5)
+            c.setFillColor(colors.HexColor("#666666"))
+            c.drawString(bx, by, "Type:")
+            c.setFont("Times-Roman", 7.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(bx + 55, by, "Current Account")
+
+            by -= 11
+            c.setFont("Times-Roman", 7.5)
+            c.setFillColor(colors.HexColor("#666666"))
+            c.drawString(bx, by, "IFSC:")
+            c.setFont("Times-Bold", 7.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(bx + 55, by, "HDFC0004211")
+
+            by -= 11
+            c.setFont("Times-Roman", 7.5)
+            c.setFillColor(colors.HexColor("#666666"))
+            c.drawString(bx, by, "MICR:")
+            c.setFont("Times-Roman", 7.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(bx + 55, by, "500240078")
+
+            # Column Divider 1
             c.setStrokeColor(colors.HexColor("#DCE7FF"))
-            c.line(310, bank_y + 5, 310, bank_y + 75)
+            c.setLineWidth(1)
+            c.line(310, bank_y + 5, 310, bank_y + bank_h - 5)
 
-            # UPI Col
-            c.setFont("Helvetica-Bold", 8)
+            # UPI Column (Middle)
+            upi_cx = 385
+            c.setFont("Times-Bold", 8.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
-            c.drawString(320, bank_y + 66, "UPI PAYMENT")
+            c.drawCentredString(upi_cx, bank_y + bank_h - 15, "UPI PAYMENT")
+
             if os.path.exists(qr_path):
-                c.drawImage(qr_path, 320, bank_y + 12, width=50, height=50, preserveAspectRatio=True, mask='auto')
-            c.setFont("Helvetica", 7.5)
-            c.setFillColor(colors.HexColor("#333333"))
-            c.drawString(375, bank_y + 35, "UPI ID: 9866613699@hdfcbank")
+                c.drawImage(qr_path, upi_cx - 26, bank_y + bank_h - 70, width=52, height=52, preserveAspectRatio=True, mask='auto')
 
-            c.line(460, bank_y + 5, 460, bank_y + 75)
+            c.setFont("Times-Bold", 7.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawCentredString(upi_cx, bank_y + 6, "UPI ID: 9866613699@hdfcbank")
 
-            # Seal Col
+            # Column Divider 2
+            c.line(460, bank_y + 5, 460, bank_y + bank_h - 5)
+
+            # Verified Seal Column (Right)
             if os.path.exists(seal_path):
-                c.drawImage(seal_path, 470, bank_y + 8, width=65, height=65, preserveAspectRatio=True, mask='auto')
+                c.drawImage(seal_path, 470, bank_y + (bank_h - 68) / 2.0, width=68, height=68, preserveAspectRatio=True, mask='auto')
 
             # School Signatures if SCHOOL template
             if inv_type == "SCHOOL":
@@ -420,24 +485,24 @@ def generate_invoice_pdf(invoice) -> bytes:
                 c.line(50, sig_y + 12, 160, sig_y + 12)
                 c.line(220, sig_y + 12, 330, sig_y + 12)
                 c.line(390, sig_y + 12, 500, sig_y + 12)
-                c.setFont("Helvetica-Bold", 8)
+                c.setFont("Times-Bold", 8.5)
                 c.setFillColor(colors.HexColor("#0B2C8C"))
                 c.drawCentredString(105, sig_y, "Principal Signature")
                 c.drawCentredString(275, sig_y, "AO Signature")
                 c.drawCentredString(445, sig_y, "AGM Signature")
 
         # 7. Footer (On every page)
-        c.setFont("Helvetica-Oblique", 7.5)
+        c.setFont("Times-Italic", 8)
         c.setFillColor(colors.HexColor("#0B2C8C"))
         c.drawCentredString(width / 2.0, 48, "This invoice is system generated. No signature is required.")
         
         c.setStrokeColor(colors.HexColor("#0B2C8C"))
         c.line(30, 36, width / 2.0 - 50, 36)
-        c.setFont("Helvetica-Bold", 7.5)
+        c.setFont("Times-Bold", 8)
         c.drawCentredString(width / 2.0, 33, "OUR SERVICES")
         c.line(width / 2.0 + 50, 36, width - 30, 36)
 
-        c.setFont("Helvetica", 6.5)
+        c.setFont("Times-Roman", 7)
         c.setFillColor(colors.HexColor("#0B2C8C"))
         services_text = "ICU Care at Home   •   Doctor Visits   •   Nursing Care   •   Caretaker Services   •   Physiotherapy   •   Lab Tests at Home   •   Equipment Rental   •   Medicine Delivery   •   Post-Operative Care"
         c.drawCentredString(width / 2.0, 20, services_text)
