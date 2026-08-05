@@ -238,7 +238,7 @@ export function InvoicePage() {
     setActiveTab('EDITOR')
   }
 
-  const handleSaveInvoice = () => {
+  const handleSaveInvoice = async (): Promise<Invoice | null> => {
     const subtotal = invoiceData.services.reduce((a, b) => a + (b.total || 0), 0)
     const gstRate = Number(invoiceData.gstRate) || 0
     const computedGstAmount = (subtotal * gstRate) / 100
@@ -277,29 +277,43 @@ export function InvoicePage() {
       remarks: invoiceData.remarks,
       services_data: invoiceData.services,
     }
-    saveMutation.mutate(payload)
+    try {
+      const saved = await saveMutation.mutateAsync(payload)
+      if (saved) {
+        setSelectedInvoice(saved)
+      }
+      return saved
+    } catch (err: any) {
+      alert(`Save Error: ${err.message || 'Failed to save invoice.'}`)
+      return null
+    }
   }
 
   const handleDownloadPDF = async (inv?: Invoice) => {
-    const target = inv || selectedInvoice
-    if (target) {
-      try {
-        const token = (await getToken()) || ''
-        const res = await authedFetch(`/api/invoices/${target.id}/pdf/`, token)
-        if (!res.ok) throw new Error('PDF download failed.')
-        const blob = await res.blob()
-        const url = window.URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = `Invoice_${target.invoice_number.replace(/\s+/g, '_')}.pdf`
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-      } catch (err: any) {
-        alert(`Download Error: ${err.message}`)
+    let target = inv || selectedInvoice
+    try {
+      const token = (await getToken()) || ''
+      if (!target) {
+        target = await handleSaveInvoice()
       }
-    } else {
-      handleSaveInvoice()
+      if (!target) return
+
+      const res = await authedFetch(`/api/invoices/${target.id}/pdf/`, token)
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}))
+        throw new Error(errData.detail || 'PDF download failed.')
+      }
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `Invoice_${target.invoice_number.replace(/\s+/g, '_')}.pdf`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      window.URL.revokeObjectURL(url)
+    } catch (err: any) {
+      alert(`Download Error: ${err.message || 'Failed to download PDF'}`)
     }
   }
 

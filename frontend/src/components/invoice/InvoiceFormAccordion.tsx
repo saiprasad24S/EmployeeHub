@@ -134,7 +134,7 @@ const InputField: React.FC<{
 /* ── Main Component ──────────────────────────────────── */
 export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data, onChange }) => {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    invoice: true, client: false, service: false, other: false,
+    invoice: true, client: false, profile: false, other: false,
     table: true, financial: false, remarks: false, school: false,
   });
 
@@ -149,11 +149,26 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
   const updateService = (index: number, field: keyof ServiceItem, value: any) => {
     const updated = [...data.services];
     const row = { ...updated[index], [field]: value };
+
+    const rate = Number(row.rate) || 0;
+    const days = Number(row.days) || 0;
+    if (field === 'rate' || field === 'days') {
+      if (rate > 0 && days > 0) {
+        row.amount = rate * days;
+      }
+    } else if (field === 'amount') {
+      row.amount = Number(value) || 0;
+    }
+
     const amount = Number(row.amount) || 0;
     const otherExp = Number(row.other_expenses) || 0;
     row.total = amount + otherExp;
     updated[index] = row;
-    onChange({ ...data, services: updated });
+
+    const newSubtotal = updated.reduce((a, s) => a + (s.total || 0), 0);
+    const rateGst = Number(data.gstRate) || 0;
+    const computedGst = (newSubtotal * rateGst) / 100;
+    onChange({ ...data, services: updated, gstAmount: computedGst });
   };
 
   const addServiceRow = () => {
@@ -188,36 +203,41 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
         <InputField label="Invoice Number (Auto-Generated)" icon={<FileText style={iconSize} />} value={data.invoiceNumber} onChange={v => updateField('invoiceNumber', v)} readOnly={true} />
         <InputField label="Invoice Date" icon={<Calendar style={iconSize} />} type="date" value={data.invoiceDate} onChange={v => updateField('invoiceDate', v)} />
         <InputField label="Billing Period" icon={<Calendar style={iconSize} />} value={data.billingPeriodText} onChange={v => updateField('billingPeriodText', v)} />
-        <InputField label="Start Date" icon={<Calendar style={iconSize} />} value={data.startDateText} onChange={v => updateField('startDateText', v)} />
+        <InputField label="Start Date" icon={<Calendar style={iconSize} />} type="date" value={data.startDateText} onChange={v => updateField('startDateText', v)} />
         <InputField
-          label="Template Type" icon={<Layers style={iconSize} />}
-          value={data.invoiceType}
+          label="Template Type" icon={<Layers style={iconSize} />} value={data.invoiceType}
           onChange={v => updateField('invoiceType', v as any)}
           options={[
-            { label: 'Regular Invoice', value: 'REGULAR' },
-            { label: 'School / College', value: 'SCHOOL' },
-            { label: 'Multi-Service', value: 'MULTI_SERVICE' },
+            { label: 'Regular Template', value: 'REGULAR' },
+            { label: 'School Template', value: 'SCHOOL' },
+            { label: 'Multi-Service Template', value: 'MULTI_SERVICE' },
           ]}
         />
       </AccordionSection>
 
-      {/* 2. Client / Billing */}
-      <AccordionSection id="client" title="Client / Billing" icon={<Building style={iconSize} />} isOpen={!!openSections.client} onToggle={toggleSection}>
-        {data.invoiceType === 'REGULAR' || data.invoiceType === 'SCHOOL' ? (
+      {/* 2. Client / Billing Information */}
+      <AccordionSection id="client" title="Client / Billing Information" icon={<Building style={iconSize} />} isOpen={!!openSections.client} onToggle={toggleSection}>
+        {data.invoiceType === 'REGULAR' ? (
           <>
             <InputField label="Organization Name" icon={<Building style={iconSize} />} value={data.clientName} onChange={v => updateField('clientName', v)} />
             <InputField label="Contact Person" icon={<User style={iconSize} />} value={data.contactPerson || ''} onChange={v => updateField('contactPerson', v)} />
+            <InputField label="Contact No." icon={<Phone style={iconSize} />} value={data.clientContact} onChange={v => updateField('clientContact', v)} />
+            <InputField label="GST No. (Optional)" icon={<Building style={iconSize} />} value={data.clientGst || ''} onChange={v => updateField('clientGst', v)} />
+            <InputField label="Address" icon={<MapPin style={iconSize} />} value={data.clientAddress} onChange={v => updateField('clientAddress', v)} isTextarea />
           </>
         ) : (
-          <InputField label="Client Name" icon={<User style={iconSize} />} value={data.clientName} onChange={v => updateField('clientName', v)} />
+          <>
+            <InputField label="Client Name" icon={<User style={iconSize} />} value={data.clientName} onChange={v => updateField('clientName', v)} />
+            <InputField label="Contact No." icon={<Phone style={iconSize} />} value={data.clientContact} onChange={v => updateField('clientContact', v)} />
+            <InputField label="GST No. (Optional)" icon={<Building style={iconSize} />} value={data.clientGst || ''} onChange={v => updateField('clientGst', v)} />
+            <InputField label="Address" icon={<MapPin style={iconSize} />} value={data.clientAddress} onChange={v => updateField('clientAddress', v)} isTextarea />
+          </>
         )}
-        <InputField label="Contact No." icon={<Phone style={iconSize} />} value={data.clientContact} onChange={v => updateField('clientContact', v)} />
-        <InputField label="Address" icon={<MapPin style={iconSize} />} value={data.clientAddress} onChange={v => updateField('clientAddress', v)} isTextarea />
       </AccordionSection>
 
       {/* 3. Service Profile */}
-      <AccordionSection id="service" title="Service Profile" icon={<Briefcase style={iconSize} />} isOpen={!!openSections.service} onToggle={toggleSection}>
-        {(data.invoiceType === 'MULTI_SERVICE') && (
+      <AccordionSection id="profile" title="Service Profile" icon={<Briefcase style={iconSize} />} isOpen={!!openSections.profile} onToggle={toggleSection}>
+        {data.invoiceType === 'MULTI_SERVICE' && (
           <>
             <InputField label="Patient Name" icon={<Heart style={iconSize} />} value={data.patientName || ''} onChange={v => updateField('patientName', v)} />
             <InputField label="Age / Gender" icon={<User style={iconSize} />} value={data.patientAgeGender || ''} onChange={v => updateField('patientAgeGender', v)} />
@@ -225,18 +245,17 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
         )}
         <InputField label="Service Type" icon={<Briefcase style={iconSize} />} value={data.serviceType || ''} onChange={v => updateField('serviceType', v)} />
         <InputField label="Consultant" icon={<UserCheck style={iconSize} />} value={data.consultant || ''} onChange={v => updateField('consultant', v)} />
-        <InputField label="Service Started" icon={<Calendar style={iconSize} />} value={data.serviceStarted || ''} onChange={v => updateField('serviceStarted', v)} />
-        <InputField label="Service End" icon={<Calendar style={iconSize} />} value={data.serviceEnd || ''} onChange={v => updateField('serviceEnd', v)} />
+        <InputField label="Service Started" icon={<Calendar style={iconSize} />} type="date" value={data.serviceStarted || ''} onChange={v => updateField('serviceStarted', v)} />
+        <InputField label="Service End" icon={<Calendar style={iconSize} />} type="date" value={data.serviceEnd || ''} onChange={v => updateField('serviceEnd', v)} />
         <InputField label="Rendered Days" icon={<Clock style={iconSize} />} value={data.renderedDays || ''} onChange={v => updateField('renderedDays', v)} />
       </AccordionSection>
 
       {/* 4. Other Information */}
       <AccordionSection id="other" title="Other Information" icon={<DollarSign style={iconSize} />} isOpen={!!openSections.other} onToggle={toggleSection}>
-        <InputField label="Per Day Charges" icon={<DollarSign style={iconSize} />} type="number" value={data.perDayCharges} onChange={v => updateField('perDayCharges', Number(v))} />
-        <InputField label="Advance Amount" icon={<DollarSign style={iconSize} />} type="number" value={data.advanceReceived} onChange={v => updateField('advanceReceived', Number(v))} />
+        <InputField label="Per Day Charges (Rs.)" icon={<DollarSign style={iconSize} />} type="number" value={data.perDayCharges} onChange={v => updateField('perDayCharges', Number(v))} />
+        <InputField label="Advance Amount (Rs.)" icon={<DollarSign style={iconSize} />} type="number" value={data.advanceReceived} onChange={v => updateField('advanceReceived', Number(v))} />
         <InputField
-          label="Payment Status" icon={<CreditCard style={iconSize} />}
-          value={data.paymentStatus}
+          label="Payment Status" icon={<CreditCard style={iconSize} />} value={data.paymentStatus}
           onChange={v => updateField('paymentStatus', v)}
           options={[
             { label: 'Pending', value: 'Pending' },
@@ -253,36 +272,48 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
               <tr style={{ background: '#0B2C8C', color: '#fff', fontSize: 10, fontWeight: 600, textTransform: 'uppercase' }}>
-                <th style={{ padding: '8px 6px', textAlign: 'center', width: 36 }}>S.No</th>
+                <th style={{ padding: '8px 6px', textAlign: 'center', width: 30 }}>S.No</th>
                 <th style={{ padding: '8px 6px', textAlign: 'left' }}>Service Details</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', width: 85 }}>Amount</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', width: 85 }}>Other Exp</th>
-                <th style={{ padding: '8px 6px', textAlign: 'right', width: 85 }}>Total</th>
-                <th style={{ padding: '8px 6px', width: 32 }}></th>
+                <th style={{ padding: '8px 4px', textAlign: 'right', width: 65 }}>Rate (₹)</th>
+                <th style={{ padding: '8px 4px', textAlign: 'right', width: 45 }}>Days</th>
+                <th style={{ padding: '8px 4px', textAlign: 'right', width: 75 }}>Amount (₹)</th>
+                <th style={{ padding: '8px 4px', textAlign: 'right', width: 75 }}>Other Exp (₹)</th>
+                <th style={{ padding: '8px 6px', textAlign: 'right', width: 75 }}>Total (₹)</th>
+                <th style={{ padding: '8px 4px', width: 28 }}></th>
               </tr>
             </thead>
             <tbody>
               {data.services.map((row, idx) => (
                 <tr key={idx} style={{ borderBottom: '1px solid #E8ECF4' }}>
                   <td style={{ padding: '6px', textAlign: 'center', fontSize: 11, fontWeight: 600, color: '#616161' }}>{row.s_no}</td>
-                  <td style={{ padding: '4px 6px' }}>
+                  <td style={{ padding: '4px 4px' }}>
                     <input
-                      placeholder="Service name & details..."
+                      placeholder="Service details..."
                       value={row.service_name}
                       onChange={e => updateService(idx, 'service_name', e.target.value)}
-                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 8px', fontSize: 11, outline: 'none', background: '#fff' }}
-                      onFocus={e => { e.currentTarget.style.borderColor = '#0B2C8C'; e.currentTarget.style.boxShadow = '0 0 0 2px rgba(11,44,140,0.08)'; }}
-                      onBlur={e => { e.currentTarget.style.borderColor = '#E8ECF4'; e.currentTarget.style.boxShadow = 'none'; }}
+                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 6px', fontSize: 11, outline: 'none', background: '#fff' }}
+                      onFocus={e => { e.currentTarget.style.borderColor = '#0B2C8C'; }}
+                      onBlur={e => { e.currentTarget.style.borderColor = '#E8ECF4'; }}
                     />
                   </td>
-                  <td style={{ padding: '4px 6px' }}>
-                    <input type="number" value={row.amount} onChange={e => updateService(idx, 'amount', Number(e.target.value))}
-                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 6px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}
+                  <td style={{ padding: '4px 4px' }}>
+                    <input type="number" value={row.rate || ''} placeholder="0" onChange={e => updateService(idx, 'rate', Number(e.target.value))}
+                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 4px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}
                       onFocus={e => { e.currentTarget.style.borderColor = '#0B2C8C'; }} onBlur={e => { e.currentTarget.style.borderColor = '#E8ECF4'; }} />
                   </td>
-                  <td style={{ padding: '4px 6px' }}>
+                  <td style={{ padding: '4px 4px' }}>
+                    <input type="number" value={row.days || ''} placeholder="0" onChange={e => updateService(idx, 'days', Number(e.target.value))}
+                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 4px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}
+                      onFocus={e => { e.currentTarget.style.borderColor = '#0B2C8C'; }} onBlur={e => { e.currentTarget.style.borderColor = '#E8ECF4'; }} />
+                  </td>
+                  <td style={{ padding: '4px 4px' }}>
+                    <input type="number" value={row.amount} onChange={e => updateService(idx, 'amount', Number(e.target.value))}
+                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 4px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}
+                      onFocus={e => { e.currentTarget.style.borderColor = '#0B2C8C'; }} onBlur={e => { e.currentTarget.style.borderColor = '#E8ECF4'; }} />
+                  </td>
+                  <td style={{ padding: '4px 4px' }}>
                     <input type="number" value={row.other_expenses} onChange={e => updateService(idx, 'other_expenses', Number(e.target.value))}
-                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 6px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}
+                      style={{ width: '100%', border: '1px solid #E8ECF4', borderRadius: 6, padding: '5px 4px', fontSize: 11, textAlign: 'right', outline: 'none', background: '#fff' }}
                       onFocus={e => { e.currentTarget.style.borderColor = '#0B2C8C'; }} onBlur={e => { e.currentTarget.style.borderColor = '#E8ECF4'; }} />
                   </td>
                   <td style={{ padding: '6px', textAlign: 'right', fontSize: 11, fontWeight: 700, color: '#0B2C8C' }}>{(row.total || 0).toLocaleString('en-IN')}</td>

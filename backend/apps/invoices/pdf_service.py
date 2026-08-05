@@ -53,6 +53,9 @@ def generate_invoice_pdf(invoice) -> bytes:
     c = canvas.Canvas(buffer, pagesize=A4)
     width, height = A4 # 595.27 x 841.89 pt
 
+    inv_type = str(getattr(invoice, "invoice_type", "REGULAR"))
+    services = getattr(invoice, "services_data", []) or []
+
     assets_dir = os.path.join(settings.BASE_DIR, "static", "invoice")
     bg_regular = os.path.join(assets_dir, "template_regular.png")
     bg_school = os.path.join(assets_dir, "template_school.png")
