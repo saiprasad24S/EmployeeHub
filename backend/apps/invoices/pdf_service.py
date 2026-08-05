@@ -197,8 +197,8 @@ def generate_invoice_pdf(invoice) -> bytes:
             gst = (subtotal * gst_rate) / 100.0
         discount = float(getattr(invoice, "discount", 0) or 0)
         tot_after_gst = subtotal + gst - discount
-        balance_due = tot_after_gst - adv_amt
-        grand_total = max(0.0, balance_due)
+        grand_total = max(0.0, tot_after_gst)
+        balance_due = grand_total - adv_amt
         amt_words = str(getattr(invoice, "amount_in_words", "") or amount_in_rupees_words(grand_total))
 
         c.setFont("Times-Bold", 8)

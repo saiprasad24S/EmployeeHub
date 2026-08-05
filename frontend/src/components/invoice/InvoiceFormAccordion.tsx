@@ -370,19 +370,21 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({ data
         <InputField label="Discount Amount (₹)" icon={<DollarSign style={iconSize} />} type="number" value={data.discountAmount} onChange={v => updateField('discountAmount', Number(v))} />
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 4 }}>
           {[
-            ['Subtotal', subtotal, '#1A1A1A'],
-            ['GST Amount (+)', calculatedGstAmount, '#2E7D32'],
-            ['Discount (-)', discountAmount, '#ED6C02'],
-            ['Total After GST', totalAfterGst, '#0B2C8C'],
-            ['Advance Received (-)', advanceReceived, '#616161'],
-            ['Balance Due', balanceDue, '#D32F2F'],
-            ['Grand Total', grandTotal, '#0B2C8C'],
-          ].map(([label, val, color]) => (
-            <React.Fragment key={label as string}>
-              <div style={{ fontSize: 11, fontWeight: 600, color: '#616161', padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>{label as string}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: color as string, textAlign: 'right', padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>₹ {(val as number).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            </React.Fragment>
-          ))}
+            ['Subtotal', subtotal, '#1A1A1A', true],
+            ['GST Amount (+)', calculatedGstAmount, '#2E7D32', calculatedGstAmount > 0],
+            ['Discount (-)', discountAmount, '#ED6C02', discountAmount > 0],
+            ['Total After GST', totalAfterGst, '#0B2C8C', calculatedGstAmount > 0],
+            ['Grand Total', grandTotal, '#0B2C8C', true],
+            ['Advance Received (-)', advanceReceived, '#616161', true],
+            ['Balance Due', balanceDue, '#D32F2F', true],
+          ]
+            .filter(([, , , show]) => show)
+            .map(([label, val, color]) => (
+              <React.Fragment key={label as string}>
+                <div style={{ fontSize: 11, fontWeight: 600, color: '#616161', padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>{label as string}</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: color as string, textAlign: 'right', padding: '6px 0', borderBottom: '1px solid #E8ECF4' }}>₹ {(val as number).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+              </React.Fragment>
+            ))}
         </div>
       </AccordionSection>
 

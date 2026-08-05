@@ -55,11 +55,11 @@ export function computeInvoiceTotals(data: InvoicePreviewData) {
     ? (subtotal * gstRate) / 100
     : (Number(data.gstAmount) || 0);
   const discountAmount = Number(data.discountAmount) || 0;
-  const totalAfterGst = subtotal + gstAmount - discountAmount;
+  const totalAfterGst = subtotal + (gstAmount > 0 ? gstAmount : 0) - discountAmount;
+  const grandTotal = Math.max(0, totalAfterGst);
   const advanceReceived = Number(data.advanceReceived) || 0;
-  const balanceDue = totalAfterGst - advanceReceived;
-  const grandTotal = Math.max(0, balanceDue);
-  return { subtotal, gstRate, gstAmount, discountAmount, totalAfterGst, advanceReceived, balanceDue, grandTotal };
+  const balanceDue = grandTotal - advanceReceived;
+  return { subtotal, gstRate, gstAmount: gstAmount > 0 ? gstAmount : 0, discountAmount, totalAfterGst, advanceReceived, balanceDue, grandTotal };
 }
 
 interface InvoiceLivePreviewProps {
@@ -153,7 +153,7 @@ function generatePreviewHash(data: InvoicePreviewData): string {
 }
 
 export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zoom }) => {
-  const { subtotal, gstRate, gstAmount, totalAfterGst, balanceDue, grandTotal } = computeInvoiceTotals(data);
+  const { subtotal, gstRate, gstAmount, discountAmount, totalAfterGst, advanceReceived, balanceDue, grandTotal } = computeInvoiceTotals(data);
   const amountInWords = numToWords(grandTotal);
   const currentDisplayHash = generatePreviewHash(data);
 
@@ -387,17 +387,27 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
                   <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>Sub Total</td>
                   <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right', fontWeight: '500' }}>₹ {subtotal.toFixed(2)}</td>
                 </tr>
-                <tr>
-                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>GST ({gstRate}%)</td>
-                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {gstAmount.toFixed(2)}</td>
-                </tr>
-                <tr style={{ backgroundColor: '#F7F9FC' }}>
-                  <td style={{ padding: '8px 6px', borderBottom: '1px solid #DCE7FF', fontWeight: 'bold', color: '#0B2C8C' }}>Total After GST</td>
-                  <td style={{ padding: '8px 6px', borderBottom: '1px solid #DCE7FF', textAlign: 'right', fontWeight: 'bold', color: '#0B2C8C' }}>₹ {totalAfterGst.toFixed(2)}</td>
-                </tr>
+                {gstAmount > 0 && (
+                  <tr>
+                    <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>GST {gstRate > 0 ? `(${gstRate}%)` : ''}</td>
+                    <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {gstAmount.toFixed(2)}</td>
+                  </tr>
+                )}
+                {discountAmount > 0 && (
+                  <tr>
+                    <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>Discount</td>
+                    <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>- ₹ {discountAmount.toFixed(2)}</td>
+                  </tr>
+                )}
+                {gstAmount > 0 && (
+                  <tr style={{ backgroundColor: '#F7F9FC' }}>
+                    <td style={{ padding: '8px 6px', borderBottom: '1px solid #DCE7FF', fontWeight: 'bold', color: '#0B2C8C' }}>Total After GST</td>
+                    <td style={{ padding: '8px 6px', borderBottom: '1px solid #DCE7FF', textAlign: 'right', fontWeight: 'bold', color: '#0B2C8C' }}>₹ {totalAfterGst.toFixed(2)}</td>
+                  </tr>
+                )}
                 <tr>
                   <td style={{ padding: '6px', borderBottom: '1px solid #eee', color: '#666' }}>Advance Received</td>
-                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {(data.advanceReceived || 0).toFixed(2)}</td>
+                  <td style={{ padding: '6px', borderBottom: '1px solid #eee', textAlign: 'right' }}>₹ {(advanceReceived || 0).toFixed(2)}</td>
                 </tr>
                 <tr>
                   <td style={{ padding: '8px 6px', fontWeight: 'bold', color: '#0B2C8C' }}>Balance Due</td>
