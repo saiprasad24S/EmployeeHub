@@ -125,8 +125,8 @@ export function EmployeesPage() {
           body: payload.formData,
         })
       } catch (networkErr: any) {
-        console.error('[EmployeeSave] Network error:', networkErr, 'URL:', `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${url}`)
-        throw new Error(`Network error: Could not reach the server. Please check that the backend is running. (${networkErr.message})`)
+        console.error('[EmployeeSave] Save request failed:', networkErr)
+        throw new Error(networkErr.message || 'Network error: Failed to connect to server')
       }
 
       if (!res.ok) {
