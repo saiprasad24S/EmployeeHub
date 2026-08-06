@@ -202,7 +202,7 @@ logger.info("Database configuration source: %s", DB_CONFIG_SOURCE)
 
 from corsheaders.defaults import default_headers, default_methods
 
-CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env("CORS_ALLOWED_ORIGINS", default="").split(",") if origin.strip()]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https?://.*$",

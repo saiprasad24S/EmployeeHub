@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
-import { authedFetch } from '../lib/api'
+import { authedFetch, API_BASE_URL } from '../lib/api'
 
 type Employee = {
   id: number
@@ -80,7 +80,7 @@ export function AttendancePage() {
       if (!token) throw new Error('No authentication token')
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api/attendance/export?start_date=${startDate}&end_date=${endDate}`,
+        `${API_BASE_URL}/api/attendance/export?start_date=${startDate}&end_date=${endDate}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,

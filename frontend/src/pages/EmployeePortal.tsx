@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useMemo } from 'react'
 import * as faceapi from 'face-api.js'
 import { SignOutButton, useAuth } from '@clerk/clerk-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { authedFetch } from '../lib/api'
+import { authedFetch, API_BASE_URL } from '../lib/api'
 
 type SessionSummary = {
   active_session?: boolean
@@ -478,7 +478,7 @@ export function EmployeePortal() {
             formData.append('selfies', annotatedBlob || await (await fetch(updated[i])).blob(), `selfie_${i}.jpg`)
           }
 
-          const res = await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api/face/register`, {
+          const res = await fetch(`${API_BASE_URL}/api/face/register`, {
             method: 'POST',
             headers: { Authorization: `Bearer ${token}` },
             body: formData,
@@ -499,7 +499,7 @@ export function EmployeePortal() {
             const profileForm = new FormData()
             const profileBlob = await buildAnnotatedPhoto(updated[0])
             profileForm.append('profile_photo_file', profileBlob || await (await fetch(updated[0])).blob(), 'profile.jpg')
-            await fetch(`${import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'}/api/employees/${profile.id}/upload-photo/`, {
+            await fetch(`${API_BASE_URL}/api/employees/${profile.id}/upload-photo/`, {
               method: 'POST',
               headers: { Authorization: `Bearer ${token}` },
               body: profileForm,
