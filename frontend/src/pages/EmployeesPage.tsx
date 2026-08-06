@@ -128,7 +128,15 @@ export function EmployeesPage() {
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
-        throw new Error(errData.detail || JSON.stringify(errData) || 'Failed to save employee')
+        let message = 'Failed to save employee'
+        if (errData.detail) {
+          message = errData.detail
+        } else if (typeof errData === 'object' && Object.keys(errData).length > 0) {
+          message = Object.entries(errData)
+            .map(([field, errs]) => `${field.replace('_', ' ')}: ${Array.isArray(errs) ? errs.join(', ') : errs}`)
+            .join(' | ')
+        }
+        throw new Error(message)
       }
       return res.json()
     },
