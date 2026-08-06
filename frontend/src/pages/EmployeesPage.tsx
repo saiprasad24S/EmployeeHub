@@ -113,19 +113,25 @@ export function EmployeesPage() {
   const saveMutation = useMutation({
     mutationFn: async (payload: { formData: FormData; id?: number }) => {
       const token = await getToken()
-      if (!token) throw new Error('No auth token')
+      if (!token) throw new Error('No auth token — please sign in again')
 
       const url = payload.id ? `/api/employees/${payload.id}/` : '/api/employees/'
       const method = payload.id ? 'PUT' : 'POST'
 
-      const res = await authedFetch(url, token, {
-        method,
-        body: payload.formData,
-      })
+      let res: Response
+      try {
+        res = await authedFetch(url, token, {
+          method,
+          body: payload.formData,
+        })
+      } catch (networkErr: any) {
+        console.error('[EmployeeSave] Network error:', networkErr, 'URL:', `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000'}${url}`)
+        throw new Error(`Network error: Could not reach the server. Please check that the backend is running. (${networkErr.message})`)
+      }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
-        let message = 'Failed to save employee'
+        let message = `Server error (${res.status})`
         if (errData.detail) {
           message = errData.detail
         } else if (typeof errData === 'object' && Object.keys(errData).length > 0) {
