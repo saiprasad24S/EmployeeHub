@@ -1,5 +1,4 @@
-export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? (import.meta.env.PROD ? '' : 'http://localhost:8000')
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || ''
 
 export async function authedFetch(input: string, token: string, init?: RequestInit) {
   const headers = new Headers(init?.headers)
