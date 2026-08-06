@@ -200,12 +200,27 @@ else:
 
 logger.info("Database configuration source: %s", DB_CONFIG_SOURCE)
 
-CORS_ALLOW_ALL_ORIGINS = True
+from corsheaders.defaults import default_headers, default_methods
+
+CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOWED_ORIGINS = [origin.strip() for origin in _env("CORS_ALLOWED_ORIGINS", default="").split(",") if origin.strip()]
 CORS_ALLOWED_ORIGIN_REGEXES = [
     r"^https?://.*$",
 ]
 CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_HEADERS = list(default_headers) + [
+    "authorization",
+    "x-csrftoken",
+    "x-requested-with",
+]
+CORS_ALLOW_METHODS = list(default_methods) + [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

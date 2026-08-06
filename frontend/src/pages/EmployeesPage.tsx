@@ -118,11 +118,8 @@ export function EmployeesPage() {
       const url = payload.id ? `/api/employees/${payload.id}/` : '/api/employees/'
       const method = payload.id ? 'PUT' : 'POST'
 
-      const res = await fetch(`${API_BASE_URL}${url}`, {
+      const res = await authedFetch(url, token, {
         method,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
         body: payload.formData,
       })
 

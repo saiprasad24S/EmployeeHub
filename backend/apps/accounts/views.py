@@ -77,6 +77,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all().order_by("employee_id")
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
     pagination_class = None
     filterset_fields = ["department", "designation", "is_active"]
     search_fields = ["employee_id", "name", "email"]
