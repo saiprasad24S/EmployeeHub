@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
+import { safeStorage } from '../lib/storage'
 import { motion, AnimatePresence } from 'framer-motion'
 import { InvoiceDashboardHeader } from '../components/invoice/InvoiceDashboardHeader'
 import { InvoiceLivePreview, formatDisplayDate, computeInvoiceTotals } from '../components/invoice/InvoiceLivePreview'
@@ -224,7 +225,7 @@ export function InvoicePage() {
   useEffect(() => {
     const interval = setInterval(() => {
       setIsAutoSaving(true)
-      localStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceData))
+      safeStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceData))
       setTimeout(() => {
         setIsAutoSaving(false)
         setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
@@ -388,7 +389,7 @@ export function InvoicePage() {
         lastSavedTime={lastSavedTime}
         onDownloadPDF={() => handleDownloadPDF()}
         onSaveDraft={() => {
-          localStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceData))
+          safeStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceData))
           alert('Draft saved successfully!')
         }}
         onSaveInvoice={handleSaveInvoice}
@@ -429,30 +430,6 @@ export function InvoicePage() {
                     color: '#0B2C8C',
                     bg: '#EDF2FF',
                     sub: 'All generated invoices',
-                  },
-                  {
-                    label: 'Total Revenue',
-                    value: `Rs. ${statsMetrics.totalRevenue.toLocaleString('en-IN')}`,
-                    icon: TrendingUp,
-                    color: '#2E7D32',
-                    bg: '#E8F5E9',
-                    sub: 'Across all invoices',
-                  },
-                  {
-                    label: 'Paid',
-                    value: statsMetrics.paidCount,
-                    icon: CheckCircle2,
-                    color: '#2E7D32',
-                    bg: '#E8F5E9',
-                    sub: 'Settled accounts',
-                  },
-                  {
-                    label: 'Pending',
-                    value: statsMetrics.pendingCount,
-                    icon: Clock,
-                    color: '#ED6C02',
-                    bg: '#FFF3E0',
-                    sub: 'Awaiting payment',
                   },
                 ].map((stat, i) => (
                   <motion.div

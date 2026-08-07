@@ -12,22 +12,24 @@ const navItems = [
   { label: 'Invoice', to: '/invoice' },
 ]
 
+import { safeStorage } from '../lib/storage'
+
 export function AppShell({ children }: PropsWithChildren) {
   const navigate = useNavigate()
   const location = useLocation()
   const { searchQuery, setSearchQuery } = useSearch()
   const currentDate = useMemo(() => new Intl.DateTimeFormat('en-IN', { dateStyle: 'full' }).format(new Date()), [])
   const [isDarkMode, setIsDarkMode] = useState(() => {
-    const savedTheme = window.localStorage.getItem('employeehub-theme')
+    const savedTheme = safeStorage.getItem('employeehub-theme')
     if (savedTheme) return savedTheme === 'dark'
-    return window.matchMedia('(prefers-color-scheme: dark)').matches
+    return typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
   })
 
   useEffect(() => {
     const theme = isDarkMode ? 'dark' : 'light'
     document.documentElement.dataset.theme = theme
     document.documentElement.style.colorScheme = theme
-    window.localStorage.setItem('employeehub-theme', theme)
+    safeStorage.setItem('employeehub-theme', theme)
   }, [isDarkMode])
 
   const breadcrumb = useMemo(() => {

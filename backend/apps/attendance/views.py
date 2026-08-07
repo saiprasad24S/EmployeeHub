@@ -5,7 +5,7 @@ from django.db import transaction
 from django.http import HttpResponse
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -200,3 +200,129 @@ class AttendanceExportView(APIView):
         response = HttpResponse(workbook_bytes, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response["Content-Disposition"] = f"attachment; filename=attendance_{start}_{end}.xlsx"
         return response
+
+
+class ManualAttendanceEditView(APIView):
+    parser_classes = [JSONParser, FormParser, MultiPartParser]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        from datetime import date, datetime, time, timedelta
+        from django.utils import timezone
+
+        employee_ids = request.data.get("employee_ids") or []
+        if isinstance(employee_ids, (int, str)):
+            employee_ids = [employee_ids]
+
+        dates = request.data.get("dates") or []
+        single_date = request.data.get("date")
+        if single_date and single_date not in dates:
+            dates.append(single_date)
+
+        start_date = request.data.get("start_date")
+        end_date = request.data.get("end_date")
+        if start_date and end_date:
+            try:
+                s_date = datetime.strptime(start_date, "%Y-%m-%d").date()
+                e_date = datetime.strptime(end_date, "%Y-%m-%d").date()
+                curr = s_date
+                while curr <= e_date:
+                    d_str = curr.strftime("%Y-%m-%d")
+                    if d_str not in dates:
+                        dates.append(d_str)
+                    curr += timedelta(days=1)
+            except ValueError:
+                pass
+
+        if not employee_ids:
+            return Response({"detail": "Please select at least one candidate."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not dates:
+            return Response({"detail": "Please select at least one date or date range."}, status=status.HTTP_400_BAD_REQUEST)
+
+        status_str = (request.data.get("status") or "PRESENT").upper()
+        time_from_str = request.data.get("time_from") or "09:00"
+        time_to_str = request.data.get("time_to") or "18:00"
+        remarks = request.data.get("remarks") or "Admin manual update"
+
+        employees = Employee.objects.filter(id__in=employee_ids)
+        if not employees.exists():
+            employees = Employee.objects.filter(employee_id__in=employee_ids)
+
+        if not employees.exists():
+            return Response({"detail": "No matching employees found."}, status=status.HTTP_400_BAD_REQUEST)
+
+        updated_count = 0
+        now_date = timezone.now().date()
+
+        for emp in employees:
+            for d_str in dates:
+                try:
+                    target_date = datetime.strptime(d_str, "%Y-%m-%d").date()
+                except ValueError:
+                    continue
+
+                if status_str == "ABSENT":
+                    Attendance.objects.filter(employee=emp, session__login_time__date=target_date).delete()
+                    Attendance.objects.filter(employee=emp, timestamp__date=target_date).delete()
+                    Attendance.objects.filter(employee=emp, created_at__date=target_date).delete()
+                    Session.objects.filter(employee=emp, login_time__date=target_date).delete()
+                    updated_count += 1
+                else:  # PRESENT
+                    try:
+                        tf_clean = time_from_str.split()[0]
+                        tf_parts = [int(p) for p in tf_clean.split(":")[:2]]
+                        t_from = time(tf_parts[0], tf_parts[1])
+                    except Exception:
+                        t_from = time(9, 0)
+
+                    try:
+                        tt_clean = time_to_str.split()[0]
+                        tt_parts = [int(p) for p in tt_clean.split(":")[:2]]
+                        t_to = time(tt_parts[0], tt_parts[1])
+                    except Exception:
+                        t_to = time(18, 0)
+
+                    naive_in = datetime.combine(target_date, t_from)
+                    naive_out = datetime.combine(target_date, t_to)
+
+                    login_dt = timezone.make_aware(naive_in) if timezone.is_naive(naive_in) else naive_in
+                    logout_dt = timezone.make_aware(naive_out) if timezone.is_naive(naive_out) else naive_out
+
+                    session = Session.objects.filter(employee=emp, login_time__date=target_date).order_by("-login_time").first()
+                    is_active_session = target_date == now_date and not time_to_str
+
+                    if not session:
+                        session = Session.objects.create(employee=emp, is_active=is_active_session)
+
+                    Session.objects.filter(pk=session.pk).update(
+                        login_time=login_dt,
+                        logout_time=logout_dt if not is_active_session else None,
+                        is_active=is_active_session,
+                    )
+
+                    att, _ = Attendance.objects.get_or_create(
+                        employee=emp,
+                        session=session,
+                        attendance_type=Attendance.AttendanceType.CHECK_IN,
+                        defaults={
+                            "latitude": emp.default_latitude or 17.4435,
+                            "longitude": emp.default_longitude or 78.3772,
+                            "address": emp.default_address or "Manual Entry by Admin",
+                            "status": Attendance.Status.APPROVED,
+                            "remarks": remarks,
+                        },
+                    )
+                    Attendance.objects.filter(pk=att.pk).update(
+                        timestamp=login_dt,
+                        created_at=login_dt,
+                        status=Attendance.Status.APPROVED,
+                        remarks=remarks,
+                    )
+                    updated_count += 1
+
+        return Response({
+            "detail": f"Successfully updated attendance for {len(employees)} candidate(s) across {len(dates)} date(s).",
+            "updated_count": updated_count,
+        })
+

@@ -245,7 +245,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           </div>
           <div style={{ flex: 1, padding: '0 10px', borderRight: '1px solid #DCE7FF', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> +91 96609 66369</div>
-            <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> skandanhomecarre@gmail.com</div>
+            <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> admin@skandanhomecarre.com</div>
             <div style={{ display: 'flex', alignItems: 'center' }}><Globe size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> www.skandanhomecarre.com</div>
           </div>
           <div style={{ flex: 1, paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: '500' }}>

@@ -1,3 +1,6 @@
+import { initStoragePolyfill } from './lib/storage'
+initStoragePolyfill()
+
 import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { ClerkProvider } from '@clerk/clerk-react'

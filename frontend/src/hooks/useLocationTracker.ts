@@ -1,12 +1,13 @@
 import { useEffect, useRef } from 'react'
 import { authedFetch } from '../lib/api'
+import { safeStorage } from '../lib/storage'
 
 export function useLocationTracker(getToken: () => Promise<string | null>) {
   const watchIdRef = useRef<number | null>(null)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
-    const isCheckedIn = localStorage.getItem('skandan_active_session') === 'true'
+    const isCheckedIn = safeStorage.getItem('skandan_active_session') === 'true'
     if (!isCheckedIn) {
       if (watchIdRef.current !== null) {
         navigator.geolocation.clearWatch(watchIdRef.current)
@@ -33,10 +34,10 @@ export function useLocationTracker(getToken: () => Promise<string | null>) {
             }),
           })
         } else {
-          // If logged out of Clerk but session active, buffer coordinates in localStorage
-          const queue = JSON.parse(localStorage.getItem('skandan_offline_locations') || '[]')
+          // If logged out of Clerk but session active, buffer coordinates in safeStorage
+          const queue = JSON.parse(safeStorage.getItem('skandan_offline_locations') || '[]')
           queue.push({ latitude, longitude, accuracy: accuracy ?? 1.0, timestamp: new Date().toISOString() })
-          localStorage.setItem('skandan_offline_locations', JSON.stringify(queue.slice(-50)))
+          safeStorage.setItem('skandan_offline_locations', JSON.stringify(queue.slice(-50)))
         }
       } catch (err) {
         console.warn('Background location tracking update failed', err)

@@ -159,7 +159,7 @@ def generate_invoice_pdf(invoice) -> bytes:
 
             # Col 2: Phone, Email, Website
             c.drawString(230, bar_y + 37, "+91 96609 66369")
-            c.drawString(230, bar_y + 25, "skandanhomecarre@gmail.com")
+            c.drawString(230, bar_y + 25, "admin@skandanhomecarre.com")
             c.drawString(230, bar_y + 13, "www.skandanhomecarre.com")
 
             # Divider line 2

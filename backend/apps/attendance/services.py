@@ -196,7 +196,7 @@ def upload_profile_photo(image_file, *, employee_id: str, employee_name: str | N
 
 def get_employee_presence_summary(employee: Employee, *, reference_time: datetime | None = None) -> dict[str, Any]:
     reference_time = reference_time or timezone.now()
-    today = reference_time.date()
+    today = timezone.localtime(reference_time).date()
     
     session = Session.objects.filter(employee=employee, login_time__date=today).order_by('-login_time').first()
     if not session:
@@ -337,36 +337,51 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
         ws.cell(row=row_idx, column=2).font = bold_font
         ws.cell(row=row_idx, column=3).font = regular_font
 
+        emp_sessions = list(Session.objects.filter(employee=emp).order_by('-login_time'))
+        emp_attendances = list(Attendance.objects.filter(employee=emp).order_by('-timestamp'))
+
         c_idx = 4
         present_count = 0
         for dt in date_list:
-            session = Session.objects.filter(employee=emp, login_time__date=dt).first()
+            # Match session by local login date or Attendance timestamp
+            session = next(
+                (s for s in emp_sessions if s.login_time and timezone.localtime(s.login_time).date() == dt),
+                None
+            )
             if not session:
-                session = get_session_for_date(emp, dt)
+                session = Session.objects.filter(employee=emp, login_time__date=dt).first()
 
-            if not session:
+            attendance_rec = next(
+                (a for a in emp_attendances if a.timestamp and timezone.localtime(a.timestamp).date() == dt),
+                None
+            )
+
+            if not session and not attendance_rec:
                 check_in_val = "-"
                 check_out_val = "-"
                 hours_val = "Absent"
             else:
                 present_count += 1
-                login_time = session.login_time
-                logout_time = session.logout_time
-                
+                login_time = session.login_time if session else attendance_rec.timestamp
+                logout_time = session.logout_time if session else None
+
                 check_in_val = timezone.localtime(login_time).strftime("%I:%M %p") if login_time else "-"
-                
-                if session.is_active or not logout_time:
+
+                if session and (session.is_active or not logout_time):
                     check_out_val = "Active"
                     diff = timezone.now() - login_time
                     h = int(diff.total_seconds() // 3600)
                     m = int((diff.total_seconds() % 3600) // 60)
                     hours_val = f"{h}h {m}m"
-                else:
+                elif logout_time:
                     check_out_val = timezone.localtime(logout_time).strftime("%I:%M %p")
                     diff = logout_time - login_time
                     h = int(diff.total_seconds() // 3600)
                     m = int((diff.total_seconds() % 3600) // 60)
                     hours_val = f"{h}h {m}m"
+                else:
+                    check_out_val = "-"
+                    hours_val = "Present"
 
             c1 = ws.cell(row=row_idx, column=c_idx, value=check_in_val)
             c2 = ws.cell(row=row_idx, column=c_idx + 1, value=check_out_val)

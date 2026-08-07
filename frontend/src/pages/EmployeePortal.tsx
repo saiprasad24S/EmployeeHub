@@ -3,6 +3,7 @@ import * as faceapi from 'face-api.js'
 import { SignOutButton, useAuth } from '@clerk/clerk-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { authedFetch, API_BASE_URL } from '../lib/api'
+import { safeStorage } from '../lib/storage'
 
 type SessionSummary = {
   active_session?: boolean
@@ -280,7 +281,7 @@ export function EmployeePortal() {
       const res = await authedFetch('/api/attendance/', token)
       if (!res.ok) return []
       const data = await res.json()
-      return (data.results ?? data ?? []) as Array<{ created_at: string; attendance_type: string }>
+      return (data.results ?? data ?? []) as Array<{ created_at: string; timestamp?: string; session_login_time?: string; attendance_type: string }>
     },
   })
 
@@ -296,7 +297,12 @@ export function EmployeePortal() {
     const totalDays = lastDay.getDate()
 
     const records = attendanceHistoryQuery.data ?? []
-    const presentDates = new Set(records.map((r) => new Date(r.created_at).toDateString()))
+    const presentDates = new Set(
+      records.map((r) => {
+        const dtStr = r.session_login_time || r.timestamp || r.created_at
+        return new Date(dtStr).toDateString()
+      })
+    )
 
     const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
 
@@ -587,9 +593,9 @@ export function EmployeePortal() {
         }
 
         if (cameraMode === 'checkin') {
-          localStorage.setItem('skandan_active_session', 'true')
+          safeStorage.setItem('skandan_active_session', 'true')
         } else {
-          localStorage.setItem('skandan_active_session', 'false')
+          safeStorage.setItem('skandan_active_session', 'false')
         }
 
         queryClient.invalidateQueries({ queryKey: ['my-assignment'] })
