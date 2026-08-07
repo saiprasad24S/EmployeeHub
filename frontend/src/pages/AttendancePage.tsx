@@ -168,13 +168,9 @@ export function AttendancePage() {
       const token = await getToken()
       if (!token) throw new Error('No authentication token')
 
-      const response = await fetch(
-        `${API_BASE_URL}/api/attendance/export?start_date=${startDate}&end_date=${endDate}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
+      const response = await authedFetch(
+        `/api/attendance/export?start_date=${startDate}&end_date=${endDate}`,
+        token
       )
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))

@@ -199,6 +199,7 @@ class AttendanceExportView(APIView):
         workbook_bytes = generate_attendance_export(start, end)
         response = HttpResponse(workbook_bytes, content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response["Content-Disposition"] = f"attachment; filename=attendance_{start}_{end}.xlsx"
+        response["Access-Control-Expose-Headers"] = "Content-Disposition"
         return response
 
 
