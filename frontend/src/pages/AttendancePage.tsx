@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch, API_BASE_URL } from '../lib/api'
@@ -44,6 +44,17 @@ export function AttendancePage() {
   const [isSubmittingEdit, setIsSubmittingEdit] = useState(false)
   const [editMsg, setEditMsg] = useState<string | null>(null)
 
+  // Whole Month Attendance Calendar State
+  const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
+  const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1)
+  const [monthData, setMonthData] = useState<any | null>(null)
+  const [isLoadingMonthData, setIsLoadingMonthData] = useState(false)
+  const [selectedCalendarDates, setSelectedCalendarDates] = useState<string[]>([])
+
+  // Candidate Search State
+  const [candidateSearchQuery, setCandidateSearchQuery] = useState('')
+  const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false)
+
   const employeesQuery = useQuery({
     queryKey: ['employees-attendance'],
     queryFn: async () => {
@@ -60,6 +71,98 @@ export function AttendancePage() {
   })
 
   const employees = employeesQuery.data ?? []
+
+  const activeEmp = employees.find((e) => e.id === selectedEmpIds[0])
+
+  const candidateAttendanceQuery = useQuery({
+    queryKey: ['candidate-attendance-history', activeEmp?.id, activeEmp?.employee_id],
+    enabled: !!activeEmp,
+    queryFn: async () => {
+      const token = await getToken()
+      if (!token) return []
+      const url = `/api/attendance/?employee_id=${encodeURIComponent(activeEmp!.employee_id)}`
+      const res = await authedFetch(url, token)
+      if (!res.ok) return []
+      const data = await res.json()
+      return (Array.isArray(data) ? data : (data.results ?? [])) as Array<{
+        created_at: string
+        timestamp?: string
+        session_login_time?: string
+        attendance_type?: string
+      }>
+    },
+    staleTime: 5000,
+  })
+
+  // Generate candidate calendar days grid matching Candidate Portal 100% identically
+  const calendarGridItems = useMemo(() => {
+    const now = new Date()
+    const yr = selectedYear
+    const moIdx = selectedMonth - 1
+
+    const firstDay = new Date(yr, moIdx, 1)
+    const lastDay = new Date(yr, moIdx + 1, 0)
+
+    const startingDayOfWeek = firstDay.getDay()
+    const totalDays = lastDay.getDate()
+
+    const records = candidateAttendanceQuery.data ?? []
+    const presentDates = new Set(
+      records.map((r) => {
+        const dtStr = r.session_login_time || r.timestamp || r.created_at
+        return new Date(dtStr).toDateString()
+      })
+    )
+
+    const items: (any | null)[] = []
+
+    // Leading empty weekday padding slots
+    for (let i = 0; i < startingDayOfWeek; i++) {
+      items.push(null)
+    }
+
+    for (let dayNum = 1; dayNum <= totalDays; dayNum++) {
+      const d = new Date(yr, moIdx, dayNum)
+      const dateStr = d.toDateString()
+
+      const padMonth = String(selectedMonth).padStart(2, '0')
+      const padDay = String(dayNum).padStart(2, '0')
+      const isoDateStr = `${yr}-${padMonth}-${padDay}`
+
+      const isToday = dateStr === now.toDateString()
+      const isPast = d < new Date(now.getFullYear(), now.getMonth(), now.getDate())
+      const isPastOrToday = isPast || isToday
+
+      const isPresent = presentDates.has(dateStr) || (isToday && (activeEmp?.is_present || activeEmp?.presence_status === 'Present' || activeEmp?.session_login_time !== null))
+
+      items.push({
+        date: isoDateStr,
+        dateStr,
+        dayNumber: dayNum,
+        day_number: dayNum,
+        isToday,
+        isPast,
+        isPastOrToday,
+        isPresent,
+      })
+    }
+
+    return items
+  }, [selectedYear, selectedMonth, candidateAttendanceQuery.data, activeEmp])
+
+  const monthStats = useMemo(() => {
+    const validDays = calendarGridItems.filter((item) => item !== null)
+    const presentCount = validDays.filter((item) => item?.isPresent).length
+    const totalCount = validDays.length
+    const absentCount = totalCount - presentCount
+
+    return {
+      totalDays: totalCount,
+      presentCount,
+      absentCount,
+      monthName: new Date(selectedYear, selectedMonth - 1, 1).toLocaleString('default', { month: 'long', year: 'numeric' }),
+    }
+  }, [calendarGridItems, selectedYear, selectedMonth])
 
   const formatDuration = (seconds: number | undefined) => {
     if (!seconds) return '0m'
@@ -86,13 +189,28 @@ export function AttendancePage() {
     (e) => !e.is_present && e.presence_status !== 'Present' && e.presence_status !== 'Checked Out' && e.session_login_time === null
   )
 
+  const filteredSearchEmployees = useMemo(() => {
+    if (!candidateSearchQuery.trim()) return employees
+    const q = candidateSearchQuery.toLowerCase().trim()
+    return employees.filter(
+      (e) =>
+        e.name.toLowerCase().includes(q) ||
+        e.employee_id.toLowerCase().includes(q) ||
+        (e.department && e.department.toLowerCase().includes(q))
+    )
+  }, [employees, candidateSearchQuery])
+
   const handleOpenEditModal = (emp?: Employee | null) => {
     setEditMsg(null)
-    if (emp) {
-      setSelectedEmpIds([emp.id])
+    const targetEmp = emp || (employees.length > 0 ? employees[0] : null)
+    if (targetEmp) {
+      setSelectedEmpIds([targetEmp.id])
+      setCandidateSearchQuery(`${targetEmp.name} (${targetEmp.employee_id})`)
     } else {
       setSelectedEmpIds([])
+      setCandidateSearchQuery('')
     }
+    setIsSearchDropdownOpen(false)
     setIsEditModalOpen(true)
   }
 
@@ -105,6 +223,116 @@ export function AttendancePage() {
       setSelectedEmpIds([])
     } else {
       setSelectedEmpIds(employees.map((e) => e.id))
+    }
+  }
+
+  const fetchCandidateMonthAttendance = async (empIdStr: string, yr: number, mo: number) => {
+    setIsLoadingMonthData(true)
+    try {
+      const token = await getToken()
+      if (!token) return
+      const res = await authedFetch(`/api/attendance/employee-month?employee_id=${encodeURIComponent(empIdStr)}&year=${yr}&month=${mo}`, token)
+      if (res.ok) {
+        const data = await res.json()
+        setMonthData(data)
+      }
+    } catch (err) {
+      console.error('Failed to load candidate month attendance:', err)
+    } finally {
+      setIsLoadingMonthData(false)
+    }
+  }
+
+  useEffect(() => {
+    if (isEditModalOpen && selectedEmpIds.length > 0) {
+      const activeEmp = employees.find((e) => e.id === selectedEmpIds[0])
+      if (activeEmp) {
+        fetchCandidateMonthAttendance(activeEmp.employee_id, selectedYear, selectedMonth)
+      }
+    }
+  }, [isEditModalOpen, selectedEmpIds, selectedYear, selectedMonth])
+
+  const handlePrevMonth = () => {
+    if (selectedMonth === 1) {
+      setSelectedMonth(12)
+      setSelectedYear((y) => y - 1)
+    } else {
+      setSelectedMonth((m) => m - 1)
+    }
+  }
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 12) {
+      setSelectedMonth(1)
+      setSelectedYear((y) => y + 1)
+    } else {
+      setSelectedMonth((m) => m + 1)
+    }
+  }
+
+  const handleToggleCalendarDate = (dateStr: string) => {
+    setSelectedCalendarDates((prev) =>
+      prev.includes(dateStr) ? prev.filter((d) => d !== dateStr) : [...prev, dateStr]
+    )
+  }
+
+  const handleQuickMarkDateStatus = async (targetDates: string[], statusToSet: 'PRESENT' | 'ABSENT') => {
+    if (selectedEmpIds.length === 0) {
+      alert('Please select a candidate first.')
+      return
+    }
+    if (targetDates.length === 0) {
+      alert('Please select at least one date.')
+      return
+    }
+
+    setIsSubmittingEdit(true)
+    setEditMsg(null)
+    try {
+      const token = await getToken()
+      if (!token) throw new Error('No authentication token')
+
+      const payload: any = {
+        employee_ids: selectedEmpIds,
+        status: statusToSet,
+        time_from: editTimeFrom,
+        time_to: editTimeTo,
+        remarks: editRemarks || `Manual ${statusToSet.toLowerCase()} update by admin`,
+      }
+
+      if (targetDates.length === 1) {
+        payload.date = targetDates[0]
+      } else {
+        payload.start_date = targetDates[0]
+        payload.end_date = targetDates[targetDates.length - 1]
+      }
+
+      const res = await authedFetch('/api/attendance/manual-edit', token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.detail || 'Failed to update attendance')
+      }
+
+      setEditMsg(`Successfully marked ${targetDates.length} date(s) as ${statusToSet}.`)
+      setSelectedCalendarDates([])
+
+      const activeEmp = employees.find((e) => e.id === selectedEmpIds[0])
+      if (activeEmp) {
+        fetchCandidateMonthAttendance(activeEmp.employee_id, selectedYear, selectedMonth)
+      }
+      queryClient.invalidateQueries({ queryKey: ['candidate-attendance-history'] })
+      queryClient.invalidateQueries({ queryKey: ['my-attendance-history'] })
+      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
+    } catch (err: any) {
+      setEditMsg(err.message || 'Error updating attendance.')
+    } finally {
+      setIsSubmittingEdit(false)
     }
   }
 
@@ -147,10 +375,16 @@ export function AttendancePage() {
       }
 
       const data = await res.json()
-      alert(data.detail || 'Attendance modified successfully!')
+      setEditMsg(data.detail || 'Attendance modified successfully!')
+
+      const activeEmp = employees.find((e) => e.id === selectedEmpIds[0])
+      if (activeEmp) {
+        fetchCandidateMonthAttendance(activeEmp.employee_id, selectedYear, selectedMonth)
+      }
+      queryClient.invalidateQueries({ queryKey: ['candidate-attendance-history'] })
+      queryClient.invalidateQueries({ queryKey: ['my-attendance-history'] })
       queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
       queryClient.invalidateQueries({ queryKey: ['employees'] })
-      setIsEditModalOpen(false)
     } catch (err: any) {
       setEditMsg(err.message || 'Error saving attendance updates.')
     } finally {
@@ -356,296 +590,420 @@ export function AttendancePage() {
       {/* Edit Attendance Modal */}
       {isEditModalOpen && (
         <div className="camera-modal-backdrop" style={{ zIndex: 9999 }}>
-          <div className="camera-modal" style={{ maxWidth: '540px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
-            <div className="camera-header" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--panel)' }}>
-              <h3 style={{ fontSize: '1.2rem', margin: 0 }}>
-                Edit Candidate Attendance
-              </h3>
-              <button
-                onClick={() => setIsEditModalOpen(false)}
-                style={{ background: 'none', border: 'none', fontSize: '1.5rem', cursor: 'pointer', color: 'var(--muted)' }}
-              >
-                &times;
-              </button>
+          <div className="camera-modal" style={{ maxWidth: '840px', width: '95%', maxHeight: '92vh', overflowY: 'auto', borderRadius: '16px' }}>
+            <div className="camera-header" style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--panel)', borderBottom: '1px solid var(--border)', padding: '1rem 1.25rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <h3 style={{ fontSize: '1.2rem', margin: 0, fontWeight: 700 }}>
+                  Edit Candidate Attendance & Monthly View
+                </h3>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  style={{ background: 'none', border: 'none', fontSize: '1.6rem', cursor: 'pointer', color: 'var(--muted)' }}
+                >
+                  &times;
+                </button>
+              </div>
             </div>
 
             {editMsg && (
-              <div style={{ padding: '0.75rem 1.25rem', background: '#FEE2E2', color: '#991B1B', fontSize: '0.85rem', fontWeight: 600 }}>
+              <div style={{ padding: '0.75rem 1.25rem', background: 'rgba(16, 185, 129, 0.1)', color: '#065F46', fontSize: '0.85rem', fontWeight: 600, borderBottom: '1px solid var(--border)' }}>
                 {editMsg}
               </div>
             )}
 
-            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              {/* 1. Candidate Selection */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>
-                    Select Candidate(s) ({selectedEmpIds.length} selected)
-                  </label>
-                  <button
-                    type="button"
-                    onClick={handleSelectAllEmps}
-                    style={{ background: 'none', border: 'none', color: '#6366F1', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer' }}
-                  >
-                    {selectedEmpIds.length === employees.length ? 'Deselect All' : 'Select All'}
-                  </button>
-                </div>
-                <div
-                  style={{
-                    maxHeight: '130px',
-                    overflowY: 'auto',
-                    border: '1px solid var(--border)',
-                    borderRadius: '10px',
-                    padding: '0.4rem',
-                    background: 'var(--panel)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '0.25rem',
-                  }}
-                >
-                  {employees.map((emp) => (
-                    <label
-                      key={emp.id}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.6rem',
-                        fontSize: '0.85rem',
-                        padding: '0.3rem 0.5rem',
-                        borderRadius: '6px',
-                        cursor: 'pointer',
-                        background: selectedEmpIds.includes(emp.id) ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={selectedEmpIds.includes(emp.id)}
-                        onChange={() => handleToggleEmp(emp.id)}
-                      />
-                      <img
-                        src={emp.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(emp.name)}
-                        alt={emp.name}
-                        style={{ width: '22px', height: '22px', borderRadius: '50%', objectFit: 'cover' }}
-                      />
-                      <span style={{ fontWeight: 600 }}>{emp.name}</span>
-                      <span style={{ color: 'var(--muted)', fontSize: '0.75rem' }}>({emp.employee_id})</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* 2. Date Selection Mode */}
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: '0.4rem' }}>
-                  Date Selection Mode
+            <div style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+              {/* Candidate Search Input Field */}
+              <div style={{ position: 'relative' }}>
+                <label style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', display: 'block', marginBottom: '0.4rem' }}>
+                  Search Candidate
                 </label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <button
-                    type="button"
-                    className={dateMode === 'SINGLE' ? 'btn-primary' : 'btn-secondary'}
-                    style={{ flex: 1, padding: '0.45rem', fontSize: '0.8rem' }}
-                    onClick={() => setDateMode('SINGLE')}
-                  >
-                    Single Date
-                  </button>
-                  <button
-                    type="button"
-                    className={dateMode === 'RANGE' ? 'btn-primary' : 'btn-secondary'}
-                    style={{ flex: 1, padding: '0.45rem', fontSize: '0.8rem' }}
-                    onClick={() => setDateMode('RANGE')}
-                  >
-                    Multiple Dates / Date Range
-                  </button>
-                </div>
-              </div>
-
-              {/* Date Inputs */}
-              {dateMode === 'SINGLE' ? (
-                <div className="stack" style={{ gap: '0.3rem' }}>
-                  <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Select Date</label>
+                <div style={{ position: 'relative' }}>
                   <input
-                    type="date"
-                    value={editSingleDate}
-                    onChange={(e) => setEditSingleDate(e.target.value)}
+                    type="text"
+                    placeholder="Search candidate by name or ID (e.g. EMP001)..."
+                    value={candidateSearchQuery}
+                    onFocus={() => setIsSearchDropdownOpen(true)}
+                    onChange={(e) => {
+                      setCandidateSearchQuery(e.target.value)
+                      setIsSearchDropdownOpen(true)
+                    }}
                     style={{
-                      padding: '0.5rem',
-                      borderRadius: '8px',
+                      width: '100%',
+                      padding: '0.55rem 0.85rem',
+                      borderRadius: '10px',
                       border: '1px solid var(--border)',
                       background: 'var(--panel)',
                       color: 'var(--text)',
+                      fontSize: '0.88rem',
+                      fontWeight: 500,
                     }}
                   />
+                  {candidateSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCandidateSearchQuery('')
+                        setIsSearchDropdownOpen(true)
+                      }}
+                      style={{
+                        position: 'absolute',
+                        right: '10px',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--muted)',
+                        fontSize: '1.1rem',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      &times;
+                    </button>
+                  )}
                 </div>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>From Date</label>
-                    <input
-                      type="date"
-                      value={editFromDate}
-                      onChange={(e) => setEditFromDate(e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--panel)',
-                        color: 'var(--text)',
-                      }}
-                    />
+
+                {/* Search Dropdown */}
+                {isSearchDropdownOpen && (
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      zIndex: 100,
+                      marginTop: '4px',
+                      maxHeight: '220px',
+                      overflowY: 'auto',
+                      background: 'var(--panel)',
+                      border: '1px solid var(--border)',
+                      borderRadius: '12px',
+                      boxShadow: '0 10px 25px rgba(0,0,0,0.15)',
+                      padding: '0.4rem',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '0.25rem',
+                    }}
+                  >
+                    {filteredSearchEmployees.length === 0 ? (
+                      <div style={{ padding: '0.75rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.85rem' }}>
+                        No candidates found matching "{candidateSearchQuery}"
+                      </div>
+                    ) : (
+                      filteredSearchEmployees.map((emp) => {
+                        const isSelected = selectedEmpIds.includes(emp.id)
+                        return (
+                          <div
+                            key={emp.id}
+                            onClick={() => {
+                              setSelectedEmpIds([emp.id])
+                              setCandidateSearchQuery(`${emp.name} (${emp.employee_id})`)
+                              setIsSearchDropdownOpen(false)
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '0.5rem 0.75rem',
+                              borderRadius: '8px',
+                              cursor: 'pointer',
+                              background: isSelected ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
+                              transition: 'background 0.12s ease',
+                            }}
+                          >
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+                              <img
+                                src={emp.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(emp.name)}
+                                alt={emp.name}
+                                style={{ width: '28px', height: '28px', borderRadius: '50%', objectFit: 'cover' }}
+                              />
+                              <div>
+                                <div style={{ fontSize: '0.88rem', fontWeight: 600, color: 'var(--text)' }}>{emp.name}</div>
+                                <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{emp.employee_id} {emp.department ? `· ${emp.department}` : ''}</div>
+                              </div>
+                            </div>
+                            {isSelected && (
+                              <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--primary)', background: 'rgba(107, 47, 160, 0.1)', padding: '0.2rem 0.5rem', borderRadius: '6px' }}>
+                                Selected
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })
+                    )}
                   </div>
-                  <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>To Date</label>
-                    <input
-                      type="date"
-                      value={editToDate}
-                      onChange={(e) => setEditToDate(e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--panel)',
-                        color: 'var(--text)',
-                      }}
-                    />
+                )}
+              </div>
+
+              {/* Candidate Info Bar & Month Navigator */}
+              {selectedEmpIds.length > 0 && (
+                <div style={{ background: 'var(--accent-soft)', padding: '1rem', borderRadius: '12px', display: 'flex', flexDirection: 'column', gap: '0.8rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                      {monthData?.profile_photo && (
+                        <img
+                          src={monthData.profile_photo}
+                          alt="Candidate"
+                          style={{ width: 44, height: 44, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)' }}
+                        />
+                      )}
+                      <div>
+                        <div style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text)' }}>
+                          {monthData?.employee_name || employees.find((e) => e.id === selectedEmpIds[0])?.name}
+                        </div>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>
+                          Candidate ID: {monthData?.employee_id || employees.find((e) => e.id === selectedEmpIds[0])?.employee_id}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Month Navigator */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: 'var(--panel)', padding: '0.25rem 0.5rem', borderRadius: '8px', border: '1px solid var(--border)' }}>
+                      <button
+                        type="button"
+                        onClick={handlePrevMonth}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 700, padding: '0.2rem 0.5rem', color: 'var(--primary)' }}
+                      >
+                        ◀
+                      </button>
+                      <span style={{ fontWeight: 700, fontSize: '0.9rem', color: 'var(--text)' }}>
+                        {monthStats.monthName}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleNextMonth}
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1rem', fontWeight: 700, padding: '0.2rem 0.5rem', color: 'var(--primary)' }}
+                      >
+                        ▶
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Summary Bar */}
+                  <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', fontSize: '0.82rem' }}>
+                    <div style={{ background: 'rgba(16, 185, 129, 0.12)', color: '#065F46', padding: '0.35rem 0.75rem', borderRadius: '6px', fontWeight: 700 }}>
+                      Present: {monthStats.presentCount} Days
+                    </div>
+                    <div style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#991B1B', padding: '0.35rem 0.75rem', borderRadius: '6px', fontWeight: 700 }}>
+                      Unmarked / Off: {monthStats.absentCount} Days
+                    </div>
+                    <div style={{ background: 'var(--panel)', color: 'var(--text)', padding: '0.35rem 0.75rem', borderRadius: '6px', fontWeight: 600, border: '1px solid var(--border)' }}>
+                      Total Days: {monthStats.totalDays}
+                    </div>
                   </div>
                 </div>
               )}
 
-              {/* 3. Attendance Status (Present / Absent) */}
-              <div>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)', display: 'block', marginBottom: '0.4rem' }}>
-                  Mark Attendance Status
-                </label>
-                <div style={{ display: 'flex', gap: '0.75rem' }}>
-                  <label
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem',
-                      borderRadius: '8px',
-                      border: editStatus === 'PRESENT' ? '2px solid #10B981' : '1px solid var(--border)',
-                      background: editStatus === 'PRESENT' ? 'rgba(16, 185, 129, 0.1)' : 'var(--panel)',
-                      color: editStatus === 'PRESENT' ? '#10B981' : 'var(--text)',
-                      fontWeight: 700,
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="status"
-                      value="PRESENT"
-                      checked={editStatus === 'PRESENT'}
-                      onChange={() => setEditStatus('PRESENT')}
-                      style={{ display: 'none' }}
-                    />
-                    Present
-                  </label>
-                  <label
-                    style={{
-                      flex: 1,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '0.5rem',
-                      padding: '0.5rem',
-                      borderRadius: '8px',
-                      border: editStatus === 'ABSENT' ? '2px solid #EF4444' : '1px solid var(--border)',
-                      background: editStatus === 'ABSENT' ? 'rgba(239, 68, 68, 0.1)' : 'var(--panel)',
-                      color: editStatus === 'ABSENT' ? '#EF4444' : 'var(--text)',
-                      fontWeight: 700,
-                      fontSize: '0.9rem',
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <input
-                      type="radio"
-                      name="status"
-                      value="ABSENT"
-                      checked={editStatus === 'ABSENT'}
-                      onChange={() => setEditStatus('ABSENT')}
-                      style={{ display: 'none' }}
-                    />
-                    Absent
-                  </label>
+              {/* Attendance Calendar (Exact Candidate Portal Style) */}
+              <div className="glass-card card-soft" style={{ padding: '1.25rem', borderRadius: '14px', border: '1px solid var(--border)', background: 'var(--panel)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                  <h4 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.1rem', fontWeight: 700 }}>
+                    Attendance Calendar
+                  </h4>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', background: 'var(--bg)', padding: '0.35rem 0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                      {monthStats.monthName}
+                    </span>
+                    <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.75rem' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (monthData?.days) {
+                            setSelectedCalendarDates(monthData.days.map((d: any) => d.date))
+                          }
+                        }}
+                        style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Select All
+                      </button>
+                      <span>·</span>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCalendarDates([])}
+                        style={{ background: 'none', border: 'none', color: 'var(--muted)', fontWeight: 600, cursor: 'pointer' }}
+                      >
+                        Clear ({selectedCalendarDates.length})
+                      </button>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Day Name Headers (Sun..Sat) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem', textAlign: 'center', marginBottom: '0.5rem' }}>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((d) => (
+                    <div key={d} style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase' }}>
+                      {d}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Days Grid (Exact Candidate Portal Component Style) */}
+                {isLoadingMonthData ? (
+                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.9rem' }}>
+                    Loading candidate monthly attendance calendar...
+                  </div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.2rem' }}>
+                    {calendarGridItems.map((item, idx) => {
+                      if (!item) {
+                        return <div key={`empty-${idx}`} style={{ minHeight: '58px', background: 'transparent' }} />
+                      }
+
+                      const isSelectedDate = selectedCalendarDates.includes(item.date)
+
+                      return (
+                        <div
+                          key={item.date}
+                          onClick={() => handleToggleCalendarDate(item.date)}
+                          style={{
+                            minHeight: '58px',
+                            background: isSelectedDate ? 'rgba(99, 102, 241, 0.08)' : 'var(--panel)',
+                            border: item.isToday
+                              ? '2px solid var(--primary)'
+                              : isSelectedDate
+                              ? '2px solid #6366F1'
+                              : '1px solid var(--border)',
+                            borderRadius: '12px',
+                            padding: '0.4rem',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            cursor: 'pointer',
+                            transition: 'all 0.15s ease',
+                          }}
+                        >
+                          <span style={{ fontSize: '0.8rem', fontWeight: item.isToday ? 800 : 600 }}>
+                            {item.dayNumber}
+                          </span>
+
+                          {item.isPastOrToday ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleQuickMarkDateStatus([item.date], item.isPresent ? 'ABSENT' : 'PRESENT')
+                              }}
+                              disabled={isSubmittingEdit}
+                              title={`Click to toggle ${item.date} status (${item.isPresent ? 'Present' : 'Absent'})`}
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                width: '22px',
+                                height: '22px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                borderRadius: '50%',
+                                border: 'none',
+                                background: item.isPresent ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                                color: item.isPresent ? '#10B981' : '#EF4444',
+                                marginTop: '0.2rem',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {item.isPresent ? 'P' : 'A'}
+                            </button>
+                          ) : (
+                            <span style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '0.2rem' }}>—</span>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
-              {/* 4. Time From & Time To (If Present) */}
-              {editStatus === 'PRESENT' && (
+              {/* Batch Action Bar */}
+              <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)' }}>
+                  Batch Edit Options {selectedCalendarDates.length > 0 && `(${selectedCalendarDates.length} Date(s) Selected)`}
+                </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Time From (Check-In)</label>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Check-In Time</label>
                     <input
                       type="time"
                       value={editTimeFrom}
                       onChange={(e) => setEditTimeFrom(e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--panel)',
-                        color: 'var(--text)',
-                      }}
+                      style={{ padding: '0.45rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.85rem' }}
                     />
                   </div>
                   <div className="stack" style={{ gap: '0.3rem' }}>
-                    <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Time To (Check-Out)</label>
+                    <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Check-Out Time</label>
                     <input
                       type="time"
                       value={editTimeTo}
                       onChange={(e) => setEditTimeTo(e.target.value)}
-                      style={{
-                        padding: '0.5rem',
-                        borderRadius: '8px',
-                        border: '1px solid var(--border)',
-                        background: 'var(--panel)',
-                        color: 'var(--text)',
-                      }}
+                      style={{ padding: '0.45rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.85rem' }}
                     />
                   </div>
                 </div>
-              )}
 
-              {/* Remarks */}
-              <div className="stack" style={{ gap: '0.3rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>Remarks (Optional)</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Admin manual correction"
-                  value={editRemarks}
-                  onChange={(e) => setEditRemarks(e.target.value)}
-                  style={{
-                    padding: '0.5rem',
-                    borderRadius: '8px',
-                    border: '1px solid var(--border)',
-                    background: 'var(--panel)',
-                    color: 'var(--text)',
-                  }}
-                />
-              </div>
+                <div className="stack" style={{ gap: '0.3rem' }}>
+                  <label style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>Remarks (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. Admin monthly attendance update"
+                    value={editRemarks}
+                    onChange={(e) => setEditRemarks(e.target.value)}
+                    style={{ padding: '0.45rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: '0.85rem' }}
+                  />
+                </div>
 
-              {/* Action Buttons */}
-              <div className="button-group-row" style={{ marginTop: '0.5rem' }}>
-                <button
-                  type="button"
-                  className="btn-secondary"
-                  onClick={() => setIsEditModalOpen(false)}
-                  disabled={isSubmittingEdit}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={submitEditAttendance}
-                  disabled={isSubmittingEdit}
-                >
-                  {isSubmittingEdit ? 'Saving...' : 'Save Attendance Changes'}
-                </button>
+                {/* Batch Action Buttons */}
+                <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem' }}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedCalendarDates.length > 0) {
+                        handleQuickMarkDateStatus(selectedCalendarDates, 'PRESENT')
+                      } else {
+                        submitEditAttendance()
+                      }
+                    }}
+                    disabled={isSubmittingEdit}
+                    style={{
+                      flex: 1,
+                      padding: '0.6rem',
+                      borderRadius: '8px',
+                      background: '#10B981',
+                      color: '#FFF',
+                      border: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isSubmittingEdit ? 'Updating...' : selectedCalendarDates.length > 0 ? `Mark ${selectedCalendarDates.length} Selected Dates Present` : 'Mark Selected Candidate Present'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (selectedCalendarDates.length > 0) {
+                        handleQuickMarkDateStatus(selectedCalendarDates, 'ABSENT')
+                      } else {
+                        setEditStatus('ABSENT')
+                        submitEditAttendance()
+                      }
+                    }}
+                    disabled={isSubmittingEdit}
+                    style={{
+                      flex: 1,
+                      padding: '0.6rem',
+                      borderRadius: '8px',
+                      background: '#EF4444',
+                      color: '#FFF',
+                      border: 'none',
+                      fontWeight: 700,
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isSubmittingEdit ? 'Updating...' : selectedCalendarDates.length > 0 ? `Mark ${selectedCalendarDates.length} Selected Dates Absent` : 'Mark Selected Candidate Absent'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

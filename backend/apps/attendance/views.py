@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime
+import calendar
+from datetime import date, datetime, time, timedelta
 from django.db import transaction
 from django.http import HttpResponse
 from rest_framework import status
@@ -177,7 +178,10 @@ class AttendanceListView(APIView):
             queryset = queryset.filter(employee_id=request.user.employee_id)
         employee_id = request.query_params.get("employee_id")
         if employee_id:
-            queryset = queryset.filter(employee__employee_id=employee_id)
+            if str(employee_id).isdigit():
+                queryset = queryset.filter(Q(employee__employee_id=employee_id) | Q(employee__id=int(employee_id)))
+            else:
+                queryset = queryset.filter(employee__employee_id=employee_id)
         return Response(AttendanceSerializer(queryset, many=True).data)
 
 
@@ -326,4 +330,113 @@ class ManualAttendanceEditView(APIView):
             "detail": f"Successfully updated attendance for {len(employees)} candidate(s) across {len(dates)} date(s).",
             "updated_count": updated_count,
         })
+
+
+class EmployeeMonthAttendanceView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        employee_id = request.query_params.get("employee_id")
+        year_str = request.query_params.get("year")
+        month_str = request.query_params.get("month")
+
+        if not employee_id:
+            return Response({"detail": "employee_id is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        now = datetime.now()
+        year = int(year_str) if year_str and year_str.isdigit() else now.year
+        month = int(month_str) if month_str and month_str.isdigit() else now.month
+
+        employee = Employee.objects.filter(employee_id=employee_id).first()
+        if not employee:
+            try:
+                employee = Employee.objects.filter(pk=int(employee_id)).first()
+            except (ValueError, TypeError):
+                pass
+        if not employee:
+            return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        num_days = calendar.monthrange(year, month)[1]
+        start_date = date(year, month, 1)
+        end_date = date(year, month, num_days)
+
+        sessions = list(Session.objects.filter(employee=employee, login_time__date__range=(start_date, end_date)).order_by("login_time"))
+        attendances = list(Attendance.objects.filter(employee=employee, timestamp__date__range=(start_date, end_date)).order_by("timestamp"))
+
+        days_data = []
+        present_count = 0
+        unmarked_count = 0
+
+        for d in range(1, num_days + 1):
+            curr_date = date(year, month, d)
+            date_str = curr_date.strftime("%Y-%m-%d")
+            day_name = curr_date.strftime("%a")
+
+            session = next(
+                (s for s in sessions if s.login_time and timezone.localtime(s.login_time).date() == curr_date),
+                None
+            )
+            attendance_rec = next(
+                (a for a in attendances if a.timestamp and timezone.localtime(a.timestamp).date() == curr_date),
+                None
+            )
+
+            if not session and not attendance_rec:
+                days_data.append({
+                    "date": date_str,
+                    "day_number": d,
+                    "day_name": day_name,
+                    "status": "UNMARKED",
+                    "check_in": None,
+                    "check_out": None,
+                    "total_hours": None,
+                })
+                unmarked_count += 1
+            else:
+                present_count += 1
+                login_time = session.login_time if session else attendance_rec.timestamp
+                logout_time = session.logout_time if session else None
+
+                check_in_str = timezone.localtime(login_time).strftime("%I:%M %p") if login_time else None
+                check_out_str = timezone.localtime(logout_time).strftime("%I:%M %p") if logout_time else (
+                    "Active" if session and session.is_active else None
+                )
+
+                hours_str = "Present"
+                if session and session.is_active:
+                    diff = timezone.now() - login_time
+                    h = int(diff.total_seconds() // 3600)
+                    m = int((diff.total_seconds() % 3600) // 60)
+                    hours_str = f"{h}h {m}m"
+                elif logout_time:
+                    diff = logout_time - login_time
+                    h = int(diff.total_seconds() // 3600)
+                    m = int((diff.total_seconds() % 3600) // 60)
+                    hours_str = f"{h}h {m}m"
+
+                days_data.append({
+                    "date": date_str,
+                    "day_number": d,
+                    "day_name": day_name,
+                    "status": "PRESENT",
+                    "check_in": check_in_str,
+                    "check_out": check_out_str,
+                    "total_hours": hours_str,
+                })
+
+        js_starting_day = (start_date.weekday() + 1) % 7
+        return Response({
+            "employee_id": employee.employee_id,
+            "employee_name": employee.name,
+            "profile_photo": employee.profile_photo,
+            "year": year,
+            "month": month,
+            "month_name": date(year, month, 1).strftime("%B %Y"),
+            "starting_day_of_week": js_starting_day,
+            "total_days": num_days,
+            "present_count": present_count,
+            "unmarked_count": unmarked_count,
+            "days": days_data,
+        })
+
 
