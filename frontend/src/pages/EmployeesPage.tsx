@@ -889,7 +889,16 @@ export function EmployeesPage() {
                 </div>
                 <div className="stack" style={{ gap: '0.35rem' }}>
                   <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Profile Picture File</label>
-                  <input type="file" accept="image/*" onChange={(e) => { if (e.target.files && e.target.files.length > 0) setProfilePhotoFile(e.target.files[0]) }} style={{ padding: '0.5rem', fontSize: '0.85rem', color: 'var(--text)', width: '100%' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {(profilePhotoFile || editingEmployee?.profile_photo) && (
+                      <img
+                        src={profilePhotoFile ? URL.createObjectURL(profilePhotoFile) : editingEmployee?.profile_photo}
+                        alt="Profile Preview"
+                        style={{ width: 42, height: 42, borderRadius: '50%', objectFit: 'cover', border: '2px solid var(--primary)', flexShrink: 0 }}
+                      />
+                    )}
+                    <input type="file" accept="image/*" onChange={(e) => { if (e.target.files && e.target.files.length > 0) setProfilePhotoFile(e.target.files[0]) }} style={{ padding: '0.5rem', fontSize: '0.85rem', color: 'var(--text)', width: '100%' }} />
+                  </div>
                 </div>
               </div>
 

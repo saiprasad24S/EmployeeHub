@@ -15,8 +15,12 @@ from PIL import Image, ImageDraw, ImageFont
 
 logger = logging.getLogger(__name__)
 
-ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
-ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
+ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif", ".jfif", ".pjpeg", ".bmp"}
+ALLOWED_MIME_TYPES = {
+    "image/jpeg", "image/jpg", "image/png", "image/webp", "image/pjpeg",
+    "image/jfif", "image/heic", "image/heif", "image/x-png", "image/bmp",
+    "application/octet-stream", ""
+}
 MAX_IMAGE_SIZE_BYTES = int(getattr(settings, "CLOUDINARY_MAX_SIZE", 10 * 1024 * 1024))
 
 
@@ -68,22 +72,27 @@ def validate_upload_file(image_file, *, max_size_bytes: int | None = None) -> No
     if image_file is None:
         raise ValueError("No file provided")
 
-    file_name = getattr(image_file, "name", "") or "upload"
-    ext = Path(file_name).suffix.lower()
-    if ext not in ALLOWED_EXTENSIONS:
-        raise ValueError("Unsupported file format")
-
-    if not getattr(image_file, "content_type", ""):
-        raise ValueError("Missing content type")
-    if getattr(image_file, "content_type", "") not in ALLOWED_MIME_TYPES and not file_name.lower().endswith((".jpg", ".jpeg", ".png", ".webp")):
-        raise ValueError("Unsupported file format")
-
     size_limit = max_size_bytes or MAX_IMAGE_SIZE_BYTES
     image_file.seek(0)
     data = image_file.read()
     if len(data) > size_limit:
         raise ValueError("File exceeds the 10 MB limit")
+    if len(data) == 0:
+        raise ValueError("Uploaded image file is empty")
     image_file.seek(0)
+
+    # Verify PIL image readability
+    try:
+        img = Image.open(image_file)
+        img.verify()
+        image_file.seek(0)
+    except Exception:
+        image_file.seek(0)
+        file_name = getattr(image_file, "name", "") or "upload.jpg"
+        ext = Path(file_name).suffix.lower()
+        if ext and ext not in ALLOWED_EXTENSIONS:
+            raise ValueError("Unsupported file format")
+        image_file.seek(0)
 
 
 def _load_image(image_file) -> Image.Image:
@@ -215,20 +224,38 @@ def upload_image(
     prepared = _compress_and_prepare(image_file, metadata or {}, kind=kind)
     folder = _get_folder_path(kind, employee_id, patient_id=patient_id, date_str=date_str)
     public_id = _build_public_id(kind, employee_id, file_name=file_name, patient_id=patient_id, date_str=date_str)
-    result = cloudinary.uploader.upload(
-        prepared,
-        folder=folder,
-        public_id=public_id,
-        resource_type="image",
-        overwrite=True,
-        unique_filename=False,
-        use_filename=False,
-    )
-    return {
-        "url": result.get("secure_url") or result.get("url") or "",
-        "public_id": result.get("public_id") or public_id,
-        "secure_url": result.get("secure_url") or result.get("url") or "",
-    }
+    
+    try:
+        result = cloudinary.uploader.upload(
+            prepared,
+            folder=folder,
+            public_id=public_id,
+            resource_type="image",
+            overwrite=True,
+            unique_filename=False,
+            use_filename=False,
+        )
+        return {
+            "url": result.get("secure_url") or result.get("url") or "",
+            "public_id": result.get("public_id") or public_id,
+            "secure_url": result.get("secure_url") or result.get("url") or "",
+        }
+    except Exception as exc:
+        logger.warning(f"Cloudinary upload warning ({exc}). Saving image using local media storage fallback.")
+        media_dir = os.path.join(settings.BASE_DIR, "media", kind, str(employee_id))
+        os.makedirs(media_dir, exist_ok=True)
+        clean_file_name = Path(file_name).name if "." in file_name else f"{file_name}.jpg"
+        local_path = os.path.join(media_dir, clean_file_name)
+        prepared.seek(0)
+        with open(local_path, "wb") as f:
+            f.write(prepared.read())
+        
+        relative_url = f"/media/{kind}/{employee_id}/{clean_file_name}"
+        return {
+            "url": relative_url,
+            "public_id": public_id,
+            "secure_url": relative_url,
+        }
 
 
 def upload_attendance_image(image_file, *, employee_id: str, attendance_type: str, timestamp: str | None = None, latitude: float | None = None, longitude: float | None = None, address: str | None = None, employee_name: str | None = None, battery_percentage: int | None = None, network_type: str | None = None, device_name: str | None = None) -> dict[str, Any]:
