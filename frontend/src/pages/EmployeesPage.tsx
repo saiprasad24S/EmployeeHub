@@ -459,6 +459,9 @@ export function EmployeesPage() {
                             <img
                               src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
                               alt={employee.name}
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'
+                              }}
                               style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover', border: '1px solid var(--border)' }}
                             />
                             <button
@@ -604,6 +607,9 @@ export function EmployeesPage() {
                     <img
                       src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
                       alt={employee.name}
+                      onError={(e) => {
+                        (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'
+                      }}
                       style={{ width: '46px', height: '46px', borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
                     />
                     <div style={{ flex: 1, minWidth: 0 }}>

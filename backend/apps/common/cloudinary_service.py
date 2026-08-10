@@ -205,9 +205,8 @@ def _get_folder_path(kind: str, employee_id: str, *, patient_id: str | None = No
 
 
 def _build_public_id(kind: str, employee_id: str, *, file_name: str, patient_id: str | None = None, date_str: str | None = None) -> str:
-    folder = _get_folder_path(kind, employee_id, patient_id=patient_id, date_str=date_str)
     file_stem = Path(file_name).stem
-    return f"{folder}/{file_stem}"
+    return file_stem
 
 
 def upload_image(
