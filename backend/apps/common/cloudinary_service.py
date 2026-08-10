@@ -225,37 +225,22 @@ def upload_image(
     folder = _get_folder_path(kind, employee_id, patient_id=patient_id, date_str=date_str)
     public_id = _build_public_id(kind, employee_id, file_name=file_name, patient_id=patient_id, date_str=date_str)
     
-    try:
-        result = cloudinary.uploader.upload(
-            prepared,
-            folder=folder,
-            public_id=public_id,
-            resource_type="image",
-            overwrite=True,
-            unique_filename=False,
-            use_filename=False,
-        )
-        return {
-            "url": result.get("secure_url") or result.get("url") or "",
-            "public_id": result.get("public_id") or public_id,
-            "secure_url": result.get("secure_url") or result.get("url") or "",
-        }
-    except Exception as exc:
-        logger.warning(f"Cloudinary upload warning ({exc}). Saving image using local media storage fallback.")
-        media_dir = os.path.join(settings.BASE_DIR, "media", kind, str(employee_id))
-        os.makedirs(media_dir, exist_ok=True)
-        clean_file_name = Path(file_name).name if "." in file_name else f"{file_name}.jpg"
-        local_path = os.path.join(media_dir, clean_file_name)
-        prepared.seek(0)
-        with open(local_path, "wb") as f:
-            f.write(prepared.read())
-        
-        relative_url = f"/media/{kind}/{employee_id}/{clean_file_name}"
-        return {
-            "url": relative_url,
-            "public_id": public_id,
-            "secure_url": relative_url,
-        }
+    initialize_cloudinary()
+    result = cloudinary.uploader.upload(
+        prepared,
+        folder=folder,
+        public_id=public_id,
+        resource_type="image",
+        overwrite=True,
+        unique_filename=False,
+        use_filename=False,
+    )
+    url = result.get("secure_url") or result.get("url") or ""
+    return {
+        "url": url,
+        "public_id": result.get("public_id") or public_id,
+        "secure_url": url,
+    }
 
 
 def upload_attendance_image(image_file, *, employee_id: str, attendance_type: str, timestamp: str | None = None, latitude: float | None = None, longitude: float | None = None, address: str | None = None, employee_name: str | None = None, battery_percentage: int | None = None, network_type: str | None = None, device_name: str | None = None) -> dict[str, Any]:
@@ -339,27 +324,14 @@ def upload_invoice_pdf(pdf_bytes: bytes, invoice_number: str) -> str:
     clean_num = invoice_number.replace(" ", "_")
     base_folder = _env("CLOUDINARY_FOLDER", default=getattr(settings, "CLOUDINARY_FOLDER", "skandan"))
     folder = f"{base_folder}/invoices"
-    try:
-        if initialize_cloudinary():
-            res = cloudinary.uploader.upload(
-                io.BytesIO(pdf_bytes),
-                folder=folder,
-                public_id=f"Invoice_{clean_num}",
-                resource_type="raw",
-                overwrite=True,
-            )
-            url = res.get("secure_url") or res.get("url") or ""
-            if url:
-                return url
-    except Exception as exc:
-        logger.warning("Cloudinary invoice PDF upload warning: %s", exc)
-
-    # Fallback to local storage if Cloudinary upload fails
-    pdf_dir = os.path.join(settings.BASE_DIR, "media", "invoices")
-    os.makedirs(pdf_dir, exist_ok=True)
-    pdf_filename = f"Invoice_{clean_num}.pdf"
-    pdf_full_path = os.path.join(pdf_dir, pdf_filename)
-    with open(pdf_full_path, "wb") as f:
-        f.write(pdf_bytes)
-    return f"/media/invoices/{pdf_filename}"
+    initialize_cloudinary()
+    res = cloudinary.uploader.upload(
+        io.BytesIO(pdf_bytes),
+        folder=folder,
+        public_id=f"Invoice_{clean_num}",
+        resource_type="raw",
+        overwrite=True,
+    )
+    url = res.get("secure_url") or res.get("url") or ""
+    return url
 
