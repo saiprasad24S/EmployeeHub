@@ -115,29 +115,33 @@ def generate_invoice_pdf(invoice) -> bytes:
     total_pages = len(pages)
 
     for page_idx, (page_services, is_last_page) in enumerate(pages, 1):
-        # 1. Header (Using Times New Roman font family to match Live Preview)
+        # 1. Header (Exact pixel-perfect alignment matching Live Preview)
         if page_idx == 1:
+            logo_w = 190
+            logo_h = 67.5
+            logo_y = height - 30 - logo_h
             if os.path.exists(logo_path):
-                c.drawImage(logo_path, 30, height - 95, width=240, height=65, preserveAspectRatio=True, mask='auto')
+                c.drawImage(logo_path, 30, logo_y, width=logo_w, height=logo_h, preserveAspectRatio=True, mask='auto')
             
-            # Tagline
+            # Tagline below logo
+            tagline_y = logo_y - 12
             c.setFont("Times-Italic", 9.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.setStrokeColor(colors.HexColor("#0B2C8C"))
             c.setLineWidth(0.5)
-            c.line(30, height - 103, 80, height - 103)
-            c.drawString(85, height - 106, "Strive for service.")
-            c.line(165, height - 103, 215, height - 103)
+            c.line(30, tagline_y + 3, 75, tagline_y + 3)
+            c.drawString(80, tagline_y, "Strive for service.")
+            c.line(165, tagline_y + 3, 210, tagline_y + 3)
 
-            # INVOICE Title
-            c.setFont("Times-BoldItalic", 30)
+            # INVOICE Title (aligned with top edge of logo at height - 30)
+            c.setFont("Times-BoldItalic", 32)
             c.setFillColor(colors.HexColor("#0B2C8C"))
-            c.drawRightString(width - 30, height - 55, "INVOICE")
+            c.drawRightString(width - 30, height - 54, "INVOICE")
 
             # Verification ID
-            c.setFont("Times-Bold", 10)
+            c.setFont("Times-Bold", 10.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
-            c.drawRightString(width - 30, height - 74, f"Verification ID : {disp_hash}")
+            c.drawRightString(width - 30, height - 72, f"Verification ID : {disp_hash}")
 
             # 2. Contact Bar
             bar_y = height - 168
