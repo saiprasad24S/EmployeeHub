@@ -80,6 +80,27 @@ export function EmployeePortal() {
     profileQuery.data?.active_session ??
     profileQuery.data?.session_summary?.is_present,
   )
+
+  const sessionSummary = profileQuery.data?.session_summary
+  const checkInTimeStr = sessionSummary?.check_in_time
+
+  const activeDurationText = useMemo(() => {
+    if (!sessionActive || !checkInTimeStr) return null
+    try {
+      const checkInDate = new Date(checkInTimeStr)
+      const diffMs = Math.max(0, currentTime.getTime() - checkInDate.getTime())
+      const totalSec = Math.floor(diffMs / 1000)
+      const hours = Math.floor(totalSec / 3600)
+      const minutes = Math.floor((totalSec % 3600) / 60)
+      const seconds = totalSec % 60
+      if (hours > 0) {
+        return `${hours}h ${minutes}m ${seconds}s`
+      }
+      return `${minutes}m ${seconds}s`
+    } catch {
+      return null
+    }
+  }, [sessionActive, checkInTimeStr, currentTime])
   // Camera capture state
   const [isCameraOpen, setIsCameraOpen] = useState(false)
   const [cameraMode, setCameraMode] = useState<'register' | 'checkin' | 'checkout'>('checkin')
@@ -768,6 +789,42 @@ export function EmployeePortal() {
                         >
                           🔄 Retry Location Access
                         </button>
+                      </div>
+                    )}
+
+                    {sessionActive && (
+                      <div
+                        style={{
+                          background: 'rgba(16, 185, 129, 0.08)',
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
+                          borderRadius: '12px',
+                          padding: '1rem',
+                          marginBottom: '1.25rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          flexWrap: 'wrap',
+                          gap: '0.75rem',
+                        }}
+                      >
+                        <div>
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#065F46', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                            🟢 Active Duty Session
+                          </div>
+                          {checkInTimeStr && (
+                            <div style={{ fontSize: '0.85rem', color: 'var(--text)', marginTop: '0.2rem', fontWeight: 600 }}>
+                              Check-in Time: {new Date(checkInTimeStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </div>
+                          )}
+                        </div>
+                        {activeDurationText && (
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 600 }}>Active Time</div>
+                            <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10B981', fontFamily: 'monospace' }}>
+                              {activeDurationText}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
 

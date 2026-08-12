@@ -196,9 +196,18 @@ def upload_profile_photo(image_file, *, employee_id: str, employee_name: str | N
 
 def get_employee_presence_summary(employee: Employee, *, reference_time: datetime | None = None) -> dict[str, Any]:
     reference_time = reference_time or timezone.now()
-    today = timezone.localtime(reference_time).date()
+    local_ref = timezone.localtime(reference_time)
+    today = local_ref.date()
     
-    session = Session.objects.filter(employee=employee, login_time__date=today).order_by('-login_time').first()
+    sessions = Session.objects.filter(employee=employee).order_by('-login_time')[:10]
+    session = None
+    for s in sessions:
+        if s.login_time:
+            s_local_date = timezone.localtime(s.login_time).date()
+            if s_local_date == today:
+                session = s
+                break
+
     if not session:
         return {
             'is_present': False,
