@@ -4,6 +4,7 @@ import calendar
 from datetime import date, datetime, time, timedelta
 from django.db import transaction
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -360,8 +361,12 @@ class EmployeeMonthAttendanceView(APIView):
         start_date = date(year, month, 1)
         end_date = date(year, month, num_days)
 
-        sessions = list(Session.objects.filter(employee=employee, login_time__date__range=(start_date, end_date)).order_by("login_time"))
-        attendances = list(Attendance.objects.filter(employee=employee, timestamp__date__range=(start_date, end_date)).order_by("timestamp"))
+        tz = timezone.get_current_timezone()
+        local_start = timezone.make_aware(datetime.combine(start_date, time.min), tz)
+        local_end = timezone.make_aware(datetime.combine(end_date, time.max), tz)
+
+        sessions = list(Session.objects.filter(employee=employee, login_time__range=(local_start, local_end)).order_by("login_time"))
+        attendances = list(Attendance.objects.filter(employee=employee, timestamp__range=(local_start, local_end)).order_by("timestamp"))
 
         days_data = []
         present_count = 0

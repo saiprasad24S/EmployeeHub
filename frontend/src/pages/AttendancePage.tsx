@@ -88,7 +88,17 @@ export function AttendancePage() {
     },
     staleTime: 60_000,
     refetchOnWindowFocus: false,
-    placeholderData: (previousData) => previousData,
+    placeholderData: (previousData: any) => {
+      if (
+        previousData &&
+        previousData.employee_id === activeEmp?.employee_id &&
+        previousData.year === selectedYear &&
+        previousData.month === selectedMonth
+      ) {
+        return previousData
+      }
+      return undefined
+    },
   })
 
   const monthData = candidateMonthlyAttendanceQuery.data
