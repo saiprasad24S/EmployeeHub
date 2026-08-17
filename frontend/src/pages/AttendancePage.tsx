@@ -47,8 +47,6 @@ export function AttendancePage() {
   // Whole Month Attendance Calendar State
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1)
-  const [monthData, setMonthData] = useState<any | null>(null)
-  const [isLoadingMonthData, setIsLoadingMonthData] = useState(false)
   const [selectedCalendarDates, setSelectedCalendarDates] = useState<string[]>([])
 
   // Candidate Search State
@@ -66,40 +64,37 @@ export function AttendancePage() {
       return (Array.isArray(data) ? data : (data.results ?? [])) as Employee[]
     },
     staleTime: 60_000,
-    refetchInterval: 60_000,
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   })
 
   const employees = employeesQuery.data ?? []
 
-  const activeEmp = employees.find((e) => e.id === selectedEmpIds[0])
+  const activeEmpId = selectedEmpIds[0]
+  const activeEmp = useMemo(() => employees.find((e) => e.id === activeEmpId), [employees, activeEmpId])
 
-  const candidateAttendanceQuery = useQuery({
-    queryKey: ['candidate-attendance-history', activeEmp?.id, activeEmp?.employee_id],
-    enabled: !!activeEmp,
+  const candidateMonthlyAttendanceQuery = useQuery({
+    queryKey: ['candidate-month-attendance', activeEmp?.id, activeEmp?.employee_id, selectedYear, selectedMonth],
+    enabled: isEditModalOpen && !!activeEmp,
     queryFn: async () => {
       const token = await getToken()
-      if (!token) return []
-      const url = `/api/attendance/?employee_id=${encodeURIComponent(activeEmp!.employee_id)}`
-      const res = await authedFetch(url, token)
-      if (!res.ok) return []
-      const data = await res.json()
-      return (Array.isArray(data) ? data : (data.results ?? [])) as Array<{
-        created_at: string
-        timestamp?: string
-        session_login_time?: string
-        attendance_type?: string
-      }>
+      if (!token || !activeEmp) return null
+      const res = await authedFetch(
+        `/api/attendance/employee-month?employee_id=${encodeURIComponent(activeEmp.employee_id)}&year=${selectedYear}&month=${selectedMonth}`,
+        token
+      )
+      if (!res.ok) return null
+      return res.json()
     },
-    staleTime: 30_000,
+    staleTime: 60_000,
     refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   })
 
+  const monthData = candidateMonthlyAttendanceQuery.data
+
   // Generate candidate calendar days grid matching Candidate Portal 100% identically
   const calendarGridItems = useMemo(() => {
-    const now = new Date()
     const yr = selectedYear
     const moIdx = selectedMonth - 1
 
@@ -109,14 +104,13 @@ export function AttendancePage() {
     const startingDayOfWeek = firstDay.getDay()
     const totalDays = lastDay.getDate()
 
-    const records = candidateAttendanceQuery.data ?? []
     const presentDates = new Set(
-      records.map((r) => {
-        const dtStr = r.session_login_time || r.timestamp || r.created_at
-        return new Date(dtStr).toDateString()
-      })
+      (monthData?.days || [])
+        .filter((d: any) => d.status === 'PRESENT')
+        .map((d: any) => d.date)
     )
 
+    const now = new Date()
     const items: (any | null)[] = []
 
     // Leading empty weekday padding slots
@@ -136,7 +130,7 @@ export function AttendancePage() {
       const isPast = d < new Date(now.getFullYear(), now.getMonth(), now.getDate())
       const isPastOrToday = isPast || isToday
 
-      const isPresent = presentDates.has(dateStr) || (isToday && (activeEmp?.is_present || activeEmp?.presence_status === 'Present' || activeEmp?.session_login_time !== null))
+      const isPresent = presentDates.has(isoDateStr)
 
       items.push({
         date: isoDateStr,
@@ -151,7 +145,7 @@ export function AttendancePage() {
     }
 
     return items
-  }, [selectedYear, selectedMonth, candidateAttendanceQuery.data, activeEmp])
+  }, [selectedYear, selectedMonth, monthData])
 
   const monthStats = useMemo(() => {
     const validDays = calendarGridItems.filter((item) => item !== null)
@@ -229,42 +223,6 @@ export function AttendancePage() {
     }
   }
 
-  const fetchMonthRef = useRef<AbortController | null>(null)
-
-  const fetchCandidateMonthAttendance = useCallback(async (empIdStr: string, yr: number, mo: number) => {
-    // Abort any in-flight request to prevent stacking
-    fetchMonthRef.current?.abort()
-    const controller = new AbortController()
-    fetchMonthRef.current = controller
-
-    setIsLoadingMonthData(true)
-    try {
-      const token = await getToken()
-      if (!token) return
-      const res = await authedFetch(`/api/attendance/employee-month?employee_id=${encodeURIComponent(empIdStr)}&year=${yr}&month=${mo}`, token)
-      if (controller.signal.aborted) return
-      if (res.ok) {
-        const data = await res.json()
-        if (!controller.signal.aborted) setMonthData(data)
-      }
-    } catch (err: any) {
-      if (err?.name !== 'AbortError') {
-        console.error('Failed to load candidate month attendance:', err)
-      }
-    } finally {
-      if (!controller.signal.aborted) setIsLoadingMonthData(false)
-    }
-  }, [getToken])
-
-  useEffect(() => {
-    if (isEditModalOpen && selectedEmpIds.length > 0) {
-      const emp = employees.find((e) => e.id === selectedEmpIds[0])
-      if (emp) {
-        fetchCandidateMonthAttendance(emp.employee_id, selectedYear, selectedMonth)
-      }
-    }
-  }, [isEditModalOpen, selectedEmpIds, selectedYear, selectedMonth, employees, fetchCandidateMonthAttendance])
-
   const handlePrevMonth = () => {
     if (selectedMonth === 1) {
       setSelectedMonth(12)
@@ -334,13 +292,9 @@ export function AttendancePage() {
       setEditMsg(`Successfully marked ${targetDates.length} date(s) as ${statusToSet}.`)
       setSelectedCalendarDates([])
 
-      const activeEmp = employees.find((e) => e.id === selectedEmpIds[0])
-      if (activeEmp) {
-        fetchCandidateMonthAttendance(activeEmp.employee_id, selectedYear, selectedMonth)
-      }
-      // Targeted invalidation: only refetch candidate history, defer employee list refresh
-      queryClient.invalidateQueries({ queryKey: ['candidate-attendance-history'] })
-      queryClient.invalidateQueries({ queryKey: ['my-attendance-history'] })
+      // Invalidate month attendance query and employee attendance table
+      queryClient.invalidateQueries({ queryKey: ['candidate-month-attendance'] })
+      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
     } catch (err: any) {
       setEditMsg(err.message || 'Error updating attendance.')
     } finally {
@@ -389,13 +343,9 @@ export function AttendancePage() {
       const data = await res.json()
       setEditMsg(data.detail || 'Attendance modified successfully!')
 
-      const activeEmp = employees.find((e) => e.id === selectedEmpIds[0])
-      if (activeEmp) {
-        fetchCandidateMonthAttendance(activeEmp.employee_id, selectedYear, selectedMonth)
-      }
-      // Targeted invalidation: only refetch candidate history, defer employee list refresh
-      queryClient.invalidateQueries({ queryKey: ['candidate-attendance-history'] })
-      queryClient.invalidateQueries({ queryKey: ['my-attendance-history'] })
+      // Invalidate month attendance query and employee attendance table
+      queryClient.invalidateQueries({ queryKey: ['candidate-month-attendance'] })
+      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
     } catch (err: any) {
       setEditMsg(err.message || 'Error saving attendance updates.')
     } finally {
@@ -818,9 +768,10 @@ export function AttendancePage() {
                       <button
                         type="button"
                         onClick={() => {
-                          if (monthData?.days) {
-                            setSelectedCalendarDates(monthData.days.map((d: any) => d.date))
-                          }
+                          const allDates = calendarGridItems
+                            .filter((item): item is NonNullable<typeof item> => item !== null)
+                            .map((d) => d.date)
+                          setSelectedCalendarDates(allDates)
                         }}
                         style={{ background: 'none', border: 'none', color: 'var(--primary)', fontWeight: 600, cursor: 'pointer' }}
                       >
@@ -848,12 +799,7 @@ export function AttendancePage() {
                 </div>
 
                 {/* Days Grid (Exact Candidate Portal Component Style) */}
-                {isLoadingMonthData ? (
-                  <div style={{ padding: '2rem', textAlign: 'center', color: 'var(--muted)', fontSize: '0.9rem' }}>
-                    Loading candidate monthly attendance calendar...
-                  </div>
-                ) : (
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.2rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '0.5rem', maxHeight: '360px', overflowY: 'auto', paddingRight: '0.2rem' }}>
                     {calendarGridItems.map((item, idx) => {
                       if (!item) {
                         return <div key={`empty-${idx}`} style={{ minHeight: '58px', background: 'transparent' }} />
@@ -921,7 +867,6 @@ export function AttendancePage() {
                       )
                     })}
                   </div>
-                )}
               </div>
 
               {/* Batch Action Bar */}
