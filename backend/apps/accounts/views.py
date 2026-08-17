@@ -37,8 +37,18 @@ class AuthLoginView(APIView):
             employee = Employee.objects.filter(pk=principal.employee_id).first()
             if not employee:
                 return Response({"detail": "Employee profile not found."}, status=status.HTTP_404_NOT_FOUND)
-            active_session = Session.objects.filter(employee=employee, is_active=True).exists()
+            
+            from django.utils import timezone
+            today = timezone.localdate()
+            # Auto-close any stale active sessions from previous dates
+            Session.objects.filter(employee=employee, is_active=True, login_time__date__lt=today).update(is_active=False)
+
             presence_summary = get_employee_presence_summary(employee)
+            active_session = bool(
+                presence_summary.get("session")
+                and presence_summary.get("status") == "Present"
+                and getattr(presence_summary.get("session"), "is_active", False)
+            )
             return Response(
                 {
                     "role": "EMPLOYEE",
@@ -51,8 +61,8 @@ class AuthLoginView(APIView):
                         "check_in_time": presence_summary.get("check_in_time"),
                         "check_out_time": presence_summary.get("check_out_time"),
                         "session_duration_seconds": presence_summary.get("session_duration_seconds"),
-                        "is_present": presence_summary.get("is_present"),
-                        "status": presence_summary.get("status"),
+                        "is_present": presence_summary.get("is_present", False),
+                        "status": presence_summary.get("status", "Absent"),
                     },
                 }
             )

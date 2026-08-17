@@ -20,6 +20,32 @@ export function SignUpPage() {
             routing="path"
             signInUrl="/sign-in"
             fallbackRedirectUrl="/"
+            appearance={{
+              elements: {
+                rootBox: {
+                  width: '100%',
+                },
+                card: {
+                  boxShadow: 'none',
+                  border: 'none',
+                  background: 'transparent',
+                },
+                formButtonPrimary: {
+                  backgroundColor: '#0B2C8C',
+                  fontSize: '0.95rem',
+                  fontWeight: 600,
+                  textTransform: 'none',
+                  borderRadius: '10px',
+                  '&:hover': {
+                    backgroundColor: '#061A63',
+                  },
+                },
+                footerActionLink: {
+                  color: '#0B2C8C',
+                  fontWeight: 600,
+                },
+              },
+            }}
           />
         </div>
       </div>

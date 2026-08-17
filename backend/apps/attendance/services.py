@@ -442,7 +442,15 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
 
 @transaction.atomic
 def start_session(employee: Employee) -> Session:
-    active_session = Session.objects.select_for_update().filter(employee=employee, is_active=True).first()
+    today = timezone.localdate()
+    # Close any stale active sessions from past days
+    Session.objects.select_for_update().filter(
+        employee=employee, is_active=True, login_time__date__lt=today
+    ).update(is_active=False)
+
+    active_session = Session.objects.select_for_update().filter(
+        employee=employee, is_active=True, login_time__date=today
+    ).first()
     if active_session:
         return active_session
     return Session.objects.create(employee=employee, is_active=True)

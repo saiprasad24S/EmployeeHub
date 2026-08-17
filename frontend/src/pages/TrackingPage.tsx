@@ -54,6 +54,9 @@ export function TrackingPage() {
       const data = await response.json()
       return (Array.isArray(data) ? data : (data.results ?? [])) as Employee[]
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   })
 
   // Query present locations for the default map view
@@ -66,7 +69,10 @@ export function TrackingPage() {
       if (!response.ok) throw new Error('Unable to load present locations')
       return response.json() as Promise<LiveLocation[]>
     },
-    refetchInterval: 30000,
+    refetchInterval: 30_000,
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   })
 
   const employees = employeesQuery.data ?? []
@@ -98,7 +104,10 @@ export function TrackingPage() {
         session_duration_seconds: number | null
       }>
     },
-    refetchInterval: selectedEmployee?.id ? 15000 : undefined, // Refetch every 15s when tracking a single employee
+    refetchInterval: selectedEmployee?.id ? 15_000 : undefined,
+    staleTime: 10_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   })
 
   // Filter present employees list for default map view

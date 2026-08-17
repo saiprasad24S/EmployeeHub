@@ -133,6 +133,8 @@ export function InvoicePage() {
       if (!res.ok) return { next_invoice_number: '1369-0001' }
       return res.json()
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   })
 
   // Set initial invoice number when nextNumQuery finishes
@@ -153,6 +155,9 @@ export function InvoicePage() {
       if (!res.ok) return []
       return (await res.json()) as Invoice[]
     },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   })
 
   // Analytics
@@ -221,18 +226,21 @@ export function InvoicePage() {
     },
   })
 
-  // Auto-Save Draft
+  // Auto-Save Draft (stable interval — uses ref to avoid re-creating timer on every keystroke)
+  const invoiceDataRef = useRef(invoiceData)
+  invoiceDataRef.current = invoiceData
+
   useEffect(() => {
     const interval = setInterval(() => {
       setIsAutoSaving(true)
-      safeStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceData))
+      safeStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceDataRef.current))
       setTimeout(() => {
         setIsAutoSaving(false)
         setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
       }, 600)
     }, 5000)
     return () => clearInterval(interval)
-  }, [invoiceData])
+  }, [])
 
   const handleOpenEditor = (type: 'REGULAR' | 'SCHOOL' | 'MULTI_SERVICE') => {
     const nextNum = nextNumQuery.data?.next_invoice_number || '1369-0001'

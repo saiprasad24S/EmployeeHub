@@ -76,10 +76,13 @@ export function EmployeePortal() {
 
   const profile = profileQuery.data?.employee ?? null
   const sessionActive = Boolean(
-    profileQuery.data?.session_summary?.active_session ??
-    profileQuery.data?.active_session ??
-    profileQuery.data?.session_summary?.is_present,
+    profileQuery.data?.session_summary?.active_session &&
+    profileQuery.data?.session_summary?.status === 'Present'
   )
+
+  useEffect(() => {
+    safeStorage.setItem('skandan_active_session', sessionActive ? 'true' : 'false')
+  }, [sessionActive])
 
   const sessionSummary = profileQuery.data?.session_summary
   const checkInTimeStr = sessionSummary?.check_in_time
@@ -276,6 +279,8 @@ export function EmployeePortal() {
       }
       return res.json() as Promise<AssignmentData>
     },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
   })
 
   // Fetch today's routing map points
@@ -289,6 +294,9 @@ export function EmployeePortal() {
       if (!res.ok) throw new Error('Failed to load route')
       return res.json() as Promise<{ route: Array<{ latitude: number; longitude: number }> }>
     },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   })
   const routePoints = routeQuery.data?.route ?? []
 
@@ -304,6 +312,9 @@ export function EmployeePortal() {
       const data = await res.json()
       return (data.results ?? data ?? []) as Array<{ created_at: string; timestamp?: string; session_login_time?: string; attendance_type: string }>
     },
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   })
 
   const calendarData = useMemo(() => {
@@ -338,19 +349,22 @@ export function EmployeePortal() {
       const isToday = dateStr === now.toDateString()
       const isPast = d < new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-      const isPresent = presentDates.has(dateStr) || (isToday && (sessionActive || profile?.active_session))
+      const isCheckedInToday = Boolean(
+        sessionActive || sessionSummary?.status === 'Present' || sessionSummary?.status === 'Checked Out'
+      )
+      const isPresent = presentDates.has(dateStr) || (isToday && (isCheckedInToday || presentDates.has(dateStr)))
 
       days.push({
         dayNumber: day,
         dateStr,
         isToday,
         isPast,
-        isPresent: isToday ? (sessionActive || profile?.active_session || presentDates.has(dateStr)) : isPresent,
+        isPresent,
       })
     }
 
     return { monthName, days }
-  }, [attendanceHistoryQuery.data, profile, sessionActive])
+  }, [attendanceHistoryQuery.data, sessionActive, sessionSummary])
 
   // Background tracker: fires coordinate posts every 45s when session is active
   useEffect(() => {

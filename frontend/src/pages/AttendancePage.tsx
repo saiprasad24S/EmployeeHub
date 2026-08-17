@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch, API_BASE_URL } from '../lib/api'
@@ -65,8 +65,9 @@ export function AttendancePage() {
       const data = await response.json()
       return (Array.isArray(data) ? data : (data.results ?? [])) as Employee[]
     },
-    staleTime: 15000,
-    refetchInterval: 15000,
+    staleTime: 60_000,
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: false,
     placeholderData: (previousData) => previousData,
   })
 
@@ -91,7 +92,9 @@ export function AttendancePage() {
         attendance_type?: string
       }>
     },
-    staleTime: 5000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   })
 
   // Generate candidate calendar days grid matching Candidate Portal 100% identically
@@ -226,31 +229,41 @@ export function AttendancePage() {
     }
   }
 
-  const fetchCandidateMonthAttendance = async (empIdStr: string, yr: number, mo: number) => {
+  const fetchMonthRef = useRef<AbortController | null>(null)
+
+  const fetchCandidateMonthAttendance = useCallback(async (empIdStr: string, yr: number, mo: number) => {
+    // Abort any in-flight request to prevent stacking
+    fetchMonthRef.current?.abort()
+    const controller = new AbortController()
+    fetchMonthRef.current = controller
+
     setIsLoadingMonthData(true)
     try {
       const token = await getToken()
       if (!token) return
       const res = await authedFetch(`/api/attendance/employee-month?employee_id=${encodeURIComponent(empIdStr)}&year=${yr}&month=${mo}`, token)
+      if (controller.signal.aborted) return
       if (res.ok) {
         const data = await res.json()
-        setMonthData(data)
+        if (!controller.signal.aborted) setMonthData(data)
       }
-    } catch (err) {
-      console.error('Failed to load candidate month attendance:', err)
+    } catch (err: any) {
+      if (err?.name !== 'AbortError') {
+        console.error('Failed to load candidate month attendance:', err)
+      }
     } finally {
-      setIsLoadingMonthData(false)
+      if (!controller.signal.aborted) setIsLoadingMonthData(false)
     }
-  }
+  }, [getToken])
 
   useEffect(() => {
     if (isEditModalOpen && selectedEmpIds.length > 0) {
-      const activeEmp = employees.find((e) => e.id === selectedEmpIds[0])
-      if (activeEmp) {
-        fetchCandidateMonthAttendance(activeEmp.employee_id, selectedYear, selectedMonth)
+      const emp = employees.find((e) => e.id === selectedEmpIds[0])
+      if (emp) {
+        fetchCandidateMonthAttendance(emp.employee_id, selectedYear, selectedMonth)
       }
     }
-  }, [isEditModalOpen, selectedEmpIds, selectedYear, selectedMonth])
+  }, [isEditModalOpen, selectedEmpIds, selectedYear, selectedMonth, employees, fetchCandidateMonthAttendance])
 
   const handlePrevMonth = () => {
     if (selectedMonth === 1) {
@@ -325,10 +338,9 @@ export function AttendancePage() {
       if (activeEmp) {
         fetchCandidateMonthAttendance(activeEmp.employee_id, selectedYear, selectedMonth)
       }
+      // Targeted invalidation: only refetch candidate history, defer employee list refresh
       queryClient.invalidateQueries({ queryKey: ['candidate-attendance-history'] })
       queryClient.invalidateQueries({ queryKey: ['my-attendance-history'] })
-      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
-      queryClient.invalidateQueries({ queryKey: ['employees'] })
     } catch (err: any) {
       setEditMsg(err.message || 'Error updating attendance.')
     } finally {
@@ -381,10 +393,9 @@ export function AttendancePage() {
       if (activeEmp) {
         fetchCandidateMonthAttendance(activeEmp.employee_id, selectedYear, selectedMonth)
       }
+      // Targeted invalidation: only refetch candidate history, defer employee list refresh
       queryClient.invalidateQueries({ queryKey: ['candidate-attendance-history'] })
       queryClient.invalidateQueries({ queryKey: ['my-attendance-history'] })
-      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
-      queryClient.invalidateQueries({ queryKey: ['employees'] })
     } catch (err: any) {
       setEditMsg(err.message || 'Error saving attendance updates.')
     } finally {

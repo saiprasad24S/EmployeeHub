@@ -77,7 +77,10 @@ export function EmployeesPage() {
       const data = await response.json()
       return (Array.isArray(data) ? data : (data.results ?? [])) as Employee[]
     },
-    refetchInterval: 30000,
+    staleTime: 30_000,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: false,
+    placeholderData: (previousData) => previousData,
   })
 
   const routeQuery = useQuery({
