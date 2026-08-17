@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState, useEffect } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
-import { SignedIn, SignedOut, SignOutButton, useAuth } from '@clerk/clerk-react'
+import { AuthenticateWithRedirectCallback, SignedIn, SignedOut, SignOutButton, useAuth } from '@clerk/clerk-react'
 import { AppShell } from './components/AppShell'
 import { authedFetch } from './lib/api'
 import { useLocationTracker } from './hooks/useLocationTracker'
@@ -153,6 +153,10 @@ export default function App() {
               </SignedIn>
             </>
           }
+        />
+        <Route
+          path="/sso-callback"
+          element={<AuthenticateWithRedirectCallback />}
         />
         <Route
           path="/*"

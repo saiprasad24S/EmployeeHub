@@ -1,7 +1,30 @@
 import { useState } from 'react'
 import { useSignIn } from '@clerk/clerk-react'
 import { Link, useNavigate } from 'react-router-dom'
-import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, ArrowLeft, KeyRound, CheckCircle2 } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, LogIn, AlertCircle, ArrowLeft, CheckCircle2 } from 'lucide-react'
+
+function GoogleIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" style={{ display: 'inline-block' }}>
+      <path
+        fill="#4285F4"
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+      />
+      <path
+        fill="#34A853"
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+      />
+      <path
+        fill="#FBBC05"
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+      />
+      <path
+        fill="#EA4335"
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+      />
+    </svg>
+  )
+}
 
 export function LoginPage() {
   const { isLoaded, signIn, setActive } = useSignIn()
@@ -11,9 +34,10 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [googleLoading, setGoogleLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Forgot password flow states
+  // Forgot password states
   const [showForgot, setShowForgot] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
   const [resetCode, setResetCode] = useState('')
@@ -21,6 +45,28 @@ export function LoginPage() {
   const [resetStep, setResetStep] = useState<'REQUEST' | 'VERIFY' | 'SUCCESS'>('REQUEST')
   const [resetLoading, setResetLoading] = useState(false)
   const [resetError, setResetError] = useState<string | null>(null)
+
+  const handleGoogleSignIn = async () => {
+    if (!isLoaded || !signIn) return
+    setGoogleLoading(true)
+    setError(null)
+    try {
+      await signIn.authenticateWithRedirect({
+        strategy: 'oauth_google',
+        redirectUrl: '/sso-callback',
+        redirectUrlComplete: '/',
+      })
+    } catch (err: any) {
+      console.error('Google sign in error:', err)
+      const msg =
+        err?.errors?.[0]?.longMessage ||
+        err?.errors?.[0]?.message ||
+        err?.message ||
+        'Google sign-in could not be completed. Please use Email & Password.'
+      setError(msg)
+      setGoogleLoading(false)
+    }
+  }
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -39,7 +85,7 @@ export function LoginPage() {
     setError(null)
 
     try {
-      // Direct Email + Password authentication through Clerk (Bypasses email OTP flow)
+      // Direct Email + Password authentication (no OTPs)
       const result = await signIn.create({
         identifier: email.trim(),
         password: password,
@@ -49,7 +95,6 @@ export function LoginPage() {
         await setActive({ session: result.createdSessionId })
         navigate('/', { replace: true })
       } else if (result.status === 'needs_first_factor') {
-        // Attempt first factor with password directly if required
         const factorRes = await signIn.attemptFirstFactor({
           strategy: 'password',
           password: password,
@@ -95,7 +140,7 @@ export function LoginPage() {
         err?.errors?.[0]?.longMessage ||
         err?.errors?.[0]?.message ||
         err?.message ||
-        'Could not initiate password reset. Please verify your email or contact your administrator.'
+        'Could not initiate password reset. Please contact your administrator.'
       setResetError(msg)
     } finally {
       setResetLoading(false)
@@ -158,14 +203,13 @@ export function LoginPage() {
 
         <div className="auth-card" style={{ padding: '2rem 1.75rem', background: 'var(--panel)', borderRadius: '16px', border: '1px solid var(--panel-border)', boxShadow: '0 10px 30px rgba(0,0,0,0.06)' }}>
           {!showForgot ? (
-            /* Standard Email + Password Sign In Form */
-            <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
               <div style={{ textAlign: 'center', marginBottom: '0.25rem' }}>
                 <h2 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0, color: 'var(--text)' }}>
                   Sign In
                 </h2>
                 <p style={{ fontSize: '0.85rem', color: 'var(--muted)', marginTop: '0.25rem' }}>
-                  Enter your email and password to access your account
+                  Sign in with your Google account or email & password
                 </p>
               </div>
 
@@ -189,159 +233,195 @@ export function LoginPage() {
                 </div>
               )}
 
-              {/* Email Input */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>
-                  Email Address
-                </label>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Mail
-                    size={18}
-                    style={{ position: 'absolute', left: '12px', color: 'var(--muted)', pointerEvents: 'none' }}
-                  />
-                  <input
-                    type="email"
-                    placeholder="name@skandanhomecarre.com"
-                    value={email}
-                    onChange={(e) => {
-                      setEmail(e.target.value)
-                      if (error) setError(null)
-                    }}
-                    required
-                    autoFocus
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 1rem 0.75rem 2.5rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg)',
-                      color: 'var(--text)',
-                      fontSize: '0.92rem',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      transition: 'border-color 0.2s',
-                    }}
-                  />
-                </div>
-              </div>
-
-              {/* Password Input */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>
-                    Password
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForgot(true)
-                      setResetEmail(email)
-                      setError(null)
-                    }}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      padding: 0,
-                      fontSize: '0.8rem',
-                      color: '#0B2C8C',
-                      fontWeight: 600,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                  <Lock
-                    size={18}
-                    style={{ position: 'absolute', left: '12px', color: 'var(--muted)', pointerEvents: 'none' }}
-                  />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    value={password}
-                    onChange={(e) => {
-                      setPassword(e.target.value)
-                      if (error) setError(null)
-                    }}
-                    required
-                    style={{
-                      width: '100%',
-                      padding: '0.75rem 2.75rem 0.75rem 2.5rem',
-                      borderRadius: '10px',
-                      border: '1px solid var(--border)',
-                      background: 'var(--bg)',
-                      color: 'var(--text)',
-                      fontSize: '0.92rem',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      transition: 'border-color 0.2s',
-                    }}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '12px',
-                      background: 'none',
-                      border: 'none',
-                      color: 'var(--muted)',
-                      cursor: 'pointer',
-                      padding: '4px',
-                      display: 'flex',
-                      alignItems: 'center',
-                    }}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Submit Button */}
+              {/* 1-Click Continue with Google Button */}
               <button
-                type="submit"
-                disabled={loading || !isLoaded}
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={googleLoading || loading || !isLoaded}
                 style={{
                   width: '100%',
-                  padding: '0.85rem',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #0B2C8C 0%, #1A4DD8 100%)',
-                  color: '#ffffff',
-                  border: 'none',
-                  fontSize: '0.95rem',
-                  fontWeight: 700,
-                  cursor: loading ? 'not-allowed' : 'pointer',
+                  padding: '0.75rem 1rem',
+                  borderRadius: '12px',
+                  background: '#ffffff',
+                  color: '#1f2937',
+                  border: '1.5px solid #e5e7eb',
+                  fontSize: '0.92rem',
+                  fontWeight: 600,
+                  cursor: googleLoading ? 'not-allowed' : 'pointer',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  gap: '0.5rem',
-                  boxShadow: '0 4px 14px rgba(11, 44, 140, 0.25)',
-                  marginTop: '0.25rem',
-                  opacity: loading ? 0.75 : 1,
-                  transition: 'transform 0.15s ease',
+                  gap: '0.75rem',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.08)',
+                  transition: 'background 0.2s, border-color 0.2s',
                 }}
               >
-                {loading ? (
-                  <>
-                    <span className="spinner" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-                    Signing In...
-                  </>
+                {googleLoading ? (
+                  <span className="spinner" style={{ width: '16px', height: '16px', border: '2px solid #cbd5e1', borderTopColor: '#0B2C8C', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
                 ) : (
-                  <>
-                    <LogIn size={18} />
-                    Sign In
-                  </>
+                  <GoogleIcon />
                 )}
+                <span>Continue with Google</span>
               </button>
 
-              <div style={{ textAlign: 'center', marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
-                Don't have an account?{' '}
-                <Link to="/sign-up" style={{ color: '#0B2C8C', fontWeight: 700, textDecoration: 'none' }}>
-                  Sign up
-                </Link>
+              {/* Divider */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', margin: '0.25rem 0' }}>
+                <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
+                <span style={{ fontSize: '0.75rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  or with email & password
+                </span>
+                <div style={{ flex: 1, height: '1px', background: 'var(--border)' }} />
               </div>
-            </form>
+
+              {/* Direct Email + Password Form */}
+              <form onSubmit={handleLoginSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>
+                    Email Address
+                  </label>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Mail
+                      size={18}
+                      style={{ position: 'absolute', left: '12px', color: 'var(--muted)', pointerEvents: 'none' }}
+                    />
+                    <input
+                      type="email"
+                      placeholder="name@gmail.com"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value)
+                        if (error) setError(null)
+                      }}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 1rem 0.75rem 2.5rem',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg)',
+                        color: 'var(--text)',
+                        fontSize: '0.92rem',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>
+                      Password
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgot(true)
+                        setResetEmail(email)
+                        setError(null)
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        padding: 0,
+                        fontSize: '0.8rem',
+                        color: '#0B2C8C',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      Forgot password?
+                    </button>
+                  </div>
+                  <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                    <Lock
+                      size={18}
+                      style={{ position: 'absolute', left: '12px', color: 'var(--muted)', pointerEvents: 'none' }}
+                    />
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value)
+                        if (error) setError(null)
+                      }}
+                      required
+                      style={{
+                        width: '100%',
+                        padding: '0.75rem 2.75rem 0.75rem 2.5rem',
+                        borderRadius: '10px',
+                        border: '1px solid var(--border)',
+                        background: 'var(--bg)',
+                        color: 'var(--text)',
+                        fontSize: '0.92rem',
+                        outline: 'none',
+                        boxSizing: 'border-box',
+                      }}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{
+                        position: 'absolute',
+                        right: '12px',
+                        background: 'none',
+                        border: 'none',
+                        color: 'var(--muted)',
+                        cursor: 'pointer',
+                        padding: '4px',
+                        display: 'flex',
+                        alignItems: 'center',
+                      }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={loading || !isLoaded}
+                  style={{
+                    width: '100%',
+                    padding: '0.85rem',
+                    borderRadius: '10px',
+                    background: 'linear-gradient(135deg, #0B2C8C 0%, #1A4DD8 100%)',
+                    color: '#ffffff',
+                    border: 'none',
+                    fontSize: '0.95rem',
+                    fontWeight: 700,
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    boxShadow: '0 4px 14px rgba(11, 44, 140, 0.25)',
+                    marginTop: '0.25rem',
+                    opacity: loading ? 0.75 : 1,
+                  }}
+                >
+                  {loading ? (
+                    <>
+                      <span className="spinner" style={{ width: '16px', height: '16px', border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
+                      Signing In...
+                    </>
+                  ) : (
+                    <>
+                      <LogIn size={18} />
+                      Sign In with Password
+                    </>
+                  )}
+                </button>
+
+                <div style={{ textAlign: 'center', marginTop: '0.5rem', fontSize: '0.85rem', color: 'var(--muted)' }}>
+                  Don't have an account?{' '}
+                  <Link to="/sign-up" style={{ color: '#0B2C8C', fontWeight: 700, textDecoration: 'none' }}>
+                    Sign up
+                  </Link>
+                </div>
+              </form>
+            </div>
           ) : (
             /* Forgot Password Flow */
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2rem' }}>
@@ -392,7 +472,7 @@ export function LoginPage() {
               {resetStep === 'REQUEST' && (
                 <form onSubmit={handleRequestPasswordReset} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                   <p style={{ fontSize: '0.85rem', color: 'var(--muted)', margin: 0, lineHeight: 1.5 }}>
-                    Enter your account email address. If email delivery is active, a password reset code will be sent.
+                    Enter your account email address. A password reset code will be sent.
                   </p>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
                     <label style={{ fontSize: '0.82rem', fontWeight: 600, color: 'var(--text)' }}>
@@ -402,7 +482,7 @@ export function LoginPage() {
                       <Mail size={18} style={{ position: 'absolute', left: '12px', color: 'var(--muted)' }} />
                       <input
                         type="email"
-                        placeholder="name@skandanhomecarre.com"
+                        placeholder="name@gmail.com"
                         value={resetEmail}
                         onChange={(e) => setResetEmail(e.target.value)}
                         required
@@ -436,9 +516,6 @@ export function LoginPage() {
                   >
                     {resetLoading ? 'Sending Reset Request...' : 'Send Reset Code'}
                   </button>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--muted)', background: 'var(--bg)', padding: '0.75rem', borderRadius: '8px', lineHeight: 1.4 }}>
-                    ℹ️ <strong>Note:</strong> If email quota is reached on development Clerk, contact your Administrator to set or update your password directly.
-                  </div>
                 </form>
               )}
 
