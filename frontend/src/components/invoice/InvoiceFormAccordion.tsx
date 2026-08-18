@@ -92,17 +92,36 @@ const InputField: React.FC<{
         {label}
       </label>
       <div style={{ position: 'relative' }}>
-        <div style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#9CA3AF', display: 'flex' }}>
+        <div
+          style={{
+            position: 'absolute',
+            left: 10,
+            top: isTextarea ? 10 : '50%',
+            transform: isTextarea ? 'none' : 'translateY(-50%)',
+            color: '#9CA3AF',
+            display: 'flex',
+            alignItems: 'center',
+            pointerEvents: 'none',
+          }}
+        >
           {icon}
         </div>
         {isTextarea ? (
           <textarea
             value={value}
+            placeholder={placeholder}
             onChange={e => onChange(e.target.value)}
             readOnly={readOnly}
             onFocus={handleFocus}
             onBlur={handleBlur}
-            style={{ ...baseInputStyle, minHeight: 70, resize: 'vertical', paddingTop: 10 }}
+            rows={3}
+            style={{
+              ...baseInputStyle,
+              minHeight: 68,
+              resize: 'vertical',
+              paddingTop: 8,
+              lineHeight: '1.45',
+            }}
           />
         ) : options ? (
           <select

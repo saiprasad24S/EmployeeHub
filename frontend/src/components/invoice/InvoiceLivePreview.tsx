@@ -271,56 +271,56 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
       {pageNumber === 1 && (
         <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
           {/* Billed To */}
-          <div style={{ flex: 1, border: '1px solid #DCE7FF', borderTop: '3px solid #0B2C8C', borderRadius: '4px', padding: '10px', fontSize: '11px' }}>
+          <div style={{ flex: 1, border: '1px solid #DCE7FF', borderTop: '3px solid #0B2C8C', borderRadius: '4px', padding: '10px', fontSize: '11px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', color: '#0B2C8C', fontWeight: 'bold', marginBottom: '8px' }}>
-              <User size={16} style={{ marginRight: '5px' }} /> BILLED TO
+              <User size={16} style={{ marginRight: '5px', flexShrink: 0 }} /> BILLED TO
             </div>
             {data.invoiceType === 'SCHOOL' ? (
-               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                 <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>School:</span> <strong>{data.clientName}</strong></div>
-                 <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Branch:</span> <span>{data.schoolBranch}</span></div>
-                 <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Contact:</span> <span>{data.clientContact}</span></div>
-                 <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Address:</span> <span>{data.clientAddress}</span></div>
+               <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                 <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>School:</span> <strong style={{ flex: 1, wordBreak: 'break-word' }}>{data.clientName}</strong></div>
+                 {data.schoolBranch && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Branch:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.schoolBranch}</span></div>}
+                 <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Contact:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.clientContact}</span></div>
+                 <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Address:</span> <span style={{ flex: 1, wordBreak: 'break-word', whiteSpace: 'pre-wrap', lineHeight: '1.35' }}>{data.clientAddress}</span></div>
                </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Name:</span> <strong>{data.clientName}</strong></div>
-                {data.contactPerson && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Contact Person:</span> <span>{data.contactPerson}</span></div>}
-                <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Contact No:</span> <span>{data.clientContact}</span></div>
-                <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Address:</span> <span>{data.clientAddress}</span></div>
-                {data.clientGst && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>GST No:</span> <span>{data.clientGst}</span></div>}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Name:</span> <strong style={{ flex: 1, wordBreak: 'break-word' }}>{data.clientName}</strong></div>
+                {data.contactPerson && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Contact Person:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.contactPerson}</span></div>}
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Contact No:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.clientContact}</span></div>
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Address:</span> <span style={{ flex: 1, wordBreak: 'break-word', whiteSpace: 'pre-wrap', lineHeight: '1.35' }}>{data.clientAddress}</span></div>
+                {data.clientGst && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>GST No:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.clientGst}</span></div>}
               </div>
             )}
           </div>
 
           {/* Service Profile */}
-          <div style={{ flex: 1, border: '1px solid #DCE7FF', borderTop: '3px solid #0B2C8C', borderRadius: '4px', padding: '10px', fontSize: '11px' }}>
+          <div style={{ flex: 1, border: '1px solid #DCE7FF', borderTop: '3px solid #0B2C8C', borderRadius: '4px', padding: '10px', fontSize: '11px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', color: '#0B2C8C', fontWeight: 'bold', marginBottom: '8px' }}>
-              <Settings size={16} style={{ marginRight: '5px' }} /> SERVICE PROFILE
+              <Settings size={16} style={{ marginRight: '5px', flexShrink: 0 }} /> SERVICE PROFILE
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {(data.invoiceType === 'MULTI_SERVICE' || data.invoiceType === 'REGULAR') && data.patientName && (
                 <>
-                  <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Patient:</span> <strong>{data.patientName}</strong></div>
-                  {data.patientAgeGender && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Age/Gender:</span> <span>{data.patientAgeGender}</span></div>}
+                  <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Patient:</span> <strong style={{ flex: 1, wordBreak: 'break-word' }}>{data.patientName}</strong></div>
+                  {data.patientAgeGender && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Age/Gender:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.patientAgeGender}</span></div>}
                 </>
               )}
-              {data.serviceType && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Service Type:</span> <span>{data.serviceType}</span></div>}
-              {data.consultant && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Consultant:</span> <span>{data.consultant}</span></div>}
-              {data.serviceStarted && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Started On:</span> <span>{formatDisplayDate(data.serviceStarted)}</span></div>}
-              {data.renderedDays && <div style={{ display: 'flex' }}><span style={{ width: '80px', color: '#666' }}>Rendered:</span> <span>{data.renderedDays}</span></div>}
+              {data.serviceType && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Service Type:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.serviceType}</span></div>}
+              {data.consultant && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Consultant:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.consultant}</span></div>}
+              {data.serviceStarted && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Started On:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{formatDisplayDate(data.serviceStarted)}</span></div>}
+              {data.renderedDays && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#666' }}>Rendered:</span> <span style={{ flex: 1, wordBreak: 'break-word' }}>{data.renderedDays}</span></div>}
             </div>
           </div>
 
           {/* Other Information */}
-          <div style={{ flex: 1, border: '1px solid #DCE7FF', borderTop: '3px solid #0B2C8C', borderRadius: '4px', padding: '10px', fontSize: '11px' }}>
+          <div style={{ flex: 1, border: '1px solid #DCE7FF', borderTop: '3px solid #0B2C8C', borderRadius: '4px', padding: '10px', fontSize: '11px', display: 'flex', flexDirection: 'column' }}>
             <div style={{ display: 'flex', alignItems: 'center', color: '#0B2C8C', fontWeight: 'bold', marginBottom: '8px' }}>
-              <Info size={16} style={{ marginRight: '5px' }} /> OTHER INFORMATION
+              <Info size={16} style={{ marginRight: '5px', flexShrink: 0 }} /> OTHER INFORMATION
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-              <div style={{ display: 'flex' }}><span style={{ width: '100px', color: '#666' }}>Per Day Chg:</span> <strong>₹ {data.perDayCharges}</strong></div>
-              <div style={{ display: 'flex' }}><span style={{ width: '100px', color: '#666' }}>Adv. Amount:</span> <span>₹ {data.advanceReceived}</span></div>
-              <div style={{ display: 'flex' }}><span style={{ width: '100px', color: '#666' }}>Payment Status:</span> <span style={{ color: '#0B2C8C', fontWeight: 'bold' }}>{data.paymentStatus}</span></div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '95px', minWidth: '95px', flexShrink: 0, color: '#666' }}>Per Day Chg:</span> <strong style={{ flex: 1 }}>₹ {data.perDayCharges}</strong></div>
+              <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '95px', minWidth: '95px', flexShrink: 0, color: '#666' }}>Adv. Amount:</span> <span style={{ flex: 1 }}>₹ {data.advanceReceived}</span></div>
+              <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '95px', minWidth: '95px', flexShrink: 0, color: '#666' }}>Payment Status:</span> <span style={{ flex: 1, color: '#0B2C8C', fontWeight: 'bold' }}>{data.paymentStatus}</span></div>
             </div>
           </div>
         </div>
