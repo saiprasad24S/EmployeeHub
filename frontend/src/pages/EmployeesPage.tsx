@@ -146,9 +146,17 @@ export function EmployeesPage() {
       }
       return res.json()
     },
-    onSuccess: () => {
+    onSuccess: (updatedEmployee) => {
+      if (updatedEmployee && updatedEmployee.id) {
+        queryClient.setQueryData<Employee[]>(['employees'], (old = []) =>
+          old.map((emp) => (emp.id === updatedEmployee.id ? { ...emp, ...updatedEmployee } : emp))
+        )
+      }
       queryClient.invalidateQueries({ queryKey: ['employees'] })
       queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
+      if (updatedEmployee && selectedEmployee && selectedEmployee.id === updatedEmployee.id) {
+        setSelectedEmployee((prev) => (prev ? { ...prev, ...updatedEmployee } : null))
+      }
       closeForm()
     },
     onError: (err: any) => {
@@ -316,11 +324,35 @@ export function EmployeesPage() {
     }
 
     let finalAddress = defaultAddress
-    if (latitude && longitude && !finalAddress.trim()) {
+    let finalLat = latitude
+    let finalLon = longitude
+
+    // If address is provided and was changed or coordinates are blank, forward-geocode
+    if (finalAddress.trim() && (!finalLat || !finalLon || (editingEmployee && finalAddress.trim() !== (editingEmployee.default_address || '').trim()))) {
       setIsGeocoding(true)
       try {
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(finalAddress)}&limit=1`
+        )
+        if (res.ok) {
+          const data = await res.json()
+          if (data && data.length > 0) {
+            finalLat = parseFloat(data[0].lat).toFixed(7)
+            finalLon = parseFloat(data[0].lon).toFixed(7)
+            setLatitude(finalLat)
+            setLongitude(finalLon)
+          }
+        }
+      } catch {
+        // Fall back to backend auto-geocoding
+      } finally {
+        setIsGeocoding(false)
+      }
+    } else if (finalLat && finalLon && !finalAddress.trim()) {
+      setIsGeocoding(true)
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLon)}`
         )
         if (res.ok) {
           const data = await res.json()
@@ -344,8 +376,8 @@ export function EmployeesPage() {
     formData.append('department', department)
     formData.append('designation', designation)
     formData.append('default_address', finalAddress)
-    if (latitude) formData.append('default_latitude', latitude)
-    if (longitude) formData.append('default_longitude', longitude)
+    if (finalLat) formData.append('default_latitude', finalLat)
+    if (finalLon) formData.append('default_longitude', finalLon)
     formData.append('default_radius', radius)
     formData.append('shift_name', shiftName)
     formData.append('shift_start_time', shiftStartTime)

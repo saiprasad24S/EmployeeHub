@@ -113,7 +113,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
-        if employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
+        if employee.default_address and (employee.default_latitude is None or employee.default_longitude is None):
+            from apps.attendance.services import ensure_default_coordinates
+            ensure_default_coordinates(employee)
+        elif employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
             from apps.attendance.services import ensure_default_address
             ensure_default_address(employee)
         if request.FILES.get("profile_photo_file"):
@@ -140,7 +143,10 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
-        if employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
+        if employee.default_address and (employee.default_latitude is None or employee.default_longitude is None):
+            from apps.attendance.services import ensure_default_coordinates
+            ensure_default_coordinates(employee)
+        elif employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
             from apps.attendance.services import ensure_default_address
             ensure_default_address(employee)
         if request.FILES.get("profile_photo_file"):

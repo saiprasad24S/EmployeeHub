@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useEffect } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
 import { Navigate, Route, Routes } from 'react-router-dom'
 import { AuthenticateWithRedirectCallback, SignedIn, SignedOut, SignOutButton, useAuth } from '@clerk/clerk-react'
 import { AppShell } from './components/AppShell'
@@ -21,12 +21,13 @@ function RouteFallback() {
 }
 
 function MainAppSelector() {
-  const { getToken } = useAuth()
+  const { getToken, isLoaded, isSignedIn } = useAuth()
   const [role, setRole] = useState<'ADMIN' | 'EMPLOYEE' | null>(null)
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState<string | null>(null)
 
-  const determineRole = async () => {
+  const determineRole = useCallback(async () => {
+    if (!isLoaded || !isSignedIn) return
     setLoading(true)
     setAuthError(null)
     try {
@@ -44,7 +45,8 @@ function MainAppSelector() {
         return
       }
       const data = await res.json()
-      setRole(data.role)
+      const normalizedRole = String(data.role || '').toUpperCase() as 'ADMIN' | 'EMPLOYEE'
+      setRole(normalizedRole || 'ADMIN')
       setLoading(false)
     } catch (err: any) {
       setAuthError(
@@ -54,11 +56,11 @@ function MainAppSelector() {
       )
       setLoading(false)
     }
-  }
+  }, [getToken, isLoaded, isSignedIn])
 
   useEffect(() => {
     determineRole()
-  }, [getToken])
+  }, [determineRole])
 
   if (loading) {
     return (
@@ -106,14 +108,14 @@ function MainAppSelector() {
     <AppShell>
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<DashboardPage />} />
-          <Route path="/employees" element={<EmployeesPage />} />
-          <Route path="/attendance" element={<AttendancePage />} />
-          <Route path="/assignments" element={<AssignmentsPage />} />
-          <Route path="/tracking" element={<TrackingPage />} />
-          <Route path="/tracking/:employeeId" element={<TrackingPage />} />
-          <Route path="/invoice" element={<InvoicePage />} />
-          <Route path="/settings" element={<SettingsPage />} />
+          <Route index element={<DashboardPage />} />
+          <Route path="employees" element={<EmployeesPage />} />
+          <Route path="attendance" element={<AttendancePage />} />
+          <Route path="assignments" element={<AssignmentsPage />} />
+          <Route path="tracking" element={<TrackingPage />} />
+          <Route path="tracking/:employeeId" element={<TrackingPage />} />
+          <Route path="invoice" element={<InvoicePage />} />
+          <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
@@ -153,6 +155,10 @@ export default function App() {
               </SignedIn>
             </>
           }
+        />
+        <Route
+          path="/sso-callback/*"
+          element={<AuthenticateWithRedirectCallback />}
         />
         <Route
           path="/sso-callback"

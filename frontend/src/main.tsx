@@ -16,13 +16,9 @@ const queryClient = new QueryClient()
 const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ?? ''
 
 function AppProviders() {
-  const navigate = useNavigate()
-
   return (
     <ClerkProvider
       publishableKey={clerkKey}
-      routerPush={(to) => navigate(to)}
-      routerReplace={(to) => navigate(to, { replace: true })}
       afterSignOutUrl="/sign-in"
     >
       <QueryClientProvider client={queryClient}>

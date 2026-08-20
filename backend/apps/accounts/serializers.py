@@ -87,10 +87,16 @@ class EmployeeSerializer(serializers.ModelSerializer):
         from apps.attendance.services import get_active_assignment
         active_assignment = get_active_assignment(instance)
         if active_assignment:
-            data["default_address"] = f"{active_assignment.patient_address} (Scheduled: {active_assignment.patient_name})"
-            data["default_latitude"] = float(active_assignment.latitude)
-            data["default_longitude"] = float(active_assignment.longitude)
-            data["default_radius"] = active_assignment.radius
+            data["active_assignment"] = {
+                "id": active_assignment.id,
+                "patient_name": active_assignment.patient_name,
+                "patient_address": active_assignment.patient_address,
+                "latitude": float(active_assignment.latitude),
+                "longitude": float(active_assignment.longitude),
+                "radius": active_assignment.radius,
+            }
+        else:
+            data["active_assignment"] = None
         return data
 
 
