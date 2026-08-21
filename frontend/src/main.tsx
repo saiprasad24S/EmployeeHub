@@ -9,6 +9,7 @@ import { BrowserRouter, useNavigate } from 'react-router-dom'
 import App from './App'
 import { SearchProvider } from './context/SearchContext'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { SmoothScroll } from './components/SmoothScroll'
 import 'leaflet/dist/leaflet.css'
 import './styles/global.css'
 
@@ -23,7 +24,9 @@ function AppProviders() {
     >
       <QueryClientProvider client={queryClient}>
         <SearchProvider>
-          <App />
+          <SmoothScroll>
+            <App />
+          </SmoothScroll>
         </SearchProvider>
       </QueryClientProvider>
     </ClerkProvider>
