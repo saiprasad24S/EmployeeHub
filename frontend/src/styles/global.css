@@ -1414,22 +1414,27 @@ form .stack textarea {
   body * {
     visibility: hidden;
   }
-  .invoice-print-container, .invoice-print-container * {
-    visibility: visible;
+  .invoice-print-container, .invoice-print-container *,
+  .payslip-print-container, .payslip-print-container *,
+  #payslip-printable-area, #payslip-printable-area * {
+    visibility: visible !important;
   }
-  .invoice-print-container {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
+  .invoice-print-container,
+  .payslip-print-container,
+  #payslip-printable-area {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
     max-width: 100% !important;
     margin: 0 !important;
-    padding: 1.5cm !important;
+    padding: 0 !important;
     box-shadow: none !important;
     border-radius: 0 !important;
   }
-  .no-print {
+  .no-print, .sidebar, .mobile-header-bar, .topbar, .mobile-bottom-nav {
     display: none !important;
   }
 }
+
 

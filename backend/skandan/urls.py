@@ -44,6 +44,7 @@ urlpatterns = [
     path("api/employees/", include("apps.accounts.employee_urls")),
     path("api/dashboard/", include("apps.analytics.urls")),
     path("api/invoices/", include("apps.invoices.urls")),
+    path("api/payslips/", include("apps.payslips.urls")),
     path("api/health/database", health_view, name="database-health"),
     path("api/health/cloudinary", cloudinary_health_view, name="cloudinary-health"),
 ]

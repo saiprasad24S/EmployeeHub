@@ -334,3 +334,21 @@ def upload_invoice_pdf(pdf_bytes: bytes, invoice_number: str) -> str:
     url = res.get("secure_url") or res.get("url") or ""
     return url
 
+
+def upload_payslip_pdf(pdf_bytes: bytes, payslip_code: str) -> str:
+    import io
+    clean_num = str(payslip_code).replace(" ", "_").replace("/", "_")
+    base_folder = _env("CLOUDINARY_FOLDER", default=getattr(settings, "CLOUDINARY_FOLDER", "skandan"))
+    folder = f"{base_folder}/payslips"
+    initialize_cloudinary()
+    res = cloudinary.uploader.upload(
+        io.BytesIO(pdf_bytes),
+        folder=folder,
+        public_id=f"Payslip_{clean_num}",
+        resource_type="raw",
+        overwrite=True,
+    )
+    url = res.get("secure_url") or res.get("url") or ""
+    return url
+
+

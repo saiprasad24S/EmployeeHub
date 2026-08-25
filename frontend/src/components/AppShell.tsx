@@ -10,6 +10,7 @@ const navItems = [
   { label: 'Assignments', to: '/assignments' },
   { label: 'Live Tracking', to: '/tracking' },
   { label: 'Invoice', to: '/invoice' },
+  { label: 'Payslip', to: '/payslip' },
 ]
 
 import { safeStorage } from '../lib/storage'

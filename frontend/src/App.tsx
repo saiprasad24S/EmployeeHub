@@ -14,6 +14,7 @@ const AttendancePage = lazy(() => import('./pages/AttendancePage').then((m) => (
 const AssignmentsPage = lazy(() => import('./pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage })))
 const TrackingPage = lazy(() => import('./pages/TrackingPage').then((m) => ({ default: m.TrackingPage })))
 const InvoicePage = lazy(() => import('./pages/InvoicePage').then((m) => ({ default: m.InvoicePage })))
+const PayslipPage = lazy(() => import('./pages/PayslipPage').then((m) => ({ default: m.PayslipPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 
 function RouteFallback() {
@@ -115,6 +116,7 @@ function MainAppSelector() {
           <Route path="tracking" element={<TrackingPage />} />
           <Route path="tracking/:employeeId" element={<TrackingPage />} />
           <Route path="invoice" element={<InvoicePage />} />
+          <Route path="payslip" element={<PayslipPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
