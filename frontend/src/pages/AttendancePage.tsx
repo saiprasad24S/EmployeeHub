@@ -363,15 +363,24 @@ export function AttendancePage() {
     }
   }
 
+  const [downloadError, setDownloadError] = useState<string | null>(null)
+  const [downloadSuccess, setDownloadSuccess] = useState(false)
+
   const triggerExportDownload = async () => {
+    setDownloadError(null)
+    setDownloadSuccess(false)
     if (!startDate || !endDate) {
-      alert('Please select both start and end dates.')
+      setDownloadError('Please select both start and end dates.')
+      return
+    }
+    if (new Date(startDate) > new Date(endDate)) {
+      setDownloadError('From Date cannot be after To Date.')
       return
     }
     setIsDownloading(true)
     try {
       const token = await getToken()
-      if (!token) throw new Error('No authentication token')
+      if (!token) throw new Error('No authentication token — please log in again.')
 
       const response = await authedFetch(
         `/api/attendance/export?start_date=${startDate}&end_date=${endDate}`,
@@ -379,20 +388,36 @@ export function AttendancePage() {
       )
       if (!response.ok) {
         const errData = await response.json().catch(() => ({}))
-        throw new Error(errData.detail || 'Export failed')
+        throw new Error(errData.detail || `Export failed with status ${response.status}`)
       }
-      const blob = await response.blob()
-      const url = window.URL.createObjectURL(blob)
+      const rawBlob = await response.blob()
+      const excelBlob = new Blob([rawBlob], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      })
+      const url = window.URL.createObjectURL(excelBlob)
       const a = document.createElement('a')
+      a.style.display = 'none'
       a.href = url
-      a.download = `attendance_${startDate}_to_${endDate}.xlsx`
+      a.setAttribute('download', `attendance_${startDate}_to_${endDate}.xlsx`)
       document.body.appendChild(a)
       a.click()
-      a.remove()
-      window.URL.revokeObjectURL(url)
-      setIsDownloadModalOpen(false)
+
+      // Allow browser time to finish downloading before revoking blob URL
+      setTimeout(() => {
+        if (document.body.contains(a)) {
+          document.body.removeChild(a)
+        }
+        window.URL.revokeObjectURL(url)
+      }, 5000)
+
+      setDownloadSuccess(true)
+      setTimeout(() => {
+        setIsDownloadModalOpen(false)
+        setDownloadSuccess(false)
+      }, 1200)
     } catch (err: any) {
-      alert(err.message || 'Failed to download attendance report')
+      console.error('[AttendanceExport] Export error:', err)
+      setDownloadError(err.message || 'Failed to download attendance report')
     } finally {
       setIsDownloading(false)
     }
@@ -979,7 +1004,7 @@ export function AttendancePage() {
       {/* Date Range Download Modal */}
       {isDownloadModalOpen && (
         <div className="camera-modal-backdrop">
-          <div className="camera-modal" style={{ maxWidth: '400px', width: '100%', height: 'auto' }}>
+          <div className="camera-modal" style={{ maxWidth: '420px', width: '100%', height: 'auto' }}>
             <div className="camera-header">
               <h3 style={{ fontSize: '1.25rem' }}>Export Attendance Report</h3>
               <button
@@ -996,6 +1021,16 @@ export function AttendancePage() {
               </button>
             </div>
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              {downloadError && (
+                <div style={{ padding: '0.75rem', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', fontSize: '0.85rem' }}>
+                  ⚠️ {downloadError}
+                </div>
+              )}
+              {downloadSuccess && (
+                <div style={{ padding: '0.75rem', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', fontSize: '0.85rem', fontWeight: 600 }}>
+                  ✓ Excel report generated and downloaded successfully!
+                </div>
+              )}
               <div className="stack" style={{ gap: '0.4rem' }}>
                 <label style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text)' }}>From Date</label>
                 <input
@@ -1026,7 +1061,7 @@ export function AttendancePage() {
                   }}
                 />
               </div>
-              <div className="button-group-row" style={{ marginTop: '1rem' }}>
+              <div className="button-group-row" style={{ marginTop: '0.5rem' }}>
                 <button
                   type="button"
                   className="btn-secondary"
@@ -1041,7 +1076,7 @@ export function AttendancePage() {
                   onClick={triggerExportDownload}
                   disabled={isDownloading}
                 >
-                  {isDownloading ? 'Downloading...' : 'Download Excel'}
+                  {isDownloading ? 'Generating Report...' : 'Download Excel'}
                 </button>
               </div>
             </div>

@@ -254,6 +254,7 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
     from openpyxl import Workbook
     from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
     from openpyxl.utils import get_column_letter
+    from datetime import time
 
     wb = Workbook()
     ws = wb.active
@@ -332,9 +333,33 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
                     cell.fill = sub_header_fill
                     cell.font = sub_header_font
 
+    # Bulk query all sessions and attendances in date range (1 query each instead of 900+)
+    tz = timezone.get_current_timezone()
+    start_dt = timezone.make_aware(datetime.combine(start_date, time.min), tz)
+    end_dt = timezone.make_aware(datetime.combine(end_date, time.max), tz)
+
+    all_sessions = Session.objects.filter(login_time__gte=start_dt, login_time__lte=end_dt).order_by('login_time')
+    sessions_by_emp_date: dict[tuple[int, date], Session] = {}
+    for s in all_sessions:
+        if s.login_time:
+            loc_date = timezone.localtime(s.login_time).date()
+            key = (s.employee_id, loc_date)
+            if key not in sessions_by_emp_date or (s.is_active or s.logout_time):
+                sessions_by_emp_date[key] = s
+
+    all_attendances = Attendance.objects.filter(timestamp__gte=start_dt, timestamp__lte=end_dt).order_by('timestamp')
+    attendances_by_emp_date: dict[tuple[int, date], Attendance] = {}
+    for a in all_attendances:
+        if a.timestamp:
+            loc_date = timezone.localtime(a.timestamp).date()
+            key = (a.employee_id, loc_date)
+            if key not in attendances_by_emp_date:
+                attendances_by_emp_date[key] = a
+
     # Populate Data Rows
     employees = Employee.objects.all().order_by("employee_id")
     row_idx = 8
+    now = timezone.now()
 
     for emp in employees:
         service_start_str = emp.created_at.strftime("%d-%b-%Y") if emp.created_at else "-"
@@ -346,24 +371,11 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
         ws.cell(row=row_idx, column=2).font = bold_font
         ws.cell(row=row_idx, column=3).font = regular_font
 
-        emp_sessions = list(Session.objects.filter(employee=emp).order_by('-login_time'))
-        emp_attendances = list(Attendance.objects.filter(employee=emp).order_by('-timestamp'))
-
         c_idx = 4
         present_count = 0
         for dt in date_list:
-            # Match session by local login date or Attendance timestamp
-            session = next(
-                (s for s in emp_sessions if s.login_time and timezone.localtime(s.login_time).date() == dt),
-                None
-            )
-            if not session:
-                session = Session.objects.filter(employee=emp, login_time__date=dt).first()
-
-            attendance_rec = next(
-                (a for a in emp_attendances if a.timestamp and timezone.localtime(a.timestamp).date() == dt),
-                None
-            )
+            session = sessions_by_emp_date.get((emp.id, dt))
+            attendance_rec = attendances_by_emp_date.get((emp.id, dt))
 
             if not session and not attendance_rec:
                 check_in_val = "-"
@@ -378,7 +390,7 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
 
                 if session and (session.is_active or not logout_time):
                     check_out_val = "Active"
-                    diff = timezone.now() - login_time
+                    diff = now - login_time
                     h = int(diff.total_seconds() // 3600)
                     m = int((diff.total_seconds() % 3600) // 60)
                     hours_val = f"{h}h {m}m"
@@ -423,17 +435,14 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
     # Freeze Panes below headers and after column C
     ws.freeze_panes = "D8"
 
-    # Auto-adjust column widths
-    for col in ws.columns:
-        max_len = 0
-        col_letter = get_column_letter(col[0].column)
-        for cell in col:
-            if cell.row < 6:
-                continue
-            val = str(cell.value or '')
-            if len(val) > max_len:
-                max_len = len(val)
-        ws.column_dimensions[col_letter].width = max(max_len + 4, 12)
+    # Set column widths efficiently
+    ws.column_dimensions["A"].width = 16
+    ws.column_dimensions["B"].width = 24
+    ws.column_dimensions["C"].width = 16
+    for c in range(4, working_days_col):
+        col_letter = get_column_letter(c)
+        ws.column_dimensions[col_letter].width = 14
+    ws.column_dimensions[get_column_letter(working_days_col)].width = 16
 
     output = BytesIO()
     wb.save(output)
