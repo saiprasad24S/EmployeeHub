@@ -169,7 +169,7 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '12px 16px 10px 16px',
+            padding: '12px 14px 10px 14px',
             borderBottom: '1px solid #111827',
             fontFamily: fontTimes,
             textTransform: 'uppercase',
@@ -181,23 +181,23 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
               src="/assets/payslip/skandan_payslip_logo.png"
               alt="SKANDAN LOGO"
               style={{
-                height: '48px',
-                maxWidth: '190px',
+                height: '46px',
+                maxWidth: '155px',
                 objectFit: 'contain',
                 display: 'block',
               }}
             />
           </div>
 
-          {/* Company Title - Times New Roman, Single Line, Dark Blue */}
-          <div style={{ flex: '1 1 auto', textAlign: 'center', padding: '0 8px', minWidth: 0 }}>
+          {/* Company Title - Prominent Size, Times New Roman, Single Line, Dark Blue */}
+          <div style={{ flex: '1 1 auto', textAlign: 'center', padding: '0 6px', minWidth: 0 }}>
             <h2
               style={{
                 margin: 0,
-                fontSize: '16px',
+                fontSize: '18px',
                 fontWeight: 800,
                 color: '#0B2C8C',
-                letterSpacing: '0.02em',
+                letterSpacing: '0.01em',
                 fontFamily: fontTimes,
                 whiteSpace: 'nowrap',
                 textTransform: 'uppercase',
@@ -212,12 +212,12 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
             style={{
               flex: '0 0 auto',
               textAlign: 'right',
-              fontSize: '9.5px',
+              fontSize: '9px',
               fontWeight: 600,
-              lineHeight: 1.4,
+              lineHeight: 1.35,
               color: '#1f2937',
               fontFamily: fontTimes,
-              textTransform: 'uppercase',
+              textTransform: 'none',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
@@ -225,11 +225,11 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
               <Phone size={11} color="#b91c1c" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-              <span>SKANDANHOMECARRE.COM</span>
+              <span>skandanhomecarre.com</span>
               <Globe size={11} color="#b91c1c" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-              <span>ADMIN@SKANDANHOMECARRE.COM</span>
+              <span>admin@skandanhomecarre.com</span>
               <Mail size={11} color="#b91c1c" />
             </div>
           </div>

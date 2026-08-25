@@ -105,17 +105,17 @@ def generate_payslip_pdf(payslip_dict: dict) -> bytes:
             pass
 
     # Header Center Title (Times-Bold - Dark Blue #0B2C8C, ALL CAPS)
-    c.setFont("Times-Bold", 12.5)
+    c.setFont("Times-Bold", 14)
     c.setFillColor(colors.HexColor("#0B2C8C"))
-    c.drawCentredString(margin_x + (box_width / 2) + 20, curr_y - 28, "SKANDAN HOME CARRE CCLINIC LLP")
+    c.drawCentredString(margin_x + (box_width / 2) + 15, curr_y - 28, "SKANDAN HOME CARRE CCLINIC LLP")
 
-    # Header Right Contact Info (Times-Roman, ALL CAPS)
+    # Header Right Contact Info (Times-Roman)
     c.setFont("Times-Roman", 7.5)
     c.setFillColor(colors.HexColor("#1F2937"))
     right_x = margin_x + box_width - 10
     c.drawRightString(right_x, curr_y - 18, "+91 96609 66369")
-    c.drawRightString(right_x, curr_y - 30, "SKANDANHOMECARRE.COM")
-    c.drawRightString(right_x, curr_y - 42, "ADMIN@SKANDANHOMECARRE.COM")
+    c.drawRightString(right_x, curr_y - 30, "skandanhomecarre.com")
+    c.drawRightString(right_x, curr_y - 42, "admin@skandanhomecarre.com")
 
     curr_y -= header_height
     c.line(margin_x, curr_y, margin_x + box_width, curr_y)
