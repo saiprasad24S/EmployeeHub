@@ -169,7 +169,7 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            padding: '14px 18px 10px 18px',
+            padding: '12px 16px 10px 16px',
             borderBottom: '1px solid #111827',
             fontFamily: fontHeader,
           }}
@@ -180,24 +180,25 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
               src="/assets/payslip/skandan_payslip_logo.png"
               alt="Skandan Logo"
               style={{
-                height: '56px',
-                maxWidth: '220px',
+                height: '48px',
+                maxWidth: '190px',
                 objectFit: 'contain',
                 display: 'block',
               }}
             />
           </div>
 
-          {/* Company Title */}
-          <div style={{ flex: 1, textAlign: 'center', padding: '0 10px' }}>
+          {/* Company Title - Strictly one line */}
+          <div style={{ flex: '1 1 auto', textAlign: 'center', padding: '0 8px', minWidth: 0 }}>
             <h2
               style={{
                 margin: 0,
-                fontSize: '18px',
+                fontSize: '15.5px',
                 fontWeight: 800,
                 color: '#0B2C8C',
-                letterSpacing: '0.04em',
+                letterSpacing: '0.02em',
                 fontFamily: fontHeader,
+                whiteSpace: 'nowrap',
               }}
             >
               SKANDAN HOME CARRE CCLINIC LLP
@@ -209,9 +210,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
             style={{
               flex: '0 0 auto',
               textAlign: 'right',
-              fontSize: '10px',
+              fontSize: '9.5px',
               fontWeight: 600,
-              lineHeight: 1.45,
+              lineHeight: 1.4,
               color: '#1f2937',
               fontFamily: fontHeader,
             }}
@@ -248,18 +249,24 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           PAYSLIP FOR THE MONTH OF {monthUpper} {yearStr}
         </div>
 
-        {/* Employee Details 2-Column Grid - Times New Roman */}
+        {/* Employee Details 2-Column Grid - Laser-Straight 50/50 Split */}
         <div style={{ borderBottom: '1px solid #111827', fontSize: '11px', fontFamily: fontTimes }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontFamily: fontTimes }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontFamily: fontTimes }}>
+            <colgroup>
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '28%' }} />
+              <col style={{ width: '22%' }} />
+              <col style={{ width: '28%' }} />
+            </colgroup>
             <tbody>
               {/* Row 1 */}
               <tr>
-                <td style={{ width: '22%', padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Employee Code</td>
-                <td style={{ width: '28%', padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Employee Code</td>
+                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {data.employeeId || '—'}
                 </td>
-                <td style={{ width: '22%', padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Employee Name</td>
-                <td style={{ width: '28%', padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Employee Name</td>
+                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
                   {data.employeeName || '—'}
                 </td>
               </tr>
@@ -344,7 +351,7 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           </table>
         </div>
 
-        {/* Earnings & Deductions Table Header - Times New Roman (Green Bold) */}
+        {/* Earnings & Deductions Table Header - Laser-Straight 50/50 Split */}
         <div
           style={{
             display: 'flex',
@@ -358,7 +365,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
         >
           <div
             style={{
-              flex: 1,
+              width: '50%',
+              flex: '0 0 50%',
+              boxSizing: 'border-box',
               textAlign: 'center',
               padding: '6px 0',
               borderRight: '1px solid #111827',
@@ -369,7 +378,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           </div>
           <div
             style={{
-              flex: 1,
+              width: '50%',
+              flex: '0 0 50%',
+              boxSizing: 'border-box',
               textAlign: 'center',
               padding: '6px 0',
               fontFamily: fontTimes,
@@ -379,8 +390,7 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           </div>
         </div>
 
-        {/* Earnings & Deductions Body Rows - Times New Roman */}
-        {/* Expands naturally as rows are added */}
+        {/* Earnings & Deductions Body Rows - Laser-Straight 50/50 Split */}
         <div
           style={{
             display: 'flex',
@@ -392,7 +402,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           {/* Earnings Column */}
           <div
             style={{
-              flex: 1,
+              width: '50%',
+              flex: '0 0 50%',
+              boxSizing: 'border-box',
               borderRight: '1px solid #111827',
               padding: '8px 14px',
               display: 'flex',
@@ -426,7 +438,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           {/* Deductions Column */}
           <div
             style={{
-              flex: 1,
+              width: '50%',
+              flex: '0 0 50%',
+              boxSizing: 'border-box',
               padding: '8px 14px',
               display: 'flex',
               flexDirection: 'column',
@@ -463,7 +477,7 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           </div>
         </div>
 
-        {/* Totals Row - Times New Roman */}
+        {/* Totals Row - Laser-Straight 50/50 Split */}
         <div
           style={{
             display: 'flex',
@@ -475,7 +489,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
         >
           <div
             style={{
-              flex: 1,
+              width: '50%',
+              flex: '0 0 50%',
+              boxSizing: 'border-box',
               display: 'flex',
               justifyContent: 'space-between',
               padding: '6px 14px',
@@ -489,7 +505,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           </div>
           <div
             style={{
-              flex: 1,
+              width: '50%',
+              flex: '0 0 50%',
+              boxSizing: 'border-box',
               display: 'flex',
               justifyContent: 'space-between',
               padding: '6px 14px',
@@ -502,7 +520,7 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           </div>
         </div>
 
-        {/* Net Salary & In Words Row - Times New Roman */}
+        {/* Net Salary & In Words Row - Laser-Straight 50/50 Split */}
         <div
           style={{
             display: 'flex',
@@ -515,7 +533,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           {/* Left: In Words */}
           <div
             style={{
-              flex: 1,
+              width: '50%',
+              flex: '0 0 50%',
+              boxSizing: 'border-box',
               padding: '7px 12px',
               borderRight: '1px solid #111827',
               lineHeight: 1.35,
@@ -531,7 +551,9 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           {/* Right: Net Salary */}
           <div
             style={{
-              flex: 1,
+              width: '50%',
+              flex: '0 0 50%',
+              boxSizing: 'border-box',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
