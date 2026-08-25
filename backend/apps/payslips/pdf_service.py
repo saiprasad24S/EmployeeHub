@@ -104,23 +104,23 @@ def generate_payslip_pdf(payslip_dict: dict) -> bytes:
         except Exception:
             pass
 
-    # Header Center Title (Sans-Serif / Helvetica-Bold - Dark Blue #0B2C8C)
-    c.setFont("Helvetica-Bold", 12)
+    # Header Center Title (Times-Bold - Dark Blue #0B2C8C, ALL CAPS)
+    c.setFont("Times-Bold", 12.5)
     c.setFillColor(colors.HexColor("#0B2C8C"))
     c.drawCentredString(margin_x + (box_width / 2) + 20, curr_y - 28, "SKANDAN HOME CARRE CCLINIC LLP")
 
-    # Header Right Contact Info (Helvetica)
-    c.setFont("Helvetica", 7.5)
+    # Header Right Contact Info (Times-Roman, ALL CAPS)
+    c.setFont("Times-Roman", 7.5)
     c.setFillColor(colors.HexColor("#1F2937"))
     right_x = margin_x + box_width - 10
     c.drawRightString(right_x, curr_y - 18, "+91 96609 66369")
-    c.drawRightString(right_x, curr_y - 30, "skandanhomecarre.com")
-    c.drawRightString(right_x, curr_y - 42, "admin@skandanhomecarre.com")
+    c.drawRightString(right_x, curr_y - 30, "SKANDANHOMECARRE.COM")
+    c.drawRightString(right_x, curr_y - 42, "ADMIN@SKANDANHOMECARRE.COM")
 
     curr_y -= header_height
     c.line(margin_x, curr_y, margin_x + box_width, curr_y)
 
-    # 2. Month Banner (Times-Bold)
+    # 2. Month Banner (Times-Bold, ALL CAPS)
     banner_height = 20
     c.setFont("Times-Bold", 9.5)
     c.setFillColor(colors.HexColor("#111827"))
@@ -131,16 +131,16 @@ def generate_payslip_pdf(payslip_dict: dict) -> bytes:
     curr_y -= banner_height
     c.line(margin_x, curr_y, margin_x + box_width, curr_y)
 
-    # 3. Employee Details Grid (8 rows, 2 columns) - Times New Roman
+    # 3. Employee Details Grid (8 rows, 2 columns) - Times New Roman (Left Label BOLD, Details NOT BOLD, ALL CAPS)
     emp_rows = [
-        ("Employee Code", str(payslip_dict.get("employee_code", "3699-D09600")), "Employee Name", str(payslip_dict.get("employee_name", "ALWALA MADHURI"))),
-        ("Designation", str(payslip_dict.get("designation", "OHC-DOCTOR")), "Grade / Level", str(payslip_dict.get("grade_level", "AA / II"))),
-        ("Location", str(payslip_dict.get("location", "TELANGANA")), "Department", str(payslip_dict.get("department", "OPERATIONS"))),
-        ("Bank Name", str(payslip_dict.get("bank_name", "SBI")), "Bank Account Number", str(payslip_dict.get("bank_account_number", "39398771652"))),
-        ("PAN Number", str(payslip_dict.get("pan_number", "CVRPA6711N")), "PF Account Number", str(payslip_dict.get("pf_account_number", "NA"))),
-        ("Date of Joining", str(payslip_dict.get("date_of_joining", "29-06-2026")), "Days Worked", str(payslip_dict.get("days_worked", 30))),
-        ("LOP", str(payslip_dict.get("lop_days", "01")).zfill(2), "ESIC Account Number", str(payslip_dict.get("esic_account_number", "NA"))),
-        ("Arrears Days", str(payslip_dict.get("arrears_days", 0)), "UAN Number", str(payslip_dict.get("uan_number", "NA"))),
+        ("EMPLOYEE CODE", str(payslip_dict.get("employee_code", "3699-D09600")).upper(), "EMPLOYEE NAME", str(payslip_dict.get("employee_name", "ALWALA MADHURI")).upper()),
+        ("DESIGNATION", str(payslip_dict.get("designation", "OHC-DOCTOR")).upper(), "GRADE / LEVEL", str(payslip_dict.get("grade_level", "AA / II")).upper()),
+        ("LOCATION", str(payslip_dict.get("location", "TELANGANA")).upper(), "DEPARTMENT", str(payslip_dict.get("department", "OPERATIONS")).upper()),
+        ("BANK NAME", str(payslip_dict.get("bank_name", "SBI")).upper(), "BANK ACCOUNT NUMBER", str(payslip_dict.get("bank_account_number", "39398771652")).upper()),
+        ("PAN NUMBER", str(payslip_dict.get("pan_number", "CVRPA6711N")).upper(), "PF ACCOUNT NUMBER", str(payslip_dict.get("pf_account_number", "NA")).upper()),
+        ("DATE OF JOINING", str(payslip_dict.get("date_of_joining", "29-06-2026")).upper(), "DAYS WORKED", str(payslip_dict.get("days_worked", 30)).upper()),
+        ("LOP", str(payslip_dict.get("lop_days", "01")).zfill(2).upper(), "ESIC ACCOUNT NUMBER", str(payslip_dict.get("esic_account_number", "NA")).upper()),
+        ("ARREARS DAYS", str(payslip_dict.get("arrears_days", 0)).upper(), "UAN NUMBER", str(payslip_dict.get("uan_number", "NA")).upper()),
     ]
 
     row_h = 16
@@ -152,21 +152,21 @@ def generate_payslip_pdf(payslip_dict: dict) -> bytes:
 
     for r_idx, (l1, v1, l2, v2) in enumerate(emp_rows):
         r_y = curr_y - ((r_idx + 1) * row_h)
-        # Label 1
-        c.setFont("Times-Roman", 8)
-        c.setFillColor(colors.HexColor("#4B5563"))
-        c.drawString(margin_x + 8, r_y + 4, l1)
-        # Value 1
+        # Label 1 (BOLD)
         c.setFont("Times-Bold", 8)
+        c.setFillColor(colors.HexColor("#111827"))
+        c.drawString(margin_x + 8, r_y + 4, l1)
+        # Value 1 (REGULAR / NOT BOLD)
+        c.setFont("Times-Roman", 8)
         c.setFillColor(colors.HexColor("#111827"))
         c.drawString(margin_x + col1_label_w + 4, r_y + 4, v1)
 
-        # Label 2
-        c.setFont("Times-Roman", 8)
-        c.setFillColor(colors.HexColor("#4B5563"))
-        c.drawString(mid_x + 8, r_y + 4, l2)
-        # Value 2
+        # Label 2 (BOLD)
         c.setFont("Times-Bold", 8)
+        c.setFillColor(colors.HexColor("#111827"))
+        c.drawString(mid_x + 8, r_y + 4, l2)
+        # Value 2 (REGULAR / NOT BOLD)
+        c.setFont("Times-Roman", 8)
         c.setFillColor(colors.HexColor("#111827"))
         c.drawString(mid_x + col2_label_w + 4, r_y + 4, v2)
 
@@ -175,7 +175,7 @@ def generate_payslip_pdf(payslip_dict: dict) -> bytes:
     curr_y -= (len(emp_rows) * row_h)
     c.line(margin_x, curr_y, margin_x + box_width, curr_y)
 
-    # 4. Earnings & Deductions Table Header (Times-Bold, Green)
+    # 4. Earnings & Deductions Table Header (Times-Bold, Green, ALL CAPS)
     header_table_h = 18
     c.setFont("Times-Bold", 9)
     c.setFillColor(colors.HexColor("#16A34A"))
@@ -185,7 +185,7 @@ def generate_payslip_pdf(payslip_dict: dict) -> bytes:
     curr_y -= header_table_h
     c.line(margin_x, curr_y, margin_x + box_width, curr_y)
 
-    # 5. Earnings & Deductions Data Rows
+    # 5. Earnings & Deductions Data Rows (Labels BOLD, Amounts REGULAR, ALL CAPS)
     earnings_items = [
         ("BASIC SALARY", payslip_dict.get("basic_salary", 12096.81)),
         ("CONVEYANCE ALLOWANCE", payslip_dict.get("conveyance_allowance", 7258.00)),
@@ -211,20 +211,20 @@ def generate_payslip_pdf(payslip_dict: dict) -> bytes:
 
     for r_i in range(max_rows):
         row_y = curr_y - ((r_i + 1) * body_row_h)
-        # Left (Earnings)
+        # Left (Earnings) - Label BOLD, Amount REGULAR
         if r_i < len(earnings_items):
             lbl, amt = earnings_items[r_i]
             c.setFont("Times-Bold", 8)
-            c.setFillColor(colors.HexColor("#374151"))
+            c.setFillColor(colors.HexColor("#111827"))
             c.drawString(margin_x + 8, row_y + 4, lbl)
             c.setFont("Times-Roman", 8)
             c.drawRightString(mid_x - 12, row_y + 4, format_currency_str(amt))
 
-        # Right (Deductions)
+        # Right (Deductions) - Label BOLD, Amount REGULAR
         if r_i < len(deductions_items):
             lbl, amt = deductions_items[r_i]
             c.setFont("Times-Bold", 8)
-            c.setFillColor(colors.HexColor("#374151"))
+            c.setFillColor(colors.HexColor("#111827"))
             c.drawString(mid_x + 8, row_y + 4, lbl)
             c.setFont("Times-Roman", 8)
             c.drawRightString(margin_x + box_width - 12, row_y + 4, format_currency_str(amt))

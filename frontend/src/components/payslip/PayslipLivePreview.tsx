@@ -163,7 +163,7 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
           backgroundColor: '#fff',
         }}
       >
-        {/* Top Header - Sans-Serif */}
+        {/* Top Header */}
         <div
           style={{
             display: 'flex',
@@ -171,14 +171,15 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
             justifyContent: 'space-between',
             padding: '12px 16px 10px 16px',
             borderBottom: '1px solid #111827',
-            fontFamily: fontHeader,
+            fontFamily: fontTimes,
+            textTransform: 'uppercase',
           }}
         >
           {/* Logo */}
           <div style={{ flex: '0 0 auto' }}>
             <img
               src="/assets/payslip/skandan_payslip_logo.png"
-              alt="Skandan Logo"
+              alt="SKANDAN LOGO"
               style={{
                 height: '48px',
                 maxWidth: '190px',
@@ -188,17 +189,18 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
             />
           </div>
 
-          {/* Company Title - Strictly one line */}
+          {/* Company Title - Times New Roman, Single Line, Dark Blue */}
           <div style={{ flex: '1 1 auto', textAlign: 'center', padding: '0 8px', minWidth: 0 }}>
             <h2
               style={{
                 margin: 0,
-                fontSize: '15.5px',
+                fontSize: '16px',
                 fontWeight: 800,
                 color: '#0B2C8C',
                 letterSpacing: '0.02em',
-                fontFamily: fontHeader,
+                fontFamily: fontTimes,
                 whiteSpace: 'nowrap',
+                textTransform: 'uppercase',
               }}
             >
               SKANDAN HOME CARRE CCLINIC LLP
@@ -214,7 +216,8 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
               fontWeight: 600,
               lineHeight: 1.4,
               color: '#1f2937',
-              fontFamily: fontHeader,
+              fontFamily: fontTimes,
+              textTransform: 'uppercase',
             }}
           >
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
@@ -222,11 +225,11 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
               <Phone size={11} color="#b91c1c" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-              <span>skandanhomecarre.com</span>
+              <span>SKANDANHOMECARRE.COM</span>
               <Globe size={11} color="#b91c1c" />
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: '4px' }}>
-              <span>admin@skandanhomecarre.com</span>
+              <span>ADMIN@SKANDANHOMECARRE.COM</span>
               <Mail size={11} color="#b91c1c" />
             </div>
           </div>
@@ -244,13 +247,14 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
             borderBottom: '1px solid #111827',
             backgroundColor: '#ffffff',
             fontFamily: fontTimes,
+            textTransform: 'uppercase',
           }}
         >
           PAYSLIP FOR THE MONTH OF {monthUpper} {yearStr}
         </div>
 
-        {/* Employee Details 2-Column Grid - Laser-Straight 50/50 Split */}
-        <div style={{ borderBottom: '1px solid #111827', fontSize: '11px', fontFamily: fontTimes }}>
+        {/* Employee Details 2-Column Grid - Left Part (Labels) BOLD, Details NOT BOLD */}
+        <div style={{ borderBottom: '1px solid #111827', fontSize: '11px', fontFamily: fontTimes, textTransform: 'uppercase' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', fontFamily: fontTimes }}>
             <colgroup>
               <col style={{ width: '22%' }} />
@@ -261,89 +265,89 @@ export const PayslipLivePreview: React.FC<PayslipLivePreviewProps> = ({ data, zo
             <tbody>
               {/* Row 1 */}
               <tr>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Employee Code</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>EMPLOYEE CODE</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {data.employeeId || '—'}
                 </td>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Employee Name</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>EMPLOYEE NAME</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, fontFamily: fontTimes }}>
                   {data.employeeName || '—'}
                 </td>
               </tr>
               {/* Row 2 */}
               <tr>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Designation</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>DESIGNATION</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {data.designation || '—'}
                 </td>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Grade / Level</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>GRADE / LEVEL</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, fontFamily: fontTimes }}>
                   {data.gradeLevel || 'AA / II'}
                 </td>
               </tr>
               {/* Row 3 */}
               <tr>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Location</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>LOCATION</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {data.location || 'TELANGANA'}
                 </td>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Department</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>DEPARTMENT</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, fontFamily: fontTimes }}>
                   {data.department || 'OPERATIONS'}
                 </td>
               </tr>
               {/* Row 4 */}
               <tr>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Bank Name</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>BANK NAME</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {data.bankName || 'SBI'}
                 </td>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Bank Account Number</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>BANK ACCOUNT NUMBER</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, fontFamily: fontTimes }}>
                   {data.bankAccountNumber || '—'}
                 </td>
               </tr>
               {/* Row 5 */}
               <tr>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>PAN Number</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>PAN NUMBER</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {data.panNumber || 'NA'}
                 </td>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>PF Account Number</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>PF ACCOUNT NUMBER</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, fontFamily: fontTimes }}>
                   {data.pfAccountNumber || 'NA'}
                 </td>
               </tr>
               {/* Row 6 */}
               <tr>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Date of Joining</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>DATE OF JOINING</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {data.dateOfJoining || '—'}
                 </td>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Days Worked</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>DAYS WORKED</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, fontFamily: fontTimes }}>
                   {data.daysWorked ?? 30}
                 </td>
               </tr>
               {/* Row 7 */}
               <tr>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>LOP</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>LOP</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {String(data.lopDays ?? 0).padStart(2, '0')}
                 </td>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>ESIC Account Number</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>ESIC ACCOUNT NUMBER</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, fontFamily: fontTimes }}>
                   {data.esicAccountNumber || 'NA'}
                 </td>
               </tr>
               {/* Row 8 */}
               <tr>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>Arrears Days</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>ARREARS DAYS</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, borderRight: '1px solid #111827', fontFamily: fontTimes }}>
                   {data.arrearsDays ?? 0}
                 </td>
-                <td style={{ padding: '3.5px 8px', color: '#4b5563', fontFamily: fontTimes }}>UAN Number</td>
-                <td style={{ padding: '3.5px 8px', fontWeight: 700, fontFamily: fontTimes }}>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 700, fontFamily: fontTimes }}>UAN NUMBER</td>
+                <td style={{ padding: '3.5px 8px', color: '#111827', fontWeight: 400, fontFamily: fontTimes }}>
                   {data.uanNumber || 'NA'}
                 </td>
               </tr>
