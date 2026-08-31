@@ -217,9 +217,15 @@ export function InvoicePage() {
           return res.json()
         },
       })
-      alert(`Invoice ${savedInvoice.invoice_number} saved & generated successfully!`)
+      
       if (updatedNext?.next_invoice_number) {
         setInvoiceData((prev) => ({ ...prev, invoiceNumber: updatedNext.next_invoice_number }))
+      }
+
+      // Automatically offer instant PDF download
+      const shouldDownload = window.confirm(`Invoice ${savedInvoice.invoice_number} generated & saved successfully!\n\nClick OK to download the PDF now.`)
+      if (shouldDownload) {
+        handleDownloadPDF(savedInvoice)
       }
     },
     onError: (err: any) => {
@@ -253,7 +259,7 @@ export function InvoicePage() {
         setIsAutoSaving(false)
         setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
       }, 600)
-    }, 5000)
+    }, 15000)
     return () => clearInterval(interval)
   }, [])
 
@@ -267,6 +273,11 @@ export function InvoicePage() {
     })
     setSelectedInvoice(null)
     setActiveTab('EDITOR')
+  }
+
+  // Print Handlers
+  const handlePrint = () => {
+    window.print()
   }
 
   const handleSaveInvoice = async (): Promise<Invoice | null> => {
@@ -320,25 +331,78 @@ export function InvoicePage() {
     let target = inv || selectedInvoice
     try {
       const token = (await getToken()) || ''
-      if (!target) {
-        target = await handleSaveInvoice()
-      }
-      if (!target) return
 
-      const res = await authedFetch(`/api/invoices/${target.id}/pdf/`, token)
+      let res: Response | null = null
+
+      // 1. If target exists with an ID, try fetching its PDF directly
+      if (target && (target.id || target.invoice_number)) {
+        const fetchId = target.id || target.invoice_number
+        res = await authedFetch(`/api/invoices/${fetchId}/pdf/`, token)
+      }
+
+      // 2. If no target or GET failed, generate directly on-the-fly via POST
+      if (!res || !res.ok) {
+        const { subtotal, gstRate, gstAmount: computedGst, discountAmount, totalAfterGst, balanceDue, grandTotal } = computeInvoiceTotals(invoiceData)
+        const payload = {
+          invoice_number: target?.invoice_number || invoiceData.invoiceNumber,
+          invoice_type: target?.invoice_type || invoiceData.invoiceType,
+          invoice_date: target?.invoice_date || invoiceData.invoiceDate,
+          billing_period_text: target?.billing_period_text || invoiceData.billingPeriodText,
+          start_date: target?.start_date || invoiceData.startDateText,
+          client_name: target?.client_name || invoiceData.clientName,
+          client_contact: target?.client_contact || invoiceData.clientContact,
+          client_address: target?.client_address || invoiceData.clientAddress,
+          client_gst: target?.client_gst || invoiceData.clientGst,
+          patient_name: target?.patient_name || invoiceData.patientName,
+          patient_age_gender: target?.patient_age_gender || invoiceData.patientAgeGender,
+          service_type: target?.service_type || invoiceData.serviceType,
+          consultant: target?.consultant || invoiceData.consultant,
+          service_start_date: invoiceData.serviceStarted || invoiceData.startDateText || '',
+          service_end_date: invoiceData.serviceEnd || '',
+          rendered_days: target?.rendered_days || invoiceData.renderedDays,
+          school_branch: target?.school_branch || invoiceData.schoolBranch,
+          contact_person: target?.contact_person || invoiceData.contactPerson,
+          per_day_charges: target?.per_day_charges ?? invoiceData.perDayCharges,
+          subtotal,
+          gst_rate: gstRate,
+          gst: computedGst,
+          discount: discountAmount,
+          total_after_gst: totalAfterGst,
+          advance_received: target?.advance_received ?? invoiceData.advanceReceived,
+          balance_due: balanceDue,
+          grand_total: grandTotal,
+          payment_status: target?.payment_status || invoiceData.paymentStatus,
+          remarks: target?.remarks || invoiceData.remarks,
+          services_data: target?.services_data || invoiceData.services,
+        }
+        res = await authedFetch('/api/invoices/download-pdf/', token, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      }
+
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
         throw new Error(errData.detail || 'PDF download failed.')
       }
+
       const blob = await res.blob()
       const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
+      a.style.display = 'none'
       a.href = url
-      a.download = `Invoice_${target.invoice_number.replace(/\s+/g, '_')}.pdf`
+      const invNum = (target?.invoice_number || invoiceData.invoiceNumber || '1369-0001').replace(/\s+/g, '_')
+      a.download = `Invoice_${invNum}.pdf`
       document.body.appendChild(a)
       a.click()
-      a.remove()
-      window.URL.revokeObjectURL(url)
+
+      setTimeout(() => {
+        if (document.body.contains(a)) {
+          document.body.removeChild(a)
+        }
+        window.URL.revokeObjectURL(url)
+      }, 1500)
     } catch (err: any) {
       alert(`Download Error: ${err.message || 'Failed to download PDF'}`)
     }
@@ -357,10 +421,6 @@ export function InvoicePage() {
     } catch (e: any) {
       setVerifyResult({ found: false, message: e.message || 'Verification error.' })
     }
-  }
-
-  const handlePrint = () => {
-    window.print()
   }
 
   const handleLoadInvoice = (inv: Invoice) => {
@@ -944,12 +1004,36 @@ export function InvoicePage() {
                         display: 'flex',
                         marginLeft: 4,
                       }}
+                      title={isPreviewFullscreen ? "Exit Fullscreen" : "Fullscreen Preview"}
                     >
                       {isPreviewFullscreen ? (
                         <Minimize2 style={{ width: 14, height: 14, color: '#616161' }} />
                       ) : (
                         <Maximize2 style={{ width: 14, height: 14, color: '#616161' }} />
                       )}
+                    </button>
+
+                    <button
+                      onClick={() => handleDownloadPDF()}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 5,
+                        padding: '4px 10px',
+                        borderRadius: 6,
+                        border: '1px solid #DCE7FF',
+                        background: '#EDF2FF',
+                        color: '#0B2C8C',
+                        cursor: 'pointer',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        marginLeft: 8,
+                        fontFamily: 'Poppins, sans-serif',
+                      }}
+                      title="Download PDF Document"
+                    >
+                      <Download style={{ width: 13, height: 13 }} />
+                      Download PDF
                     </button>
                   </div>
                 </div>
