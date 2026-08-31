@@ -144,36 +144,71 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.drawRightString(width - 30, height - 72, f"Verification ID : {disp_hash}")
 
             # 2. Contact Bar
-            bar_y = height - 168
+            bar_y = height - 172
             c.setFillColor(colors.HexColor("#F7F9FC"))
             c.setStrokeColor(colors.HexColor("#DCE7FF"))
             c.setLineWidth(1)
-            c.roundRect(30, bar_y, width - 60, 52, radius=4, fill=1, stroke=1)
+            c.roundRect(30, bar_y, width - 60, 56, radius=4, fill=1, stroke=1)
 
             c.setFillColor(colors.HexColor("#1A1A1A"))
             c.setFont("Times-Roman", 9)
 
             # Col 1: Address
-            c.drawString(40, bar_y + 37, "Plot No 13, SY NO 3,4, RR Plaza,")
-            c.drawString(40, bar_y + 25, "Madhapur, Hyderabad, Telangana -")
-            c.drawString(40, bar_y + 13, "500081")
+            c.drawString(40, bar_y + 40, "Plot No 13, SY NO 3,4, RR Plaza,")
+            c.drawString(40, bar_y + 28, "Madhapur, Hyderabad, Telangana -")
+            c.drawString(40, bar_y + 16, "500081")
 
             # Divider line 1
-            c.line(220, bar_y + 5, 220, bar_y + 47)
+            c.line(220, bar_y + 4, 220, bar_y + 52)
 
             # Col 2: Phone, Email, Website
-            c.drawString(230, bar_y + 37, "+91 96609 66369")
-            c.drawString(230, bar_y + 25, "admin@skandanhomecarre.com")
-            c.drawString(230, bar_y + 13, "www.skandanhomecarre.com")
+            c.drawString(230, bar_y + 40, "+91 96609 66369")
+            c.drawString(230, bar_y + 28, "admin@skandanhomecarre.com")
+            c.drawString(230, bar_y + 16, "www.skandanhomecarre.com")
 
             # Divider line 2
-            c.line(380, bar_y + 5, 380, bar_y + 47)
+            c.line(380, bar_y + 4, 380, bar_y + 52)
 
-            # Col 3: Invoice Meta
-            c.drawString(390, bar_y + 37, f"Invoice No.      : {inv_num_str}")
-            c.drawString(390, bar_y + 25, f"Invoice Date   : {inv_date_str}")
-            c.drawString(390, bar_y + 13, f"Billing Period  : {billing_period_str}")
-            c.drawString(390, bar_y + 2,  f"Start Date       : {start_date_str}")
+            # Col 3: Invoice Meta (Precise coordinate alignment)
+            col3_label_x = 390
+            col3_colon_x = 452
+            col3_val_x = 460
+
+            # Row 1: Invoice No.
+            c.setFont("Times-Roman", 8.5)
+            c.setFillColor(colors.HexColor("#555555"))
+            c.drawString(col3_label_x, bar_y + 42, "Invoice No.")
+            c.drawString(col3_colon_x, bar_y + 42, ":")
+            c.setFont("Times-Bold", 8.5)
+            c.setFillColor(colors.HexColor("#0B2C8C"))
+            c.drawString(col3_val_x, bar_y + 42, inv_num_str)
+
+            # Row 2: Invoice Date
+            c.setFont("Times-Roman", 8.5)
+            c.setFillColor(colors.HexColor("#555555"))
+            c.drawString(col3_label_x, bar_y + 30, "Invoice Date")
+            c.drawString(col3_colon_x, bar_y + 30, ":")
+            c.setFont("Times-Bold", 8.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(col3_val_x, bar_y + 30, inv_date_str)
+
+            # Row 3: Billing Period
+            c.setFont("Times-Roman", 8.5)
+            c.setFillColor(colors.HexColor("#555555"))
+            c.drawString(col3_label_x, bar_y + 18, "Billing Period")
+            c.drawString(col3_colon_x, bar_y + 18, ":")
+            c.setFont("Times-Bold", 8.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(col3_val_x, bar_y + 18, billing_period_str)
+
+            # Row 4: Start Date
+            c.setFont("Times-Roman", 8.5)
+            c.setFillColor(colors.HexColor("#555555"))
+            c.drawString(col3_label_x, bar_y + 6, "Start Date")
+            c.drawString(col3_colon_x, bar_y + 6, ":")
+            c.setFont("Times-Bold", 8.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(col3_val_x, bar_y + 6, start_date_str)
 
             # 3. Three Profile Cards
             cards_y = height - 275

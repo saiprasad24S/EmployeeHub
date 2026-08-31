@@ -230,29 +230,46 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           border: '1px solid #DCE7FF', 
           borderRadius: '8px', 
           display: 'flex', 
-          padding: '10px',
+          padding: '10px 12px',
           marginBottom: '20px',
           backgroundColor: '#F7F9FC',
-          fontSize: '11px'
+          fontSize: '11px',
+          alignItems: 'center'
         }}>
-          <div style={{ flex: 1, display: 'flex', paddingRight: '10px', borderRight: '1px solid #DCE7FF' }}>
+          <div style={{ flex: 1.1, display: 'flex', paddingRight: '12px', borderRight: '1px solid #DCE7FF' }}>
             <MapPin size={16} color="#0B2C8C" style={{ marginRight: '8px', marginTop: '2px', flexShrink: 0 }} />
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', lineHeight: '1.3' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', lineHeight: '1.35', color: '#333' }}>
               <span>Plot No 13, SY NO 3,4, RR Plaza,</span>
               <span>Madhapur, Hyderabad, Telangana -</span>
               <span>500081</span>
             </div>
           </div>
-          <div style={{ flex: 1, padding: '0 10px', borderRight: '1px solid #DCE7FF', display: 'flex', flexDirection: 'column', gap: '4px' }}>
-            <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> +91 96609 66369</div>
-            <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> admin@skandanhomecarre.com</div>
-            <div style={{ display: 'flex', alignItems: 'center' }}><Globe size={14} color="#0B2C8C" style={{ marginRight: '8px' }} /> www.skandanhomecarre.com</div>
+          <div style={{ flex: 1.15, padding: '0 12px', borderRight: '1px solid #DCE7FF', display: 'flex', flexDirection: 'column', gap: '4px', color: '#333' }}>
+            <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> +91 96609 66369</div>
+            <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> admin@skandanhomecarre.com</div>
+            <div style={{ display: 'flex', alignItems: 'center' }}><Globe size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> www.skandanhomecarre.com</div>
           </div>
-          <div style={{ flex: 1, paddingLeft: '10px', display: 'flex', flexDirection: 'column', gap: '4px', fontWeight: '500' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Invoice No.</span> <span>: {data.invoiceNumber}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Invoice Date</span> <span>: {formatDisplayDate(data.invoiceDate)}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Billing Period</span> <span>: {data.billingPeriodText}</span></div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Start Date</span> <span>: {formatDisplayDate(data.startDateText)}</span></div>
+          <div style={{ flex: 1.25, paddingLeft: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <span style={{ width: '84px', minWidth: '84px', color: '#555', fontSize: '11px' }}>Invoice No.</span>
+              <span style={{ width: '10px', minWidth: '10px', color: '#333', fontWeight: 600 }}>:</span>
+              <span style={{ fontWeight: 600, color: '#0B2C8C', fontSize: '11px' }}>{data.invoiceNumber}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <span style={{ width: '84px', minWidth: '84px', color: '#555', fontSize: '11px' }}>Invoice Date</span>
+              <span style={{ width: '10px', minWidth: '10px', color: '#333', fontWeight: 600 }}>:</span>
+              <span style={{ fontWeight: 600, color: '#1A1A1A', fontSize: '11px' }}>{formatDisplayDate(data.invoiceDate)}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <span style={{ width: '84px', minWidth: '84px', color: '#555', fontSize: '11px' }}>Billing Period</span>
+              <span style={{ width: '10px', minWidth: '10px', color: '#333', fontWeight: 600 }}>:</span>
+              <span style={{ fontWeight: 600, color: '#1A1A1A', fontSize: '11px' }}>{data.billingPeriodText || '—'}</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
+              <span style={{ width: '84px', minWidth: '84px', color: '#555', fontSize: '11px' }}>Start Date</span>
+              <span style={{ width: '10px', minWidth: '10px', color: '#333', fontWeight: 600 }}>:</span>
+              <span style={{ fontWeight: 600, color: '#1A1A1A', fontSize: '11px' }}>{formatDisplayDate(data.startDateText) || '—'}</span>
+            </div>
           </div>
         </div>
       )}
