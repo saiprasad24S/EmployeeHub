@@ -46,6 +46,50 @@ class InvoiceNextNumberView(APIView):
         return Response({"next_invoice_number": next_num})
 
 
+class InvoiceClientsListView(APIView):
+    """
+    Returns unique clients from previous invoices with their most recent details
+    for auto-completing invoice forms.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        query = request.query_params.get("q", "").strip()
+        invoices = Invoice.objects.exclude(client_name="").exclude(client_name__isnull=True).order_by("-created_at")
+        if query:
+            invoices = invoices.filter(client_name__icontains=query)
+
+        seen_clients: dict[str, dict] = {}
+        for inv in invoices:
+            name_raw = (inv.client_name or "").strip()
+            if not name_raw:
+                continue
+            name_key = name_raw.lower()
+            if name_key not in seen_clients:
+                seen_clients[name_key] = {
+                    "client_name": name_raw,
+                    "client_contact": inv.client_contact or "",
+                    "client_address": inv.client_address or "",
+                    "client_gst": inv.client_gst or "",
+                    "contact_person": inv.contact_person or "",
+                    "contact_person_designation": inv.contact_person_designation or "",
+                    "school_branch": inv.school_branch or "",
+                    "service_type": inv.service_type or "",
+                    "consultant": inv.consultant or "",
+                    "patient_name": inv.patient_name or "",
+                    "patient_age_gender": inv.patient_age_gender or "",
+                    "per_day_charges": float(inv.per_day_charges or 0),
+                    "invoice_type": inv.invoice_type or "REGULAR",
+                    "total_invoices": 1,
+                    "last_invoice_number": inv.invoice_number,
+                    "last_invoice_date": str(inv.invoice_date),
+                }
+            else:
+                seen_clients[name_key]["total_invoices"] += 1
+
+        return Response(list(seen_clients.values()))
+
+
 class InvoiceListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 

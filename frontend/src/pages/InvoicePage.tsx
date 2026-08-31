@@ -160,6 +160,19 @@ export function InvoicePage() {
     placeholderData: (previousData) => previousData,
   })
 
+  // Known Clients Query for Autocomplete & Auto-Fill
+  const clientsQuery = useQuery({
+    queryKey: ['invoice-clients'],
+    queryFn: async () => {
+      const token = (await getToken()) || ''
+      const res = await authedFetch('/api/invoices/clients/', token)
+      if (!res.ok) return []
+      return (await res.json())
+    },
+    staleTime: 60_000,
+    refetchOnWindowFocus: false,
+  })
+
   // Analytics
   const statsMetrics = useMemo(() => {
     const list = invoicesQuery.data || []
@@ -194,6 +207,7 @@ export function InvoicePage() {
     onSuccess: async (savedInvoice) => {
       setSelectedInvoice(savedInvoice)
       queryClient.invalidateQueries({ queryKey: ['invoices-list'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice-clients'] })
       const updatedNext = await queryClient.fetchQuery({
         queryKey: ['invoice-next-number'],
         queryFn: async () => {
@@ -223,6 +237,7 @@ export function InvoicePage() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['invoices-list'] })
+      queryClient.invalidateQueries({ queryKey: ['invoice-clients'] })
     },
   })
 
@@ -816,6 +831,8 @@ export function InvoicePage() {
                 <InvoiceFormAccordion
                   data={invoiceData}
                   onChange={setInvoiceData}
+                  existingInvoices={invoicesQuery.data || []}
+                  clientsList={clientsQuery.data || []}
                 />
               </div>
 

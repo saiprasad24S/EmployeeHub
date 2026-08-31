@@ -1,5 +1,6 @@
 from django.urls import path
 from apps.invoices.views import (
+    InvoiceClientsListView,
     InvoiceDetailView,
     InvoiceDownloadPDFView,
     InvoiceListCreateView,
@@ -10,6 +11,8 @@ from apps.invoices.views import (
 urlpatterns = [
     path("next-number", InvoiceNextNumberView.as_view(), name="invoice-next-number"),
     path("next-number/", InvoiceNextNumberView.as_view()),
+    path("clients", InvoiceClientsListView.as_view(), name="invoice-clients"),
+    path("clients/", InvoiceClientsListView.as_view()),
     path("verify", InvoiceVerifyView.as_view(), name="invoice-verify"),
     path("verify/", InvoiceVerifyView.as_view()),
     path("", InvoiceListCreateView.as_view(), name="invoice-list-create"),

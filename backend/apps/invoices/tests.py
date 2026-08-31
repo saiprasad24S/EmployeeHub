@@ -189,3 +189,47 @@ class InvoiceAPITests(TestCase):
         del_res = self.client.delete(f"/api/invoices/{invoice.id}")
         self.assertEqual(del_res.status_code, status.HTTP_200_OK)
         self.assertFalse(Invoice.objects.filter(id=invoice.id).exists())
+
+    def test_clients_list_endpoint(self):
+        Invoice.objects.create(
+            invoice_number="1369-0101",
+            invoice_type="REGULAR",
+            client_name="Apollo Hospital",
+            client_contact="9876543210",
+            client_address="Hyderabad",
+            contact_person="Dr. Ramesh",
+            per_day_charges=2500,
+        )
+        Invoice.objects.create(
+            invoice_number="1369-0102",
+            invoice_type="REGULAR",
+            client_name="Apollo Hospital",
+            client_contact="9876543210",
+            client_address="Hyderabad New Branch",
+            contact_person="Dr. Ramesh",
+            per_day_charges=2500,
+        )
+        Invoice.objects.create(
+            invoice_number="1369-0103",
+            invoice_type="SCHOOL",
+            client_name="Delhi Public School",
+            client_contact="9123456780",
+            client_address="Secunderabad",
+            school_branch="Nacharam",
+        )
+
+        res = self.client.get("/api/invoices/clients/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(res.data), 2)
+        apollo = next((c for c in res.data if c["client_name"] == "Apollo Hospital"), None)
+        self.assertIsNotNone(apollo)
+        self.assertEqual(apollo["total_invoices"], 2)
+        self.assertEqual(apollo["client_contact"], "9876543210")
+        self.assertEqual(apollo["contact_person"], "Dr. Ramesh")
+
+        # Test search query
+        search_res = self.client.get("/api/invoices/clients/?q=delhi")
+        self.assertEqual(search_res.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(search_res.data), 1)
+        self.assertEqual(search_res.data[0]["client_name"], "Delhi Public School")
+
