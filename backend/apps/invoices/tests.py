@@ -198,6 +198,8 @@ class InvoiceAPITests(TestCase):
             client_contact="9876543210",
             client_address="Hyderabad",
             contact_person="Dr. Ramesh",
+            start_date="2026-07-01",
+            service_start_date="2026-07-01",
             per_day_charges=2500,
         )
         Invoice.objects.create(
@@ -207,6 +209,8 @@ class InvoiceAPITests(TestCase):
             client_contact="9876543210",
             client_address="Hyderabad New Branch",
             contact_person="Dr. Ramesh",
+            start_date="2026-07-01",
+            service_start_date="2026-07-01",
             per_day_charges=2500,
         )
         Invoice.objects.create(
@@ -216,6 +220,7 @@ class InvoiceAPITests(TestCase):
             client_contact="9123456780",
             client_address="Secunderabad",
             school_branch="Nacharam",
+            start_date="2026-06-15",
         )
 
         res = self.client.get("/api/invoices/clients/")
@@ -226,10 +231,13 @@ class InvoiceAPITests(TestCase):
         self.assertEqual(apollo["total_invoices"], 2)
         self.assertEqual(apollo["client_contact"], "9876543210")
         self.assertEqual(apollo["contact_person"], "Dr. Ramesh")
+        self.assertEqual(apollo["start_date"], "2026-07-01")
+        self.assertEqual(apollo["service_start_date"], "2026-07-01")
 
         # Test search query
         search_res = self.client.get("/api/invoices/clients/?q=delhi")
         self.assertEqual(search_res.status_code, status.HTTP_200_OK)
         self.assertEqual(len(search_res.data), 1)
         self.assertEqual(search_res.data[0]["client_name"], "Delhi Public School")
+        self.assertEqual(search_res.data[0]["start_date"], "2026-06-15")
 

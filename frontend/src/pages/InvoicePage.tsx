@@ -286,6 +286,8 @@ export function InvoicePage() {
       patient_age_gender: invoiceData.patientAgeGender,
       service_type: invoiceData.serviceType,
       consultant: invoiceData.consultant,
+      service_start_date: invoiceData.serviceStarted || invoiceData.startDateText || '',
+      service_end_date: invoiceData.serviceEnd || '',
       rendered_days: invoiceData.renderedDays,
       school_branch: invoiceData.schoolBranch,
       contact_person: invoiceData.contactPerson,

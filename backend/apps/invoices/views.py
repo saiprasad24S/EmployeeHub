@@ -78,6 +78,8 @@ class InvoiceClientsListView(APIView):
                     "consultant": inv.consultant or "",
                     "patient_name": inv.patient_name or "",
                     "patient_age_gender": inv.patient_age_gender or "",
+                    "start_date": inv.start_date or "",
+                    "service_start_date": inv.service_start_date or inv.start_date or "",
                     "per_day_charges": float(inv.per_day_charges or 0),
                     "invoice_type": inv.invoice_type or "REGULAR",
                     "total_invoices": 1,
@@ -86,6 +88,10 @@ class InvoiceClientsListView(APIView):
                 }
             else:
                 seen_clients[name_key]["total_invoices"] += 1
+                if not seen_clients[name_key].get("start_date") and inv.start_date:
+                    seen_clients[name_key]["start_date"] = inv.start_date
+                if not seen_clients[name_key].get("service_start_date") and (inv.service_start_date or inv.start_date):
+                    seen_clients[name_key]["service_start_date"] = inv.service_start_date or inv.start_date
 
         return Response(list(seen_clients.values()))
 

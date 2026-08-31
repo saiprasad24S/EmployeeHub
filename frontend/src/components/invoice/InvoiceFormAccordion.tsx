@@ -23,6 +23,8 @@ export interface ClientProfile {
   consultant?: string;
   patient_name?: string;
   patient_age_gender?: string;
+  start_date?: string;
+  service_start_date?: string;
   per_day_charges?: number;
   invoice_type?: 'REGULAR' | 'SCHOOL' | 'MULTI_SERVICE';
   total_invoices?: number;
@@ -527,6 +529,8 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
           consultant: inv.consultant || '',
           patient_name: inv.patient_name || '',
           patient_age_gender: inv.patient_age_gender || '',
+          start_date: inv.start_date || '',
+          service_start_date: inv.service_start_date || inv.start_date || '',
           per_day_charges: Number(inv.per_day_charges || 0),
           invoice_type: inv.invoice_type || 'REGULAR',
           total_invoices: 1,
@@ -536,6 +540,12 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       } else {
         const existing = map.get(key)!;
         existing.total_invoices = (existing.total_invoices || 1) + 1;
+        if (!existing.start_date && inv.start_date) {
+          existing.start_date = inv.start_date;
+        }
+        if (!existing.service_start_date && (inv.service_start_date || inv.start_date)) {
+          existing.service_start_date = inv.service_start_date || inv.start_date;
+        }
       }
     });
 
@@ -567,6 +577,8 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       consultant: client.consultant || data.consultant || '',
       patientName: client.patient_name || data.patientName || '',
       patientAgeGender: client.patient_age_gender || data.patientAgeGender || '',
+      startDateText: client.start_date || data.startDateText || '',
+      serviceStarted: client.service_start_date || client.start_date || data.serviceStarted || '',
       perDayCharges: client.per_day_charges ? Number(client.per_day_charges) : data.perDayCharges,
     };
 
@@ -577,7 +589,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
     setOpenSections(prev => ({
       ...prev,
       client: true,
-      profile: Boolean(client.service_type || client.consultant || client.patient_name),
+      profile: Boolean(client.service_type || client.consultant || client.patient_name || client.service_start_date),
       other: Boolean(client.per_day_charges),
       school: Boolean(client.school_branch),
     }));
@@ -596,6 +608,8 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
         clientAddress: '',
         clientGst: '',
         contactPerson: '',
+        startDateText: '',
+        serviceStarted: '',
       });
       setAutoFilledClientName(null);
     }
