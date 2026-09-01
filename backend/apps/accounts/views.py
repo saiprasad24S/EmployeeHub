@@ -1,5 +1,6 @@
 from rest_framework import status, viewsets
-from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -89,13 +90,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     queryset = Employee.objects.all().order_by("employee_id")
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     pagination_class = None
     filterset_fields = ["department", "designation", "is_active"]
     search_fields = ["employee_id", "name", "email"]
 
     def get_permissions(self):
-        if self.action in {"create", "update", "partial_update", "destroy"}:
+        if self.action in {"create", "destroy"}:
             return [IsAdminRole()]
         return [IsAuthenticated()]
 
@@ -219,8 +220,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         elif employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
             from apps.attendance.services import ensure_default_address
             ensure_default_address(employee)
-        if request.FILES.get("profile_photo_file"):
-            photo_file = request.FILES["profile_photo_file"]
+        
+        photo_file = request.FILES.get("profile_photo_file") or request.data.get("profile_photo_file")
+        if photo_file and hasattr(photo_file, "read"):
             photo_file.seek(0)
             try:
                 vision_service.register_face(employee, photo_file)
@@ -236,6 +238,29 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             employee.profile_photo_public_id = upload_result["public_id"]
             employee.updated_at = timezone.now()
             employee.save(update_fields=["profile_photo", "profile_photo_public_id", "updated_at"])
+        return Response(EmployeeSerializer(employee, context={"request": request}).data)
+
+    @action(detail=True, methods=["post"], url_path="upload-photo")
+    def upload_photo(self, request, pk=None):
+        employee = self.get_object()
+        photo_file = request.FILES.get("profile_photo_file") or request.data.get("profile_photo_file")
+        if not photo_file or not hasattr(photo_file, "read"):
+            return Response({"detail": "No valid profile_photo_file provided."}, status=status.HTTP_400_BAD_REQUEST)
+        photo_file.seek(0)
+        try:
+            vision_service.register_face(employee, photo_file)
+        except Exception:
+            pass
+        photo_file.seek(0)
+        upload_result = upload_profile_photo(
+            photo_file,
+            employee_id=employee.employee_id,
+            employee_name=employee.name,
+        )
+        employee.profile_photo = upload_result["url"]
+        employee.profile_photo_public_id = upload_result["public_id"]
+        employee.updated_at = timezone.now()
+        employee.save(update_fields=["profile_photo", "profile_photo_public_id", "updated_at"])
         return Response(EmployeeSerializer(employee, context={"request": request}).data)
 
 

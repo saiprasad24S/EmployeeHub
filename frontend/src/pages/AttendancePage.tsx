@@ -486,6 +486,7 @@ export function AttendancePage() {
                         <tr key={emp.employee_id}>
                           <td>
                             <img
+                              key={`att-pres-avatar-${emp.employee_id}-${emp.profile_photo || 'none'}`}
                               src={emp.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(emp.name) + '&background=6B2FA0&color=fff'}
                               alt={emp.name}
                               style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}
@@ -552,6 +553,7 @@ export function AttendancePage() {
                         <tr key={emp.employee_id}>
                           <td>
                             <img
+                              key={`att-abs-avatar-${emp.employee_id}-${emp.profile_photo || 'none'}`}
                               src={emp.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(emp.name) + '&background=6B2FA0&color=fff'}
                               alt={emp.name}
                               style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover' }}

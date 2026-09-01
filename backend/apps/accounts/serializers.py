@@ -78,14 +78,15 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return summary.get("status") == "Present"
 
     def get_profile_photo(self, obj: Employee) -> str:
-        if not obj.profile_photo:
-            return ""
-        url = obj.profile_photo if obj.profile_photo.startswith("http") else ""
-        if url and getattr(obj, "updated_at", None):
-            ts = int(obj.updated_at.timestamp())
-            sep = "&" if "?" in url else "?"
-            return f"{url}{sep}t={ts}"
-        return url
+        if obj.profile_photo and obj.profile_photo.startswith("http"):
+            return obj.profile_photo
+        try:
+            latest_att = obj.attendance_records.filter(attendance_type="CHECK_IN").exclude(photo_url="").order_by("-timestamp").first()
+            if latest_att and latest_att.photo_url:
+                return latest_att.photo_url
+        except Exception:
+            pass
+        return ""
 
     def to_representation(self, instance: Employee):
         data = super().to_representation(instance)

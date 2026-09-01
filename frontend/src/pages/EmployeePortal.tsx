@@ -724,9 +724,13 @@ export function EmployeePortal() {
               <div className="glass-card card-soft employee-card">
                 <div className="employee-avatar-wrapper">
                   <img
-                    src={profile.profile_photo || 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=200&q=80'}
+                    key={`portal-avatar-${profile.id}-${profile.profile_photo || 'none'}`}
+                    src={profile.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(profile.name) + '&background=6B2FA0&color=fff'}
                     alt={profile.name}
                     className="employee-avatar"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).src = 'https://ui-avatars.com/api/?name=' + encodeURIComponent(profile.name) + '&background=6B2FA0&color=fff'
+                    }}
                   />
                 </div>
                 <h3>{profile.name}</h3>

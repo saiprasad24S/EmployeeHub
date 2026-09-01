@@ -497,6 +497,7 @@ export function EmployeesPage() {
                         <td style={{ textAlign: 'center', verticalAlign: 'middle', padding: '0.75rem' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.3rem' }}>
                             <img
+                              key={`table-avatar-${employee.id}-${employee.profile_photo || 'none'}`}
                               src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
                               alt={employee.name}
                               onError={(e) => {
@@ -645,6 +646,7 @@ export function EmployeesPage() {
                 <div key={employee.employee_id} style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: '14px', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
                     <img
+                      key={`card-avatar-${employee.id}-${employee.profile_photo || 'none'}`}
                       src={employee.profile_photo || 'https://ui-avatars.com/api/?name=' + encodeURIComponent(employee.name) + '&background=6B2FA0&color=fff'}
                       alt={employee.name}
                       onError={(e) => {
