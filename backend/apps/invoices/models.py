@@ -53,6 +53,8 @@ class Invoice(models.Model):
     # Client Info
     client_name = models.CharField(max_length=200, blank=True, default="")
     client_contact = models.CharField(max_length=50, blank=True)
+    gender = models.CharField(max_length=50, blank=True, default="")
+    age = models.CharField(max_length=50, blank=True, default="")
     client_address = models.TextField(blank=True)
     client_gst = models.CharField(max_length=50, blank=True)
 

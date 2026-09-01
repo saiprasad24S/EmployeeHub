@@ -19,6 +19,7 @@ export function DashboardPage() {
       if (!response.ok) throw new Error('Unable to load metrics')
       return response.json() as Promise<Record<string, number>>
     },
+    staleTime: 60_000,
   })
 
   const liveLocationsQuery = useQuery({
@@ -40,7 +41,9 @@ export function DashboardPage() {
         longitude: number
       }>>
     },
-    refetchInterval: 30000,
+    staleTime: 15_000,
+    refetchInterval: 60000,
+    refetchIntervalInBackground: false,
   })
 
   const filteredLocations = useMemo(() => {

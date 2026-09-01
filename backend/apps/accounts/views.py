@@ -6,12 +6,14 @@ from rest_framework.views import APIView
 
 
 
+from django.utils import timezone
+
 from apps.accounts.authentication import ClerkJWTAuthentication
 from apps.accounts.models import Employee
 from apps.accounts.serializers import EmployeeCreateSerializer, EmployeeSerializer
-from apps.attendance.services import get_employee_presence_summary
+from apps.assignments.models import Assignment
 from apps.attendance.models import Session
-from apps.attendance.services import end_session, upload_profile_photo
+from apps.attendance.services import get_employee_presence_summary, end_session, upload_profile_photo
 from apps.common.permissions import IsAdminRole
 from apps.vision.services import FaceService
 
@@ -97,6 +99,74 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             return [IsAdminRole()]
         return [IsAuthenticated()]
 
+    def list(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        employees = list(queryset)
+        if employees:
+            today = timezone.localdate()
+            emp_ids = [e.id for e in employees]
+
+            # 1. Bulk-fetch today's sessions in a single query
+            sessions = (
+                Session.objects.filter(employee_id__in=emp_ids, login_time__date=today)
+                .order_by("-login_time")
+            )
+            sessions_by_emp = {}
+            for s in sessions:
+                if s.employee_id not in sessions_by_emp:
+                    sessions_by_emp[s.employee_id] = s
+
+            # Pre-compute presence summary on each employee
+            now = timezone.now()
+            for emp in employees:
+                session = sessions_by_emp.get(emp.id)
+                if not session:
+                    emp._cached_presence_summary = {
+                        "is_present": False,
+                        "status": "Absent",
+                        "check_in_time": None,
+                        "check_out_time": None,
+                        "session_duration_seconds": 0,
+                        "session": None,
+                    }
+                elif session.is_active or not session.logout_time:
+                    dur = max(int((now - session.login_time).total_seconds()), 0) if session.login_time else 0
+                    emp._cached_presence_summary = {
+                        "is_present": True,
+                        "status": "Present",
+                        "check_in_time": session.login_time,
+                        "check_out_time": None,
+                        "session_duration_seconds": dur,
+                        "session": session,
+                    }
+                else:
+                    logout = session.logout_time or session.login_time
+                    dur = max(int((logout - session.login_time).total_seconds()), 0) if session.login_time else 0
+                    emp._cached_presence_summary = {
+                        "is_present": True,
+                        "status": "Checked Out",
+                        "check_in_time": session.login_time,
+                        "check_out_time": logout,
+                        "session_duration_seconds": dur,
+                        "session": session,
+                    }
+
+            # 2. Bulk-fetch today's active assignments in a single query
+            assignments = (
+                Assignment.objects.filter(employee_id__in=emp_ids, visit_date=today)
+                .exclude(status=Assignment.Status.CANCELLED)
+                .order_by("-created_at")
+            )
+            assign_by_emp = {}
+            for a in assignments:
+                if a.employee_id not in assign_by_emp:
+                    assign_by_emp[a.employee_id] = a
+            for emp in employees:
+                emp._cached_active_assignment = assign_by_emp.get(emp.id)
+
+        serializer = self.get_serializer(employees, many=True)
+        return Response(serializer.data)
+
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
         remark = request.query_params.get("remark") or request.data.get("remark") or "No remark provided"
@@ -138,7 +208,7 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return Response(EmployeeSerializer(employee, context={"request": request}).data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
-        partial = kwargs.pop("partial", False)
+        partial = kwargs.pop("partial", True)
         instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
@@ -164,7 +234,8 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             )
             employee.profile_photo = upload_result["url"]
             employee.profile_photo_public_id = upload_result["public_id"]
-            employee.save(update_fields=["profile_photo", "profile_photo_public_id"])
+            employee.updated_at = timezone.now()
+            employee.save(update_fields=["profile_photo", "profile_photo_public_id", "updated_at"])
         return Response(EmployeeSerializer(employee, context={"request": request}).data)
 
 

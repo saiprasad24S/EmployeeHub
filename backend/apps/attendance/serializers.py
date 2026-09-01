@@ -57,14 +57,20 @@ class AttendanceSerializer(serializers.ModelSerializer):
             return ""
         return obj.photo_url if obj.photo_url.startswith("http") else ""
 
+    def _get_presence(self, obj: Attendance) -> dict:
+        emp = obj.employee
+        if not hasattr(emp, "_cached_presence_summary"):
+            emp._cached_presence_summary = get_employee_presence_summary(emp)
+        return emp._cached_presence_summary
+
     def get_presence_status(self, obj: Attendance) -> str:
-        return get_employee_presence_summary(obj.employee)['status']
+        return self._get_presence(obj)['status']
 
     def get_presence_is_active(self, obj: Attendance) -> bool:
-        return get_employee_presence_summary(obj.employee)['is_present']
+        return self._get_presence(obj)['is_present']
 
     def get_presence_check_in_time(self, obj: Attendance):
-        return get_employee_presence_summary(obj.employee)['check_in_time']
+        return self._get_presence(obj)['check_in_time']
 
     def get_presence_session_duration_seconds(self, obj: Attendance) -> int:
-        return get_employee_presence_summary(obj.employee)['session_duration_seconds']
+        return self._get_presence(obj)['session_duration_seconds']

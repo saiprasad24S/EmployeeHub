@@ -4,7 +4,7 @@ import { useAuth } from '@clerk/clerk-react';
 import {
   FileText, Calendar, Layers, Building, User, Phone, MapPin,
   Briefcase, UserCheck, Clock, Heart, DollarSign, CreditCard,
-  Plus, Trash2, ChevronDown, MessageSquare, Percent, Sparkles,
+  Plus, Trash2, ChevronDown, ChevronLeft, ChevronRight, MessageSquare, Percent, Sparkles,
   Search, Check, X, RotateCcw
 } from 'lucide-react';
 import { authedFetch } from '../../lib/api';
@@ -18,6 +18,8 @@ export interface ClientProfile {
   client_gst?: string;
   contact_person?: string;
   contact_person_designation?: string;
+  gender?: string;
+  age?: string;
   school_branch?: string;
   service_type?: string;
   consultant?: string;
@@ -48,7 +50,7 @@ const AccordionSection: React.FC<{
 }> = ({ id, title, icon, isOpen, onToggle, badge, children }) => (
   <div style={{
     background: 'var(--inv-card)', borderRadius: 12, border: '1px solid var(--inv-border)',
-    boxShadow: 'var(--inv-shadow-sm)', marginBottom: 12, overflow: 'hidden',
+    boxShadow: 'var(--inv-shadow-sm)', marginBottom: 12, overflow: isOpen ? 'visible' : 'hidden',
   }}>
     <button
       onClick={() => onToggle(id)}
@@ -171,10 +173,601 @@ const InputField: React.FC<{
             readOnly={readOnly}
             onFocus={handleFocus as any}
             onBlur={handleBlur as any}
-            style={baseInputStyle}
+            onClick={type === 'date' ? (e => { try { (e.currentTarget as any).showPicker?.(); } catch (_) {} }) : undefined}
+            style={{
+              ...baseInputStyle,
+              cursor: type === 'date' ? 'pointer' : undefined,
+            }}
           />
         )}
       </div>
+    </div>
+  );
+};
+
+/* ── Interactive Date Picker Field ────────────────────────── */
+const DatePickerField: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  readOnly?: boolean;
+}> = ({ label, value, onChange, placeholder = 'DD/MM/YYYY', readOnly }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Parse current value to date object
+  const parsedDate = useMemo(() => {
+    if (!value) return null;
+    const str = value.trim();
+    // try YYYY-MM-DD
+    const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    if (ymd) {
+      return new Date(parseInt(ymd[1]), parseInt(ymd[2]) - 1, parseInt(ymd[3]));
+    }
+    // try DD/MM/YYYY
+    const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    if (dmy) {
+      return new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]));
+    }
+    const d = new Date(str);
+    return isNaN(d.getTime()) ? null : d;
+  }, [value]);
+
+  const [viewYear, setViewYear] = useState(() => parsedDate ? parsedDate.getFullYear() : new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(() => parsedDate ? parsedDate.getMonth() : new Date().getMonth());
+
+  useEffect(() => {
+    if (parsedDate) {
+      setViewYear(parsedDate.getFullYear());
+      setViewMonth(parsedDate.getMonth());
+    }
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const monthNames = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+
+  const calendarDays = useMemo(() => {
+    const firstDay = new Date(viewYear, viewMonth, 1).getDay();
+    const totalDays = new Date(viewYear, viewMonth + 1, 0).getDate();
+    const prevMonthTotalDays = new Date(viewYear, viewMonth, 0).getDate();
+
+    const days: { day: number; currentMonth: boolean; dateStr: string }[] = [];
+
+    // Prev month padding
+    for (let i = firstDay - 1; i >= 0; i--) {
+      const prevDate = new Date(viewYear, viewMonth - 1, prevMonthTotalDays - i);
+      const m = String(prevDate.getMonth() + 1).padStart(2, '0');
+      const d = String(prevDate.getDate()).padStart(2, '0');
+      days.push({
+        day: prevMonthTotalDays - i,
+        currentMonth: false,
+        dateStr: `${prevDate.getFullYear()}-${m}-${d}`,
+      });
+    }
+
+    // Current month days
+    for (let d = 1; d <= totalDays; d++) {
+      const m = String(viewMonth + 1).padStart(2, '0');
+      const dayStr = String(d).padStart(2, '0');
+      days.push({ day: d, currentMonth: true, dateStr: `${viewYear}-${m}-${dayStr}` });
+    }
+
+    // Next month padding to complete row
+    const remaining = (7 - (days.length % 7)) % 7;
+    for (let n = 1; n <= remaining; n++) {
+      const nextDate = new Date(viewYear, viewMonth + 1, n);
+      const m = String(nextDate.getMonth() + 1).padStart(2, '0');
+      const dayStr = String(n).padStart(2, '0');
+      days.push({
+        day: n,
+        currentMonth: false,
+        dateStr: `${nextDate.getFullYear()}-${m}-${dayStr}`,
+      });
+    }
+
+    return days;
+  }, [viewYear, viewMonth]);
+
+  const handlePrevMonth = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (viewMonth === 0) {
+      setViewMonth(11);
+      setViewYear(viewYear - 1);
+    } else {
+      setViewMonth(viewMonth - 1);
+    }
+  };
+
+  const handleNextMonth = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (viewMonth === 11) {
+      setViewMonth(0);
+      setViewYear(viewYear + 1);
+    } else {
+      setViewMonth(viewMonth + 1);
+    }
+  };
+
+  const handleSelectDay = (dateStr: string) => {
+    onChange(dateStr);
+    setIsOpen(false);
+  };
+
+  const handleSelectToday = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const today = new Date();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const d = String(today.getDate()).padStart(2, '0');
+    onChange(`${today.getFullYear()}-${m}-${d}`);
+    setIsOpen(false);
+  };
+
+  // User-facing formatted display
+  const displayFormatted = useMemo(() => {
+    if (!value) return '';
+    if (parsedDate) {
+      const dd = String(parsedDate.getDate()).padStart(2, '0');
+      const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+      return `${dd}/${mm}/${parsedDate.getFullYear()}`;
+    }
+    return value;
+  }, [value, parsedDate]);
+
+  return (
+    <div ref={containerRef} style={{ marginBottom: 10, position: 'relative' }}>
+      <label style={{ fontSize: 10, fontWeight: 600, color: '#616161', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' }}>
+        {label}
+      </label>
+      <div
+        onClick={() => !readOnly && setIsOpen(prev => !prev)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          border: isOpen ? '1px solid var(--inv-primary)' : '1px solid var(--inv-border)',
+          boxShadow: isOpen ? '0 0 0 3px rgba(11,44,140,0.15)' : 'none',
+          borderRadius: 8,
+          background: readOnly ? 'var(--inv-light-border)' : 'var(--inv-card)',
+          cursor: readOnly ? 'default' : 'pointer',
+          padding: '7px 10px',
+          transition: 'all 0.2s ease',
+        }}
+      >
+        <Calendar style={{ width: 14, height: 14, color: '#0B2C8C', marginRight: 8, flexShrink: 0 }} />
+        <input
+          type="text"
+          value={displayFormatted}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          readOnly={readOnly}
+          style={{
+            flex: 1,
+            border: 'none',
+            outline: 'none',
+            background: 'transparent',
+            fontSize: 12,
+            fontFamily: 'Poppins, sans-serif',
+            color: displayFormatted ? 'var(--inv-text)' : '#9CA3AF',
+            cursor: readOnly ? 'default' : 'pointer',
+            padding: 0,
+          }}
+        />
+        {value && !readOnly ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onChange(''); }}
+            title="Clear date"
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', color: '#9CA3AF' }}
+          >
+            <X style={{ width: 13, height: 13 }} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); if (!readOnly) setIsOpen(prev => !prev); }}
+            title="Open Calendar"
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', color: '#0B2C8C' }}
+          >
+            <Calendar style={{ width: 14, height: 14 }} />
+          </button>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              left: 0,
+              zIndex: 999,
+              background: '#FFFFFF',
+              border: '1px solid #D8E3F5',
+              borderRadius: 10,
+              boxShadow: '0 10px 28px rgba(11,44,140,0.18)',
+              padding: 12,
+              width: 252,
+              fontFamily: 'Poppins, sans-serif',
+            }}
+          >
+            {/* Header: Month & Year navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                style={{
+                  border: '1px solid #DCE7FF',
+                  borderRadius: 6,
+                  background: '#F7F9FC',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <ChevronLeft style={{ width: 14, height: 14, color: '#0B2C8C' }} />
+              </button>
+              <div style={{ fontWeight: 700, fontSize: 12, color: '#0B2C8C' }}>
+                {monthNames[viewMonth]} {viewYear}
+              </div>
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                style={{
+                  border: '1px solid #DCE7FF',
+                  borderRadius: 6,
+                  background: '#F7F9FC',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                }}
+              >
+                <ChevronRight style={{ width: 14, height: 14, color: '#0B2C8C' }} />
+              </button>
+            </div>
+
+            {/* Days of week header */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2, textAlign: 'center', marginBottom: 4 }}>
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((d) => (
+                <div key={d} style={{ fontSize: 10, fontWeight: 700, color: '#9CA3AF', padding: '2px 0' }}>
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Day grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 2 }}>
+              {calendarDays.map((item, idx) => {
+                const isSelected = parsedDate &&
+                  parsedDate.getFullYear() === parseInt(item.dateStr.split('-')[0]) &&
+                  (parsedDate.getMonth() + 1) === parseInt(item.dateStr.split('-')[1]) &&
+                  parsedDate.getDate() === parseInt(item.dateStr.split('-')[2]);
+
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => handleSelectDay(item.dateStr)}
+                    style={{
+                      border: 'none',
+                      borderRadius: 6,
+                      padding: '5px 0',
+                      fontSize: 11,
+                      fontWeight: isSelected ? 700 : 500,
+                      background: isSelected ? '#0B2C8C' : 'transparent',
+                      color: isSelected ? '#FFFFFF' : (item.currentMonth ? '#1A1A1A' : '#C4CDD5'),
+                      cursor: 'pointer',
+                      transition: 'background 0.1s',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = '#EDF2FF';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = 'transparent';
+                    }}
+                  >
+                    {item.day}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Footer Buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #F0F4FA', marginTop: 8, paddingTop: 8 }}>
+              <button
+                type="button"
+                onClick={handleSelectToday}
+                style={{
+                  border: 'none',
+                  background: '#EDF2FF',
+                  color: '#0B2C8C',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                }}
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#616161',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Done
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+/* ── Interactive Month Picker Field ────────────────────────── */
+const MonthPickerField: React.FC<{
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  readOnly?: boolean;
+}> = ({ label, value, onChange, placeholder = 'e.g. July 2026', readOnly }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const initialYear = useMemo(() => {
+    if (!value) return new Date().getFullYear();
+    const match = value.match(/\b(20\d{2})\b/);
+    return match ? parseInt(match[1]) : new Date().getFullYear();
+  }, [value]);
+
+  const [viewYear, setViewYear] = useState(initialYear);
+
+  useEffect(() => {
+    const match = value?.match(/\b(20\d{2})\b/);
+    if (match) setViewYear(parseInt(match[1]));
+  }, [value]);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    if (isOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isOpen]);
+
+  const months = [
+    { short: 'Jan', full: 'January' },
+    { short: 'Feb', full: 'February' },
+    { short: 'Mar', full: 'March' },
+    { short: 'Apr', full: 'April' },
+    { short: 'May', full: 'May' },
+    { short: 'Jun', full: 'June' },
+    { short: 'Jul', full: 'July' },
+    { short: 'Aug', full: 'August' },
+    { short: 'Sep', full: 'September' },
+    { short: 'Oct', full: 'October' },
+    { short: 'Nov', full: 'November' },
+    { short: 'Dec', full: 'December' },
+  ];
+
+  const handleSelectMonth = (monthName: string) => {
+    onChange(`${monthName} ${viewYear}`);
+    setIsOpen(false);
+  };
+
+  const handleSelectThisMonth = () => {
+    const now = new Date();
+    const monthName = months[now.getMonth()].full;
+    onChange(`${monthName} ${now.getFullYear()}`);
+    setIsOpen(false);
+  };
+
+  return (
+    <div ref={containerRef} style={{ marginBottom: 10, position: 'relative' }}>
+      <label style={{ fontSize: 10, fontWeight: 600, color: '#616161', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' }}>
+        {label}
+      </label>
+      <div
+        onClick={() => !readOnly && setIsOpen(prev => !prev)}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          border: isOpen ? '1px solid var(--inv-primary)' : '1px solid var(--inv-border)',
+          boxShadow: isOpen ? '0 0 0 3px rgba(11,44,140,0.15)' : 'none',
+          borderRadius: 8,
+          background: readOnly ? 'var(--inv-light-border)' : 'var(--inv-card)',
+          cursor: readOnly ? 'default' : 'pointer',
+          padding: '7px 10px',
+          transition: 'all 0.2s ease',
+        }}
+      >
+        <Calendar style={{ width: 14, height: 14, color: '#0B2C8C', marginRight: 8, flexShrink: 0 }} />
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder={placeholder}
+          readOnly={readOnly}
+          style={{
+            flex: 1,
+            border: 'none',
+            outline: 'none',
+            background: 'transparent',
+            fontSize: 12,
+            fontFamily: 'Poppins, sans-serif',
+            color: value ? 'var(--inv-text)' : '#9CA3AF',
+            cursor: readOnly ? 'default' : 'pointer',
+            padding: 0,
+          }}
+        />
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); if (!readOnly) setIsOpen(prev => !prev); }}
+          title="Open Month Calendar"
+          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', color: '#0B2C8C' }}
+        >
+          <Calendar style={{ width: 14, height: 14 }} />
+        </button>
+      </div>
+
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            transition={{ duration: 0.15 }}
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 4px)',
+              left: 0,
+              zIndex: 999,
+              background: '#FFFFFF',
+              border: '1px solid #D8E3F5',
+              borderRadius: 10,
+              boxShadow: '0 10px 28px rgba(11,44,140,0.18)',
+              padding: 12,
+              width: 252,
+              fontFamily: 'Poppins, sans-serif',
+            }}
+          >
+            {/* Year navigation */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setViewYear(viewYear - 1); }}
+                style={{
+                  border: '1px solid #DCE7FF',
+                  borderRadius: 6,
+                  background: '#F7F9FC',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                }}
+              >
+                <ChevronLeft style={{ width: 14, height: 14, color: '#0B2C8C' }} />
+              </button>
+              <div style={{ fontWeight: 700, fontSize: 13, color: '#0B2C8C' }}>
+                {viewYear}
+              </div>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); setViewYear(viewYear + 1); }}
+                style={{
+                  border: '1px solid #DCE7FF',
+                  borderRadius: 6,
+                  background: '#F7F9FC',
+                  padding: '3px 6px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                }}
+              >
+                <ChevronRight style={{ width: 14, height: 14, color: '#0B2C8C' }} />
+              </button>
+            </div>
+
+            {/* 12 Months Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6, marginBottom: 10 }}>
+              {months.map((m) => {
+                const isSelected = value && value.toLowerCase().includes(m.full.toLowerCase()) && value.includes(String(viewYear));
+                return (
+                  <button
+                    key={m.short}
+                    type="button"
+                    onClick={() => handleSelectMonth(m.full)}
+                    style={{
+                      border: isSelected ? '1px solid #0B2C8C' : '1px solid #F0F4FA',
+                      borderRadius: 6,
+                      padding: '6px 0',
+                      fontSize: 11,
+                      fontWeight: isSelected ? 700 : 500,
+                      background: isSelected ? '#0B2C8C' : '#F7F9FC',
+                      color: isSelected ? '#FFFFFF' : '#1A1A1A',
+                      cursor: 'pointer',
+                      textAlign: 'center',
+                      transition: 'all 0.12s ease',
+                    }}
+                    onMouseEnter={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = '#EDF2FF';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!isSelected) e.currentTarget.style.background = '#F7F9FC';
+                    }}
+                  >
+                    {m.short}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Quick action button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #F0F4FA', paddingTop: 8 }}>
+              <button
+                type="button"
+                onClick={handleSelectThisMonth}
+                style={{
+                  border: 'none',
+                  background: '#EDF2FF',
+                  color: '#0B2C8C',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  padding: '3px 8px',
+                  borderRadius: 4,
+                  cursor: 'pointer',
+                }}
+              >
+                This Month
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsOpen(false)}
+                style={{
+                  border: 'none',
+                  background: 'transparent',
+                  color: '#616161',
+                  fontSize: 10,
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
@@ -577,6 +1170,8 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       consultant: client.consultant || data.consultant || '',
       patientName: client.patient_name || data.patientName || '',
       patientAgeGender: client.patient_age_gender || data.patientAgeGender || '',
+      gender: client.gender || data.gender || '',
+      age: client.age || data.age || '',
       startDateText: client.start_date || data.startDateText || '',
       serviceStarted: client.service_start_date || client.start_date || data.serviceStarted || '',
       perDayCharges: client.per_day_charges ? Number(client.per_day_charges) : data.perDayCharges,
@@ -665,9 +1260,9 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       {/* 1. Invoice Information */}
       <AccordionSection id="invoice" title="Invoice Information" icon={<FileText style={iconSize} />} isOpen={!!openSections.invoice} onToggle={toggleSection}>
         <InputField label="Invoice Number (Auto-Generated)" icon={<FileText style={iconSize} />} value={data.invoiceNumber} onChange={v => updateField('invoiceNumber', v)} readOnly={true} />
-        <InputField label="Invoice Date" icon={<Calendar style={iconSize} />} type="date" value={data.invoiceDate} onChange={v => updateField('invoiceDate', v)} />
-        <InputField label="Billing Period" icon={<Calendar style={iconSize} />} value={data.billingPeriodText} onChange={v => updateField('billingPeriodText', v)} />
-        <InputField label="Start Date" icon={<Calendar style={iconSize} />} type="date" value={data.startDateText} onChange={v => updateField('startDateText', v)} />
+        <DatePickerField label="Invoice Date" value={data.invoiceDate} onChange={v => updateField('invoiceDate', v)} placeholder="DD/MM/YYYY" />
+        <MonthPickerField label="Month" value={data.billingPeriodText} onChange={v => updateField('billingPeriodText', v)} placeholder="Select Month (e.g. July 2026)" />
+        <DatePickerField label="Start Date" value={data.startDateText} onChange={v => updateField('startDateText', v)} placeholder="DD/MM/YYYY" />
         <InputField
           label="Template Type" icon={<Layers style={iconSize} />} value={data.invoiceType}
           onChange={v => updateField('invoiceType', v as any)}
@@ -755,6 +1350,10 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
             />
             <InputField label="Contact Person" icon={<User style={iconSize} />} value={data.contactPerson || ''} onChange={v => updateField('contactPerson', v)} />
             <InputField label="Contact No." icon={<Phone style={iconSize} />} value={data.clientContact} onChange={v => updateField('clientContact', v)} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <InputField label="Gender" icon={<User style={iconSize} />} value={data.gender || ''} onChange={v => updateField('gender', v)} placeholder="e.g. Male / Female" />
+              <InputField label="Age" icon={<Calendar style={iconSize} />} value={data.age || ''} onChange={v => updateField('age', v)} placeholder="e.g. 65 Yrs" />
+            </div>
             <InputField label="GST No. (Optional)" icon={<Building style={iconSize} />} value={data.clientGst || ''} onChange={v => updateField('clientGst', v)} />
             <InputField label="Address" icon={<MapPin style={iconSize} />} value={data.clientAddress} onChange={v => updateField('clientAddress', v)} isTextarea />
           </>
@@ -770,6 +1369,10 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
               onSelectClient={handleAutoFillClient}
             />
             <InputField label="Contact No." icon={<Phone style={iconSize} />} value={data.clientContact} onChange={v => updateField('clientContact', v)} />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+              <InputField label="Gender" icon={<User style={iconSize} />} value={data.gender || ''} onChange={v => updateField('gender', v)} placeholder="e.g. Male / Female" />
+              <InputField label="Age" icon={<Calendar style={iconSize} />} value={data.age || ''} onChange={v => updateField('age', v)} placeholder="e.g. 65 Yrs" />
+            </div>
             <InputField label="GST No. (Optional)" icon={<Building style={iconSize} />} value={data.clientGst || ''} onChange={v => updateField('clientGst', v)} />
             <InputField label="Address" icon={<MapPin style={iconSize} />} value={data.clientAddress} onChange={v => updateField('clientAddress', v)} isTextarea />
           </>
@@ -786,8 +1389,8 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
         )}
         <InputField label="Service Type" icon={<Briefcase style={iconSize} />} value={data.serviceType || ''} onChange={v => updateField('serviceType', v)} />
         <InputField label="Consultant" icon={<UserCheck style={iconSize} />} value={data.consultant || ''} onChange={v => updateField('consultant', v)} />
-        <InputField label="Service Started" icon={<Calendar style={iconSize} />} type="date" value={data.serviceStarted || ''} onChange={v => updateField('serviceStarted', v)} />
-        <InputField label="Service End" icon={<Calendar style={iconSize} />} type="date" value={data.serviceEnd || ''} onChange={v => updateField('serviceEnd', v)} />
+        <DatePickerField label="Service Started" value={data.serviceStarted || ''} onChange={v => updateField('serviceStarted', v)} placeholder="DD/MM/YYYY" />
+        <DatePickerField label="Service End" value={data.serviceEnd || ''} onChange={v => updateField('serviceEnd', v)} placeholder="DD/MM/YYYY" />
         <InputField label="Rendered Days" icon={<Clock style={iconSize} />} value={data.renderedDays || ''} onChange={v => updateField('renderedDays', v)} />
       </AccordionSection>
 

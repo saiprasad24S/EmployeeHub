@@ -34,7 +34,20 @@ def cloudinary_health_view(request):
     return JsonResponse(cloudinary_status())
 
 
+def root_view(request):
+    return JsonResponse(
+        {
+            "status": "online",
+            "service": "EmployeeHub API Backend",
+            "frontend_url": "http://localhost:5173",
+            "invoice_app": "http://localhost:5173/invoice",
+            "admin": "/admin/",
+        }
+    )
+
+
 urlpatterns = [
+    path("", root_view, name="api-root"),
     path("admin/", admin.site.urls),
     path("api/auth/", include("apps.accounts.urls")),
     path("api/face/", include("apps.vision.urls")),

@@ -66,11 +66,11 @@ export function AppShell({ children }: PropsWithChildren) {
           ))}
         </nav>
         <div className="sidebar-footer">
-          <button className="ghost-button" onClick={() => navigate('/sign-in')}>
+          <button className="ghost-button" onClick={() => { safeStorage.removeItem('skandan_user_role'); navigate('/sign-in') }}>
             Switch account
           </button>
           <SignOutButton>
-            <button className="ghost-button danger">Logout</button>
+            <button className="ghost-button danger" onClick={() => safeStorage.removeItem('skandan_user_role')}>Logout</button>
           </SignOutButton>
         </div>
       </aside>

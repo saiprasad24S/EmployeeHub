@@ -198,6 +198,8 @@ class InvoiceAPITests(TestCase):
             client_contact="9876543210",
             client_address="Hyderabad",
             contact_person="Dr. Ramesh",
+            gender="Male",
+            age="65 Yrs",
             start_date="2026-07-01",
             service_start_date="2026-07-01",
             per_day_charges=2500,
@@ -209,6 +211,8 @@ class InvoiceAPITests(TestCase):
             client_contact="9876543210",
             client_address="Hyderabad New Branch",
             contact_person="Dr. Ramesh",
+            gender="Male",
+            age="65 Yrs",
             start_date="2026-07-01",
             service_start_date="2026-07-01",
             per_day_charges=2500,
@@ -220,6 +224,8 @@ class InvoiceAPITests(TestCase):
             client_contact="9123456780",
             client_address="Secunderabad",
             school_branch="Nacharam",
+            gender="",
+            age="",
             start_date="2026-06-15",
         )
 
@@ -231,6 +237,8 @@ class InvoiceAPITests(TestCase):
         self.assertEqual(apollo["total_invoices"], 2)
         self.assertEqual(apollo["client_contact"], "9876543210")
         self.assertEqual(apollo["contact_person"], "Dr. Ramesh")
+        self.assertEqual(apollo["gender"], "Male")
+        self.assertEqual(apollo["age"], "65 Yrs")
         self.assertEqual(apollo["start_date"], "2026-07-01")
         self.assertEqual(apollo["service_start_date"], "2026-07-01")
 

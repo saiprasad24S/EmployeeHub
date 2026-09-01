@@ -76,6 +76,8 @@ class InvoiceClientsListView(APIView):
                     "school_branch": inv.school_branch or "",
                     "service_type": inv.service_type or "",
                     "consultant": inv.consultant or "",
+                    "gender": getattr(inv, "gender", "") or "",
+                    "age": getattr(inv, "age", "") or "",
                     "patient_name": inv.patient_name or "",
                     "patient_age_gender": inv.patient_age_gender or "",
                     "start_date": inv.start_date or "",
@@ -88,6 +90,10 @@ class InvoiceClientsListView(APIView):
                 }
             else:
                 seen_clients[name_key]["total_invoices"] += 1
+                if not seen_clients[name_key].get("gender") and getattr(inv, "gender", None):
+                    seen_clients[name_key]["gender"] = inv.gender
+                if not seen_clients[name_key].get("age") and getattr(inv, "age", None):
+                    seen_clients[name_key]["age"] = inv.age
                 if not seen_clients[name_key].get("start_date") and inv.start_date:
                     seen_clients[name_key]["start_date"] = inv.start_date
                 if not seen_clients[name_key].get("service_start_date") and (inv.service_start_date or inv.start_date):

@@ -101,6 +101,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    "django.middleware.gzip.GZipMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -187,6 +188,7 @@ if use_env_db:
             "HOST": DB_HOST,
             "PORT": DB_PORT,
             "OPTIONS": db_options,
+            "CONN_MAX_AGE": 600,
         }
     }
     DB_CONFIG_SOURCE = "env"

@@ -25,6 +25,8 @@ export interface Invoice {
   start_date: string
   client_name: string
   client_contact: string
+  gender?: string
+  age?: string
   client_address: string
   client_gst?: string
   patient_name?: string
@@ -63,6 +65,8 @@ const defaultInvoiceData: InvoicePreviewData = {
   startDateText: '',
   clientName: '',
   clientContact: '',
+  gender: '',
+  age: '',
   clientAddress: '',
   clientGst: '',
   patientName: '',
@@ -291,6 +295,8 @@ export function InvoicePage() {
       start_date: invoiceData.startDateText,
       client_name: invoiceData.clientName,
       client_contact: invoiceData.clientContact,
+      gender: invoiceData.gender || '',
+      age: invoiceData.age || '',
       client_address: invoiceData.clientAddress,
       client_gst: invoiceData.clientGst,
       patient_name: invoiceData.patientName,
@@ -351,6 +357,8 @@ export function InvoicePage() {
           start_date: target?.start_date || invoiceData.startDateText,
           client_name: target?.client_name || invoiceData.clientName,
           client_contact: target?.client_contact || invoiceData.clientContact,
+          gender: target?.gender || invoiceData.gender || '',
+          age: target?.age || invoiceData.age || '',
           client_address: target?.client_address || invoiceData.clientAddress,
           client_gst: target?.client_gst || invoiceData.clientGst,
           patient_name: target?.patient_name || invoiceData.patientName,
@@ -433,6 +441,8 @@ export function InvoicePage() {
       startDateText: inv.start_date,
       clientName: inv.client_name,
       clientContact: inv.client_contact,
+      gender: inv.gender || '',
+      age: inv.age || '',
       clientAddress: inv.client_address,
       clientGst: inv.client_gst,
       patientName: inv.patient_name,

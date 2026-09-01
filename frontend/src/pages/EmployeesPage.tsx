@@ -154,6 +154,9 @@ export function EmployeesPage() {
       }
       queryClient.invalidateQueries({ queryKey: ['employees'] })
       queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
+      queryClient.invalidateQueries({ queryKey: ['live-locations'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] })
+      queryClient.refetchQueries({ queryKey: ['employees'] })
       if (updatedEmployee && selectedEmployee && selectedEmployee.id === updatedEmployee.id) {
         setSelectedEmployee((prev) => (prev ? { ...prev, ...updatedEmployee } : null))
       }
@@ -387,6 +390,8 @@ export function EmployeesPage() {
 
     if (profilePhotoFile) {
       formData.append('profile_photo_file', profilePhotoFile)
+    } else if (editingEmployee?.profile_photo) {
+      formData.append('profile_photo', editingEmployee.profile_photo)
     }
 
     saveMutation.mutate({ formData, id: editingEmployee?.id })

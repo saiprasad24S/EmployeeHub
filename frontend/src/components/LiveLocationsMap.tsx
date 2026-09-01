@@ -36,7 +36,7 @@ export function LiveLocationsMap({ locations }: LiveLocationsMapProps) {
 
   return (
     <div className="map-card" style={{ height: '350px', borderRadius: '14px', overflow: 'hidden' }}>
-      <MapContainer key={`live-${center[0]}-${center[1]}`} center={center} zoom={12} scrollWheelZoom className="map-view" style={{ height: '100%' }}>
+      <MapContainer key="live-locations-map" center={center} zoom={12} scrollWheelZoom className="map-view" style={{ height: '100%' }}>
         <TileLayer
           attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

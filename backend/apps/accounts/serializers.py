@@ -80,12 +80,20 @@ class EmployeeSerializer(serializers.ModelSerializer):
     def get_profile_photo(self, obj: Employee) -> str:
         if not obj.profile_photo:
             return ""
-        return obj.profile_photo if obj.profile_photo.startswith("http") else ""
+        url = obj.profile_photo if obj.profile_photo.startswith("http") else ""
+        if url and getattr(obj, "updated_at", None):
+            ts = int(obj.updated_at.timestamp())
+            sep = "&" if "?" in url else "?"
+            return f"{url}{sep}t={ts}"
+        return url
 
     def to_representation(self, instance: Employee):
         data = super().to_representation(instance)
-        from apps.attendance.services import get_active_assignment
-        active_assignment = get_active_assignment(instance)
+        if hasattr(instance, "_cached_active_assignment"):
+            active_assignment = instance._cached_active_assignment
+        else:
+            from apps.attendance.services import get_active_assignment
+            active_assignment = get_active_assignment(instance)
         if active_assignment:
             data["active_assignment"] = {
                 "id": active_assignment.id,

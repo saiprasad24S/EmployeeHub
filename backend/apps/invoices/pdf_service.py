@@ -176,44 +176,44 @@ def generate_invoice_pdf(invoice) -> bytes:
             col3_val_x = 440
 
             # Row 1: Invoice No.
-            c.setFont("Times-Roman", 8)
-            c.setFillColor(colors.HexColor("#555555"))
+            c.setFont("Times-Bold", 8)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(col3_label_x, bar_y + 39, "Invoice No.")
             c.drawString(col3_colon_x, bar_y + 39, ":")
-            c.setFont("Times-Bold", 8)
+            c.setFont("Times-Roman", 8)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawString(col3_val_x, bar_y + 39, inv_num_str)
 
             # Row 2: Invoice Date
-            c.setFont("Times-Roman", 8)
-            c.setFillColor(colors.HexColor("#555555"))
+            c.setFont("Times-Bold", 8)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(col3_label_x, bar_y + 28, "Invoice Date")
             c.drawString(col3_colon_x, bar_y + 28, ":")
-            c.setFont("Times-Bold", 8)
+            c.setFont("Times-Roman", 8)
             c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(col3_val_x, bar_y + 28, inv_date_str)
 
-            # Row 3: Billing Period
-            c.setFont("Times-Roman", 8)
-            c.setFillColor(colors.HexColor("#555555"))
-            c.drawString(col3_label_x, bar_y + 17, "Billing Period")
-            c.drawString(col3_colon_x, bar_y + 17, ":")
+            # Row 3: Month
             c.setFont("Times-Bold", 8)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(col3_label_x, bar_y + 17, "Month")
+            c.drawString(col3_colon_x, bar_y + 17, ":")
+            c.setFont("Times-Roman", 8)
             c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(col3_val_x, bar_y + 17, billing_period_str)
 
             # Row 4: Start Date
-            c.setFont("Times-Roman", 8)
-            c.setFillColor(colors.HexColor("#555555"))
+            c.setFont("Times-Bold", 8)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(col3_label_x, bar_y + 6, "Start Date")
             c.drawString(col3_colon_x, bar_y + 6, ":")
-            c.setFont("Times-Bold", 8)
+            c.setFont("Times-Roman", 8)
             c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(col3_val_x, bar_y + 6, start_date_str or "—")
 
             # 3. Three Profile Cards (Top at bar_y - 15 = height - 180)
             cards_top = bar_y - 15
-            cards_h = 76
+            cards_h = 78
             cards_y = cards_top - cards_h
             card_w = (width - 60 - 20) / 3.0 # ~171.75 pt
             
@@ -227,52 +227,78 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.setFont("Times-Bold", 8.5)
             c.drawString(x1 + 8, cards_top - 14, "BILLED TO")
             
-            card1_y = cards_top - 27
+            card1_y = cards_top - 26
             
             client_n = str(getattr(invoice, 'client_name', '') or '').strip()
             contact_p = str(getattr(invoice, 'contact_person', '') or '').strip()
             contact_no = str(getattr(invoice, 'client_contact', '') or '').strip()
+            gender_str = str(getattr(invoice, 'gender', '') or '').strip()
+            age_str = str(getattr(invoice, 'age', '') or '').strip()
+            if not gender_str and not age_str and getattr(invoice, 'patient_age_gender', None):
+                pat_ag = str(getattr(invoice, 'patient_age_gender', '')).strip()
+                if pat_ag:
+                    parts = [p.strip() for p in pat_ag.split('/')]
+                    if len(parts) == 2:
+                        if any(g in parts[0].lower() for g in ['male', 'female', 'other', 'm', 'f']):
+                            gender_str, age_str = parts[0], parts[1]
+                        else:
+                            age_str, gender_str = parts[0], parts[1]
+                    else:
+                        age_str = pat_ag
+
             address_str = str(getattr(invoice, 'client_address', '') or '').strip()
             gst_no = str(getattr(invoice, 'client_gst', '') or '').strip()
             school_br = str(getattr(invoice, 'school_branch', '') or '').strip()
 
-            def draw_card_row(cx, cy, label, val, is_bold=False):
-                c.setFont("Times-Roman", 7.5)
-                c.setFillColor(colors.HexColor("#666666"))
-                c.drawString(cx + 8, cy, label)
-                c.setFont("Times-Bold" if is_bold else "Times-Roman", 7.5)
+            def draw_card_row(cx, cy, label, val):
+                c.setFont("Times-Bold", 7.5)
                 c.setFillColor(colors.HexColor("#1A1A1A"))
+                c.drawString(cx + 8, cy, label)
+                c.setFont("Times-Roman", 7.5)
+                c.setFillColor(colors.HexColor("#333333"))
                 c.drawString(cx + 52, cy, str(val)[:28])
 
             if inv_type == "SCHOOL":
-                draw_card_row(x1, card1_y, "School:", client_n, is_bold=True)
-                card1_y -= 11
+                draw_card_row(x1, card1_y, "School:", client_n)
+                card1_y -= 10.5
                 if school_br:
                     draw_card_row(x1, card1_y, "Branch:", school_br)
-                    card1_y -= 11
+                    card1_y -= 10.5
                 if contact_no:
                     draw_card_row(x1, card1_y, "Contact:", contact_no)
-                    card1_y -= 11
+                    card1_y -= 10.5
+                if gender_str:
+                    draw_card_row(x1, card1_y, "Gender:", gender_str)
+                    card1_y -= 10.5
+                if age_str:
+                    draw_card_row(x1, card1_y, "Age:", age_str)
+                    card1_y -= 10.5
             else:
-                draw_card_row(x1, card1_y, "Name:", client_n, is_bold=True)
-                card1_y -= 11
+                draw_card_row(x1, card1_y, "Name:", client_n)
+                card1_y -= 10.5
                 if contact_p:
                     draw_card_row(x1, card1_y, "Contact P:", contact_p)
-                    card1_y -= 11
+                    card1_y -= 10.5
                 if contact_no:
                     draw_card_row(x1, card1_y, "Contact No:", contact_no)
-                    card1_y -= 11
+                    card1_y -= 10.5
+                if gender_str:
+                    draw_card_row(x1, card1_y, "Gender:", gender_str)
+                    card1_y -= 10.5
+                if age_str:
+                    draw_card_row(x1, card1_y, "Age:", age_str)
+                    card1_y -= 10.5
 
             # Multiline Address Rendering
             if address_str and card1_y >= cards_y + 10:
                 addr_clean = address_str.replace('\n', ', ')
-                c.setFont("Times-Roman", 7.5)
-                c.setFillColor(colors.HexColor("#666666"))
+                c.setFont("Times-Bold", 7.5)
+                c.setFillColor(colors.HexColor("#1A1A1A"))
                 c.drawString(x1 + 8, card1_y, "Address:")
                 c.setFont("Times-Roman", 7.5)
-                c.setFillColor(colors.HexColor("#1A1A1A"))
+                c.setFillColor(colors.HexColor("#333333"))
                 c.drawString(x1 + 52, card1_y, addr_clean[:28])
-                card1_y -= 11
+                card1_y -= 10.5
                 if len(addr_clean) > 28 and card1_y >= cards_y + 4:
                     c.drawString(x1 + 52, card1_y, addr_clean[28:56])
 
@@ -296,7 +322,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             card2_y = cards_top - 27
             
             if (inv_type in ["MULTI_SERVICE", "REGULAR"]) and pat_name:
-                draw_card_row(x2, card2_y, "Patient:", pat_name, is_bold=True)
+                draw_card_row(x2, card2_y, "Patient:", pat_name)
                 card2_y -= 11
                 if pat_age:
                     draw_card_row(x2, card2_y, "Age/Gender:", pat_age)
@@ -326,20 +352,20 @@ def generate_invoice_pdf(invoice) -> bytes:
 
             per_day = float(getattr(invoice, "per_day_charges", 0) or 0)
             card3_y = cards_top - 27
-            draw_card_row(x3, card3_y, "Per Day Chg:", f"Rs. {per_day:,.2f}", is_bold=True)
+            draw_card_row(x3, card3_y, "Per Day Chg:", f"Rs. {per_day:,.2f}")
             card3_y -= 11
             draw_card_row(x3, card3_y, "Adv. Amount:", f"Rs. {advance_received:,.2f}")
             card3_y -= 11
             
-            c.setFont("Times-Roman", 7.5)
-            c.setFillColor(colors.HexColor("#666666"))
-            c.drawString(x3 + 8, card3_y, "Payment Status:")
             c.setFont("Times-Bold", 7.5)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
+            c.drawString(x3 + 8, card3_y, "Payment Status:")
+            c.setFont("Times-Roman", 7.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawString(x3 + 68, card3_y, str(getattr(invoice, 'payment_status', 'Pending')))
 
-            # Space before table header matches Live Preview (marginBottom 20px = 15pt)
-            table_title_y = cards_y - 15
+            # Space before table header (18 pt clear space below cards)
+            table_title_y = cards_y - 18
         else:
             # Header for page 2
             if os.path.exists(logo_path):
@@ -364,9 +390,11 @@ def generate_invoice_pdf(invoice) -> bytes:
         c.setFillColor(colors.HexColor("#0B2C8C"))
         c.drawString(30, table_title_y, "SERVICE DETAILS" if page_idx == 1 else "SERVICE DETAILS (CONTINUED)")
 
-        tbl_header_y = table_title_y - 18
+        # Clear 8pt vertical gap between SERVICE DETAILS heading text baseline and table header bar
+        tbl_header_h = 18
+        tbl_header_y = table_title_y - 8 - tbl_header_h
         c.setFillColor(colors.HexColor("#0B2C8C"))
-        c.rect(30, tbl_header_y, width - 60, 18, fill=1, stroke=0)
+        c.rect(30, tbl_header_y, width - 60, tbl_header_h, fill=1, stroke=0)
 
         c.setFont("Times-Bold", 8)
         c.setFillColor(colors.white)
@@ -453,11 +481,13 @@ def generate_invoice_pdf(invoice) -> bytes:
 
             # Financial Summary Table (Right - width 250 pt)
             r_x = 300
-            c.setFont("Times-Roman", 8)
-            c.setFillColor(colors.HexColor("#555555"))
             
             curr_y = fin_top - 12
+            c.setFont("Times-Bold", 8)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(r_x, curr_y, "Sub Total")
+            c.setFont("Times-Roman", 8)
+            c.setFillColor(colors.HexColor("#333333"))
             c.drawRightString(width - 30, curr_y, f"Rs. {subtotal:,.2f}")
             c.setStrokeColor(colors.HexColor("#EEEEEE"))
             c.setLineWidth(0.5)
@@ -465,13 +495,21 @@ def generate_invoice_pdf(invoice) -> bytes:
 
             curr_y -= 13
             if gst_amount > 0:
+                c.setFont("Times-Bold", 8)
+                c.setFillColor(colors.HexColor("#1A1A1A"))
                 c.drawString(r_x, curr_y, f"GST ({gst_rate:.0f}%)" if gst_rate > 0 else "GST")
+                c.setFont("Times-Roman", 8)
+                c.setFillColor(colors.HexColor("#333333"))
                 c.drawRightString(width - 30, curr_y, f"Rs. {gst_amount:,.2f}")
                 c.line(r_x, curr_y - 3, width - 30, curr_y - 3)
                 curr_y -= 13
 
             if discount_amount > 0:
+                c.setFont("Times-Bold", 8)
+                c.setFillColor(colors.HexColor("#1A1A1A"))
                 c.drawString(r_x, curr_y, "Discount")
+                c.setFont("Times-Roman", 8)
+                c.setFillColor(colors.HexColor("#333333"))
                 c.drawRightString(width - 30, curr_y, f"- Rs. {discount_amount:,.2f}")
                 c.line(r_x, curr_y - 3, width - 30, curr_y - 3)
                 curr_y -= 13
@@ -480,18 +518,24 @@ def generate_invoice_pdf(invoice) -> bytes:
                 c.setFont("Times-Bold", 8)
                 c.setFillColor(colors.HexColor("#0B2C8C"))
                 c.drawString(r_x, curr_y, "Total After GST")
+                c.setFont("Times-Roman", 8)
+                c.setFillColor(colors.HexColor("#0B2C8C"))
                 c.drawRightString(width - 30, curr_y, f"Rs. {total_after_gst:,.2f}")
                 curr_y -= 13
 
-            c.setFont("Times-Roman", 8)
-            c.setFillColor(colors.HexColor("#555555"))
+            c.setFont("Times-Bold", 8)
+            c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(r_x, curr_y, "Advance Received")
+            c.setFont("Times-Roman", 8)
+            c.setFillColor(colors.HexColor("#333333"))
             c.drawRightString(width - 30, curr_y, f"Rs. {advance_received:,.2f}")
             curr_y -= 13
 
             c.setFont("Times-Bold", 8.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawString(r_x, curr_y, "Balance Due")
+            c.setFont("Times-Roman", 8.5)
+            c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawRightString(width - 30, curr_y, f"Rs. {balance_due:,.2f}")
             curr_y -= 18
 

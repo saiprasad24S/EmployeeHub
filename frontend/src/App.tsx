@@ -5,10 +5,14 @@ import { AppShell } from './components/AppShell'
 import { authedFetch } from './lib/api'
 import { useLocationTracker } from './hooks/useLocationTracker'
 
+import { safeStorage } from './lib/storage'
+
+// Preload dashboard chunk for instant render
+const dashboardPromise = import('./pages/DashboardPage')
+const DashboardPage = lazy(() => dashboardPromise.then((m) => ({ default: m.DashboardPage })))
 const EmployeePortal = lazy(() => import('./pages/EmployeePortal').then((m) => ({ default: m.EmployeePortal })))
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })))
 const SignUpPage = lazy(() => import('./pages/SignUpPage').then((m) => ({ default: m.SignUpPage })))
-const DashboardPage = lazy(() => import('./pages/DashboardPage').then((m) => ({ default: m.DashboardPage })))
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage').then((m) => ({ default: m.EmployeesPage })))
 const AttendancePage = lazy(() => import('./pages/AttendancePage').then((m) => ({ default: m.AttendancePage })))
 const AssignmentsPage = lazy(() => import('./pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage })))
@@ -23,18 +27,28 @@ function RouteFallback() {
 
 function MainAppSelector() {
   const { getToken, isLoaded, isSignedIn } = useAuth()
-  const [role, setRole] = useState<'ADMIN' | 'EMPLOYEE' | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [role, setRole] = useState<'ADMIN' | 'EMPLOYEE' | null>(() => {
+    const cached = safeStorage.getItem('skandan_user_role')
+    return (cached === 'ADMIN' || cached === 'EMPLOYEE') ? cached : null
+  })
+  const [loading, setLoading] = useState(() => {
+    const cached = safeStorage.getItem('skandan_user_role')
+    return !cached
+  })
   const [authError, setAuthError] = useState<string | null>(null)
 
   const determineRole = useCallback(async () => {
     if (!isLoaded || !isSignedIn) return
-    setLoading(true)
+    const hasCached = !!safeStorage.getItem('skandan_user_role')
+    if (!hasCached) {
+      setLoading(true)
+    }
     setAuthError(null)
     try {
       const token = await getToken()
       if (!token) {
         setAuthError('Missing authentication session token. Please log in again.')
+        safeStorage.removeItem('skandan_user_role')
         setLoading(false)
         return
       }
@@ -42,19 +56,23 @@ function MainAppSelector() {
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
         setAuthError(errData.detail || 'Access restricted. Your account is not registered in the system.')
+        safeStorage.removeItem('skandan_user_role')
         setLoading(false)
         return
       }
       const data = await res.json()
-      const normalizedRole = String(data.role || '').toUpperCase() as 'ADMIN' | 'EMPLOYEE'
-      setRole(normalizedRole || 'ADMIN')
+      const normalizedRole = (String(data.role || '').toUpperCase() as 'ADMIN' | 'EMPLOYEE') || 'ADMIN'
+      safeStorage.setItem('skandan_user_role', normalizedRole)
+      setRole(normalizedRole)
       setLoading(false)
     } catch (err: any) {
-      setAuthError(
-        err.message === 'Failed to fetch'
-          ? 'Unable to connect to the server (Failed to fetch). Please ensure the backend server is running and accessible.'
-          : err.message || 'Verification failed'
-      )
+      if (!hasCached) {
+        setAuthError(
+          err.message === 'Failed to fetch'
+            ? 'Unable to connect to the server (Failed to fetch). Please ensure the backend server is running and accessible.'
+            : err.message || 'Verification failed'
+        )
+      }
       setLoading(false)
     }
   }, [getToken, isLoaded, isSignedIn])
