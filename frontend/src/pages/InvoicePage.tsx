@@ -23,6 +23,7 @@ export interface Invoice {
   invoice_date: string
   billing_period_text: string
   start_date: string
+  company_gstin?: string
   client_name: string
   client_contact: string
   gender?: string
@@ -63,6 +64,7 @@ const defaultInvoiceData: InvoicePreviewData = {
   invoiceDate: new Date().toISOString().split('T')[0],
   billingPeriodText: '',
   startDateText: '',
+  companyGstin: '',
   clientName: '',
   clientContact: '',
   gender: '',
@@ -293,6 +295,7 @@ export function InvoicePage() {
       invoice_date: invoiceData.invoiceDate,
       billing_period_text: invoiceData.billingPeriodText,
       start_date: invoiceData.startDateText,
+      company_gstin: invoiceData.companyGstin || '',
       client_name: invoiceData.clientName,
       client_contact: invoiceData.clientContact,
       gender: invoiceData.gender || '',
@@ -439,6 +442,7 @@ export function InvoicePage() {
       invoiceDate: inv.invoice_date,
       billingPeriodText: inv.billing_period_text,
       startDateText: inv.start_date,
+      companyGstin: inv.company_gstin || '',
       clientName: inv.client_name,
       clientContact: inv.client_contact,
       gender: inv.gender || '',

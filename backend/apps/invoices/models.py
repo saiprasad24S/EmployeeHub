@@ -49,6 +49,7 @@ class Invoice(models.Model):
     billing_period_end = models.DateField(null=True, blank=True)
     billing_period_text = models.CharField(max_length=150, blank=True)
     start_date = models.CharField(max_length=150, blank=True, null=True, default="")
+    company_gstin = models.CharField(max_length=50, blank=True, default="")
 
     # Client Info
     client_name = models.CharField(max_length=200, blank=True, default="")

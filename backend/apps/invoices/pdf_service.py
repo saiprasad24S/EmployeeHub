@@ -162,10 +162,20 @@ def generate_invoice_pdf(invoice) -> bytes:
             # Divider line 1
             c.line(205, bar_y + 4, 205, bar_y + bar_h - 4)
 
-            # Col 2: Phone, Email, Website
-            c.drawString(215, bar_y + 38, "+91 96609 66369")
-            c.drawString(215, bar_y + 26, "admin@skandanhomecarre.com")
-            c.drawString(215, bar_y + 14, "www.skandanhomecarre.com")
+            # Col 2: Phone, Email, Website, Optional GSTIN
+            company_gstin = (getattr(invoice, "company_gstin", "") or "").strip()
+            if company_gstin:
+                c.drawString(215, bar_y + 39, "+91 96609 66369")
+                c.drawString(215, bar_y + 28, "admin@skandanhomecarre.com")
+                c.drawString(215, bar_y + 17, "www.skandanhomecarre.com")
+                c.setFont("Times-Bold", 8)
+                c.drawString(215, bar_y + 6, "GSTIN: ")
+                c.setFont("Times-Roman", 8)
+                c.drawString(245, bar_y + 6, company_gstin)
+            else:
+                c.drawString(215, bar_y + 38, "+91 96609 66369")
+                c.drawString(215, bar_y + 26, "admin@skandanhomecarre.com")
+                c.drawString(215, bar_y + 14, "www.skandanhomecarre.com")
 
             # Divider line 2
             c.line(365, bar_y + 4, 365, bar_y + bar_h - 4)

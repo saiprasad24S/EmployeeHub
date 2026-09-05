@@ -1558,6 +1558,13 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
             { label: 'Multi-Service Template', value: 'MULTI_SERVICE' },
           ]}
         />
+        <InputField
+          label="Company GSTIN (Optional)"
+          icon={<FileText style={iconSize} />}
+          value={data.companyGstin || ''}
+          onChange={v => updateField('companyGstin', v)}
+          placeholder="e.g. 36AAACS1234A1Z5 (Displayed in header if entered)"
+        />
       </AccordionSection>
 
       {/* 2. Client / Billing Information with Smart Autocomplete & Auto-fill */}

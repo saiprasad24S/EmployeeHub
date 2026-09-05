@@ -3,7 +3,7 @@ import {
   MapPin, Phone, Mail, Globe, User, Settings, Info, 
   Table, MessageSquare, Activity, Stethoscope, 
   HeartPulse, UserCheck, Accessibility, TestTube, 
-  Truck, Pill, PlusSquare 
+  Truck, Pill, PlusSquare, FileText
 } from 'lucide-react';
 
 export interface ServiceItem {
@@ -23,6 +23,7 @@ export interface InvoicePreviewData {
   invoiceDate: string;
   billingPeriodText: string;
   startDateText: string;
+  companyGstin?: string;
   clientName: string;
   clientContact: string;
   gender?: string;
@@ -250,6 +251,12 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
             <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> +91 96609 66369</div>
             <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> admin@skandanhomecarre.com</div>
             <div style={{ display: 'flex', alignItems: 'center' }}><Globe size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> www.skandanhomecarre.com</div>
+            {data.companyGstin && data.companyGstin.trim() ? (
+              <div style={{ display: 'flex', alignItems: 'center' }}>
+                <FileText size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} />
+                <span><strong style={{ color: '#1A1A1A' }}>GSTIN:</strong> {data.companyGstin.trim()}</span>
+              </div>
+            ) : null}
           </div>
           <div style={{ flex: 1.25, paddingLeft: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
