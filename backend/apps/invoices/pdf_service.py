@@ -223,22 +223,10 @@ def generate_invoice_pdf(invoice) -> bytes:
 
             # 3. Three Profile Cards (Top at bar_y - 15 = height - 180)
             cards_top = bar_y - 15
-            cards_h = 78
-            cards_y = cards_top - cards_h
             card_w = (width - 60 - 20) / 3.0 # ~171.75 pt
-            
-            # Card 1: BILLED TO
-            x1 = 30
-            c.setFillColor(colors.white)
-            c.setStrokeColor(colors.HexColor("#DCE7FF"))
-            c.roundRect(x1, cards_y, card_w, cards_h, radius=4, fill=1, stroke=1)
-            c.setFillColor(colors.HexColor("#0B2C8C"))
-            c.rect(x1, cards_top - 2.5, card_w, 2.5, fill=1, stroke=0)
-            c.setFont("Times-Bold", 8.5)
-            c.drawString(x1 + 8, cards_top - 14, "BILLED TO")
-            
-            card1_y = cards_top - 26
-            
+            val_offset_card1 = 50
+            addr_val_w = card_w - val_offset_card1 - 4
+
             client_n = str(getattr(invoice, 'client_name', '') or '').strip()
             contact_p = str(getattr(invoice, 'contact_person', '') or '').strip()
             contact_no = str(getattr(invoice, 'client_contact', '') or '').strip()
@@ -260,57 +248,135 @@ def generate_invoice_pdf(invoice) -> bytes:
             gst_no = str(getattr(invoice, 'client_gst', '') or '').strip()
             school_br = str(getattr(invoice, 'school_branch', '') or '').strip()
 
-            def draw_card_row(cx, cy, label, val, val_offset=52):
-                c.setFont("Times-Bold", 7.5)
-                c.setFillColor(colors.HexColor("#1A1A1A"))
-                c.drawString(cx + 8, cy, label)
+            # Word-wrap address cleanly without cutting words
+            addr_lines = []
+            if address_str:
+                addr_clean = address_str.replace('\n', ', ').strip()
+                cur_line = ""
+                for w in addr_clean.split():
+                    test = f"{cur_line} {w}".strip() if cur_line else w
+                    if c.stringWidth(test, "Times-Roman", 7.5) <= addr_val_w:
+                        cur_line = test
+                    else:
+                        if cur_line:
+                            addr_lines.append(cur_line)
+                        cur_line = w
+                if cur_line:
+                    addr_lines.append(cur_line)
+
+            # Word-wrap name if long
+            name_lines = []
+            if client_n:
+                cur_name = ""
+                for w in client_n.split():
+                    test = f"{cur_name} {w}".strip() if cur_name else w
+                    if c.stringWidth(test, "Times-Roman", 7.5) <= addr_val_w:
+                        cur_name = test
+                    else:
+                        if cur_name:
+                            name_lines.append(cur_name)
+                        cur_name = w
+                if cur_name:
+                    name_lines.append(cur_name)
+            if not name_lines:
+                name_lines = [""]
+
+            # Card 2 fields
+            pat_name = str(getattr(invoice, 'patient_name', '') or '').strip()
+            pat_age = str(getattr(invoice, 'patient_age_gender', '') or '').strip()
+            srv_type = str(getattr(invoice, 'service_type', '') or '').strip()
+            consult = str(getattr(invoice, 'consultant', '') or '').strip()
+            srv_start = format_date_ddmmyyyy(getattr(invoice, 'service_start_date', None) or getattr(invoice, 'start_date', None))
+            rend_days = str(getattr(invoice, 'rendered_days', '') or '').strip()
+
+            # Dynamic card height calculation so all content fits with 0 truncation
+            card1_rows_count = len(name_lines)
+            if inv_type == "SCHOOL":
+                if school_br: card1_rows_count += 1
+                if contact_no: card1_rows_count += 1
+                if gender_str: card1_rows_count += 1
+                if age_str: card1_rows_count += 1
+            else:
+                if contact_p: card1_rows_count += 1
+                if contact_no: card1_rows_count += 1
+                if gender_str: card1_rows_count += 1
+                if age_str: card1_rows_count += 1
+            card1_rows_count += max(1, len(addr_lines))
+            if gst_no: card1_rows_count += 1
+
+            card2_rows_count = 0
+            if pat_name: card2_rows_count += 1
+            if pat_age: card2_rows_count += 1
+            if srv_type: card2_rows_count += 1
+            if consult: card2_rows_count += 1
+            if srv_start: card2_rows_count += 1
+            if rend_days: card2_rows_count += 1
+
+            max_rows = max(card1_rows_count, card2_rows_count, 4)
+            cards_h = max(80, 26 + max_rows * 10.5 + 8)
+            cards_y = cards_top - cards_h
+
+            def draw_card_row(cx, cy, label, val, val_offset=50):
+                if label:
+                    c.setFont("Times-Bold", 7.5)
+                    c.setFillColor(colors.HexColor("#1A1A1A"))
+                    c.drawString(cx + 8, cy, label)
                 c.setFont("Times-Roman", 7.5)
                 c.setFillColor(colors.HexColor("#333333"))
-                c.drawString(cx + val_offset, cy, str(val)[:28])
+                c.drawString(cx + val_offset, cy, str(val))
 
+            # Card 1: BILLED TO
+            x1 = 30
+            c.setFillColor(colors.white)
+            c.setStrokeColor(colors.HexColor("#DCE7FF"))
+            c.roundRect(x1, cards_y, card_w, cards_h, radius=4, fill=1, stroke=1)
+            c.setFillColor(colors.HexColor("#0B2C8C"))
+            c.rect(x1, cards_top - 2.5, card_w, 2.5, fill=1, stroke=0)
+            c.setFont("Times-Bold", 8.5)
+            c.drawString(x1 + 8, cards_top - 14, "BILLED TO")
+            
+            card1_y = cards_top - 26
             if inv_type == "SCHOOL":
-                draw_card_row(x1, card1_y, "School:", client_n)
-                card1_y -= 10.5
+                for i, nl in enumerate(name_lines):
+                    draw_card_row(x1, card1_y, "School:" if i == 0 else "", nl, val_offset=50)
+                    card1_y -= 10.5
                 if school_br:
-                    draw_card_row(x1, card1_y, "Branch:", school_br)
+                    draw_card_row(x1, card1_y, "Branch:", school_br, val_offset=50)
                     card1_y -= 10.5
                 if contact_no:
-                    draw_card_row(x1, card1_y, "Contact:", contact_no)
+                    draw_card_row(x1, card1_y, "Contact:", contact_no, val_offset=50)
                     card1_y -= 10.5
                 if gender_str:
-                    draw_card_row(x1, card1_y, "Gender:", gender_str)
+                    draw_card_row(x1, card1_y, "Gender:", gender_str, val_offset=50)
                     card1_y -= 10.5
                 if age_str:
-                    draw_card_row(x1, card1_y, "Age:", age_str)
+                    draw_card_row(x1, card1_y, "Age:", age_str, val_offset=50)
                     card1_y -= 10.5
             else:
-                draw_card_row(x1, card1_y, "Name:", client_n)
-                card1_y -= 10.5
+                for i, nl in enumerate(name_lines):
+                    draw_card_row(x1, card1_y, "Name:" if i == 0 else "", nl, val_offset=50)
+                    card1_y -= 10.5
                 if contact_p:
-                    draw_card_row(x1, card1_y, "Contact P:", contact_p)
+                    draw_card_row(x1, card1_y, "Contact P:", contact_p, val_offset=50)
                     card1_y -= 10.5
                 if contact_no:
-                    draw_card_row(x1, card1_y, "Contact No:", contact_no)
+                    draw_card_row(x1, card1_y, "Contact No:", contact_no, val_offset=50)
                     card1_y -= 10.5
                 if gender_str:
-                    draw_card_row(x1, card1_y, "Gender:", gender_str)
+                    draw_card_row(x1, card1_y, "Gender:", gender_str, val_offset=50)
                     card1_y -= 10.5
                 if age_str:
-                    draw_card_row(x1, card1_y, "Age:", age_str)
+                    draw_card_row(x1, card1_y, "Age:", age_str, val_offset=50)
                     card1_y -= 10.5
 
-            # Multiline Address Rendering
-            if address_str and card1_y >= cards_y + 10:
-                addr_clean = address_str.replace('\n', ', ')
-                c.setFont("Times-Bold", 7.5)
-                c.setFillColor(colors.HexColor("#1A1A1A"))
-                c.drawString(x1 + 8, card1_y, "Address:")
-                c.setFont("Times-Roman", 7.5)
-                c.setFillColor(colors.HexColor("#333333"))
-                c.drawString(x1 + 52, card1_y, addr_clean[:28])
+            if addr_lines:
+                for i, al in enumerate(addr_lines):
+                    draw_card_row(x1, card1_y, "Address:" if i == 0 else "", al, val_offset=50)
+                    card1_y -= 10.5
+
+            if gst_no:
+                draw_card_row(x1, card1_y, "GSTIN:", gst_no, val_offset=50)
                 card1_y -= 10.5
-                if len(addr_clean) > 28 and card1_y >= cards_y + 4:
-                    c.drawString(x1 + 52, card1_y, addr_clean[28:56])
 
             # Card 2: SERVICE PROFILE
             x2 = 30 + card_w + 10
@@ -322,33 +388,26 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.setFont("Times-Bold", 8.5)
             c.drawString(x2 + 8, cards_top - 14, "SERVICE PROFILE")
 
-            pat_name = str(getattr(invoice, 'patient_name', '') or '').strip()
-            pat_age = str(getattr(invoice, 'patient_age_gender', '') or '').strip()
-            srv_type = str(getattr(invoice, 'service_type', '') or '').strip()
-            consult = str(getattr(invoice, 'consultant', '') or '').strip()
-            srv_start = format_date_ddmmyyyy(getattr(invoice, 'service_start_date', None) or getattr(invoice, 'start_date', None))
-            rend_days = str(getattr(invoice, 'rendered_days', '') or '').strip()
-
-            card2_y = cards_top - 27
-            
+            card2_y = cards_top - 26
             if pat_name:
-                draw_card_row(x2, card2_y, "Patient Name:", pat_name, val_offset=62)
-                card2_y -= 11
-                if pat_age and card2_y >= cards_y + 8:
-                    draw_card_row(x2, card2_y, "Age/Gender:", pat_age, val_offset=54)
-                    card2_y -= 11
+                draw_card_row(x2, card2_y, "Patient Name:", pat_name, val_offset=58)
+                card2_y -= 10.5
+                if pat_age:
+                    draw_card_row(x2, card2_y, "Age/Gender:", pat_age, val_offset=58)
+                    card2_y -= 10.5
 
-            if srv_type and card2_y >= cards_y + 8:
-                draw_card_row(x2, card2_y, "Service:", srv_type)
-                card2_y -= 11
-            if consult and card2_y >= cards_y + 8:
-                draw_card_row(x2, card2_y, "Consultant:", consult)
-                card2_y -= 11
-            if srv_start and card2_y >= cards_y + 8:
-                draw_card_row(x2, card2_y, "Started On:", srv_start)
-                card2_y -= 11
-            if rend_days and card2_y >= cards_y + 4:
-                draw_card_row(x2, card2_y, "Rendered:", rend_days)
+            if srv_type:
+                draw_card_row(x2, card2_y, "Service:", srv_type, val_offset=58)
+                card2_y -= 10.5
+            if consult:
+                draw_card_row(x2, card2_y, "Consultant:", consult, val_offset=58)
+                card2_y -= 10.5
+            if srv_start:
+                draw_card_row(x2, card2_y, "Started On:", srv_start, val_offset=58)
+                card2_y -= 10.5
+            if rend_days:
+                draw_card_row(x2, card2_y, "Rendered:", rend_days, val_offset=58)
+                card2_y -= 10.5
 
             # Card 3: OTHER INFORMATION
             x3 = 30 + (card_w + 10) * 2
@@ -361,18 +420,18 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.drawString(x3 + 8, cards_top - 14, "OTHER INFORMATION")
 
             per_day = float(getattr(invoice, "per_day_charges", 0) or 0)
-            card3_y = cards_top - 27
-            draw_card_row(x3, card3_y, "Per Day Chg:", f"Rs. {per_day:,.2f}")
-            card3_y -= 11
-            draw_card_row(x3, card3_y, "Adv. Amount:", f"Rs. {advance_received:,.2f}")
-            card3_y -= 11
+            card3_y = cards_top - 26
+            draw_card_row(x3, card3_y, "Per Day Chg:", f"Rs. {per_day:,.2f}", val_offset=64)
+            card3_y -= 10.5
+            draw_card_row(x3, card3_y, "Adv. Amount:", f"Rs. {advance_received:,.2f}", val_offset=64)
+            card3_y -= 10.5
             
             c.setFont("Times-Bold", 7.5)
             c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(x3 + 8, card3_y, "Payment Status:")
             c.setFont("Times-Roman", 7.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
-            c.drawString(x3 + 68, card3_y, str(getattr(invoice, 'payment_status', 'Pending')))
+            c.drawString(x3 + 64, card3_y, str(getattr(invoice, 'payment_status', 'Pending')))
 
             # Space before table header (18 pt clear space below cards)
             table_title_y = cards_y - 18
