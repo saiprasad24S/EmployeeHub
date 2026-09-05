@@ -47,12 +47,17 @@ const AccordionSection: React.FC<{
   isOpen: boolean; onToggle: (id: string) => void;
   badge?: React.ReactNode;
   children: React.ReactNode;
-}> = ({ id, title, icon, isOpen, onToggle, badge, children }) => (
+  zIndex?: number;
+}> = ({ id, title, icon, isOpen, onToggle, badge, children, zIndex = 20 }) => (
   <div style={{
     background: 'var(--inv-card)', borderRadius: 12, border: '1px solid var(--inv-border)',
-    boxShadow: 'var(--inv-shadow-sm)', marginBottom: 12, overflow: isOpen ? 'visible' : 'hidden',
+    boxShadow: 'var(--inv-shadow-sm)', marginBottom: 12,
+    position: 'relative',
+    zIndex: isOpen ? zIndex : 1,
+    overflow: isOpen ? 'visible' : 'hidden',
   }}>
     <button
+      type="button"
       onClick={() => onToggle(id)}
       style={{
         width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -81,9 +86,9 @@ const AccordionSection: React.FC<{
           animate={{ height: 'auto', opacity: 1 }}
           exit={{ height: 0, opacity: 0 }}
           transition={{ duration: 0.25, ease: 'easeInOut' }}
-          style={{ overflow: 'hidden' }}
+          style={{ overflow: isOpen ? 'visible' : 'hidden' }}
         >
-          <div style={{ padding: '14px 16px', borderTop: '1px solid var(--inv-border)', background: 'var(--inv-bg)' }}>
+          <div style={{ padding: '14px 16px', borderTop: '1px solid var(--inv-border)', background: 'var(--inv-bg)', overflow: 'visible' }}>
             {children}
           </div>
         </motion.div>
@@ -194,12 +199,14 @@ const DatePickerField: React.FC<{
   readOnly?: boolean;
 }> = ({ label, value, onChange, placeholder = 'DD/MM/YYYY', readOnly }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const nativeInputRef = useRef<HTMLInputElement>(null);
 
-  // Parse current value to date object
+  // Parse current value to a valid Date object
   const parsedDate = useMemo(() => {
     if (!value) return null;
-    const str = value.trim();
+    const str = String(value).trim();
     // try YYYY-MM-DD
     const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
     if (ymd) {
@@ -217,12 +224,28 @@ const DatePickerField: React.FC<{
   const [viewYear, setViewYear] = useState(() => parsedDate ? parsedDate.getFullYear() : new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => parsedDate ? parsedDate.getMonth() : new Date().getMonth());
 
+  // Keep calendar viewport in sync when parsedDate updates
   useEffect(() => {
     if (parsedDate) {
       setViewYear(parsedDate.getFullYear());
       setViewMonth(parsedDate.getMonth());
     }
-  }, [value]);
+  }, [parsedDate]);
+
+  // Position detection to prevent clipping: open upward if near the bottom of viewport
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      // If less than 320px below and more than 280px above, open upward
+      if (spaceBelow < 320 && spaceAbove > 280) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
+      }
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -241,22 +264,36 @@ const DatePickerField: React.FC<{
     'July', 'August', 'September', 'October', 'November', 'December'
   ];
 
+  // Year options for fast navigation
+  const currentYear = new Date().getFullYear();
+  const yearOptions = useMemo(() => {
+    const years: number[] = [];
+    for (let y = currentYear - 8; y <= currentYear + 6; y++) {
+      years.push(y);
+    }
+    return years;
+  }, [currentYear]);
+
   const calendarDays = useMemo(() => {
     const firstDay = new Date(viewYear, viewMonth, 1).getDay();
     const totalDays = new Date(viewYear, viewMonth + 1, 0).getDate();
     const prevMonthTotalDays = new Date(viewYear, viewMonth, 0).getDate();
 
-    const days: { day: number; currentMonth: boolean; dateStr: string }[] = [];
+    const days: { day: number; currentMonth: boolean; dateStr: string; isToday: boolean }[] = [];
+    const today = new Date();
+    const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
 
     // Prev month padding
     for (let i = firstDay - 1; i >= 0; i--) {
       const prevDate = new Date(viewYear, viewMonth - 1, prevMonthTotalDays - i);
       const m = String(prevDate.getMonth() + 1).padStart(2, '0');
       const d = String(prevDate.getDate()).padStart(2, '0');
+      const dStr = `${prevDate.getFullYear()}-${m}-${d}`;
       days.push({
         day: prevMonthTotalDays - i,
         currentMonth: false,
-        dateStr: `${prevDate.getFullYear()}-${m}-${d}`,
+        dateStr: dStr,
+        isToday: dStr === todayStr,
       });
     }
 
@@ -264,7 +301,13 @@ const DatePickerField: React.FC<{
     for (let d = 1; d <= totalDays; d++) {
       const m = String(viewMonth + 1).padStart(2, '0');
       const dayStr = String(d).padStart(2, '0');
-      days.push({ day: d, currentMonth: true, dateStr: `${viewYear}-${m}-${dayStr}` });
+      const dStr = `${viewYear}-${m}-${dayStr}`;
+      days.push({
+        day: d,
+        currentMonth: true,
+        dateStr: dStr,
+        isToday: dStr === todayStr,
+      });
     }
 
     // Next month padding to complete row
@@ -273,10 +316,12 @@ const DatePickerField: React.FC<{
       const nextDate = new Date(viewYear, viewMonth + 1, n);
       const m = String(nextDate.getMonth() + 1).padStart(2, '0');
       const dayStr = String(n).padStart(2, '0');
+      const dStr = `${nextDate.getFullYear()}-${m}-${dayStr}`;
       days.push({
         day: n,
         currentMonth: false,
-        dateStr: `${nextDate.getFullYear()}-${m}-${dayStr}`,
+        dateStr: dStr,
+        isToday: dStr === todayStr,
       });
     }
 
@@ -328,13 +373,29 @@ const DatePickerField: React.FC<{
     return value;
   }, [value, parsedDate]);
 
+  // Handle direct manual typing
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const raw = e.target.value;
+    onChange(raw);
+  };
+
+  // Native date input sync value (YYYY-MM-DD)
+  const nativeValue = useMemo(() => {
+    if (parsedDate) {
+      const yyyy = parsedDate.getFullYear();
+      const mm = String(parsedDate.getMonth() + 1).padStart(2, '0');
+      const dd = String(parsedDate.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    return '';
+  }, [parsedDate]);
+
   return (
     <div ref={containerRef} style={{ marginBottom: 10, position: 'relative' }}>
       <label style={{ fontSize: 10, fontWeight: 600, color: '#616161', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4, display: 'block' }}>
         {label}
       </label>
       <div
-        onClick={() => !readOnly && setIsOpen(prev => !prev)}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -342,16 +403,37 @@ const DatePickerField: React.FC<{
           boxShadow: isOpen ? '0 0 0 3px rgba(11,44,140,0.15)' : 'none',
           borderRadius: 8,
           background: readOnly ? 'var(--inv-light-border)' : 'var(--inv-card)',
-          cursor: readOnly ? 'default' : 'pointer',
           padding: '7px 10px',
           transition: 'all 0.2s ease',
         }}
       >
-        <Calendar style={{ width: 14, height: 14, color: '#0B2C8C', marginRight: 8, flexShrink: 0 }} />
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!readOnly) setIsOpen(prev => !prev);
+          }}
+          title="Toggle Calendar"
+          style={{
+            border: 'none',
+            background: 'transparent',
+            cursor: readOnly ? 'default' : 'pointer',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            marginRight: 8,
+            flexShrink: 0,
+            color: '#0B2C8C',
+          }}
+        >
+          <Calendar style={{ width: 14, height: 14 }} />
+        </button>
+
         <input
           type="text"
           value={displayFormatted}
-          onChange={(e) => onChange(e.target.value)}
+          onChange={handleInputChange}
+          onClick={() => { if (!readOnly && !isOpen) setIsOpen(true); }}
           placeholder={placeholder}
           readOnly={readOnly}
           style={{
@@ -362,10 +444,32 @@ const DatePickerField: React.FC<{
             fontSize: 12,
             fontFamily: 'Poppins, sans-serif',
             color: displayFormatted ? 'var(--inv-text)' : '#9CA3AF',
-            cursor: readOnly ? 'default' : 'pointer',
+            cursor: readOnly ? 'default' : 'text',
             padding: 0,
           }}
         />
+
+        {/* Hidden native date input for reliable native picker fallback */}
+        <input
+          ref={nativeInputRef}
+          type="date"
+          tabIndex={-1}
+          value={nativeValue}
+          onChange={(e) => {
+            if (e.target.value) {
+              onChange(e.target.value);
+              setIsOpen(false);
+            }
+          }}
+          style={{
+            position: 'absolute',
+            opacity: 0,
+            pointerEvents: 'none',
+            width: 0,
+            height: 0,
+          }}
+        />
+
         {value && !readOnly ? (
           <button
             type="button"
@@ -378,7 +482,10 @@ const DatePickerField: React.FC<{
         ) : (
           <button
             type="button"
-            onClick={(e) => { e.stopPropagation(); if (!readOnly) setIsOpen(prev => !prev); }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!readOnly) setIsOpen(prev => !prev);
+            }}
             title="Open Calendar"
             style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', color: '#0B2C8C' }}
           >
@@ -390,34 +497,35 @@ const DatePickerField: React.FC<{
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            exit={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
             transition={{ duration: 0.15 }}
             style={{
               position: 'absolute',
-              top: 'calc(100% + 4px)',
+              [openUpward ? 'bottom' : 'top']: 'calc(100% + 6px)',
               left: 0,
-              zIndex: 999,
+              zIndex: 99999,
               background: '#FFFFFF',
               border: '1px solid #D8E3F5',
-              borderRadius: 10,
-              boxShadow: '0 10px 28px rgba(11,44,140,0.18)',
-              padding: 12,
-              width: 252,
+              borderRadius: 12,
+              boxShadow: '0 12px 36px rgba(11,44,140,0.22), 0 2px 8px rgba(0,0,0,0.06)',
+              padding: '12px 14px',
+              width: 270,
               fontFamily: 'Poppins, sans-serif',
             }}
           >
-            {/* Header: Month & Year navigation */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+            {/* Header: Month & Year navigation with Fast Select Dropdowns */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 6 }}>
               <button
                 type="button"
                 onClick={handlePrevMonth}
+                title="Previous Month"
                 style={{
                   border: '1px solid #DCE7FF',
                   borderRadius: 6,
                   background: '#F7F9FC',
-                  padding: '3px 6px',
+                  padding: '4px 6px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -425,17 +533,60 @@ const DatePickerField: React.FC<{
               >
                 <ChevronLeft style={{ width: 14, height: 14, color: '#0B2C8C' }} />
               </button>
-              <div style={{ fontWeight: 700, fontSize: 12, color: '#0B2C8C' }}>
-                {monthNames[viewMonth]} {viewYear}
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                <select
+                  value={viewMonth}
+                  onChange={(e) => setViewMonth(parseInt(e.target.value))}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#0B2C8C',
+                    background: '#F0F4FA',
+                    border: '1px solid #D8E3F5',
+                    borderRadius: 6,
+                    padding: '3px 4px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    fontFamily: 'Poppins, sans-serif',
+                  }}
+                >
+                  {monthNames.map((m, idx) => (
+                    <option key={idx} value={idx}>{m}</option>
+                  ))}
+                </select>
+
+                <select
+                  value={viewYear}
+                  onChange={(e) => setViewYear(parseInt(e.target.value))}
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: '#0B2C8C',
+                    background: '#F0F4FA',
+                    border: '1px solid #D8E3F5',
+                    borderRadius: 6,
+                    padding: '3px 4px',
+                    cursor: 'pointer',
+                    outline: 'none',
+                    fontFamily: 'Poppins, sans-serif',
+                  }}
+                >
+                  {yearOptions.map((yr) => (
+                    <option key={yr} value={yr}>{yr}</option>
+                  ))}
+                </select>
               </div>
+
               <button
                 type="button"
                 onClick={handleNextMonth}
+                title="Next Month"
                 style={{
                   border: '1px solid #DCE7FF',
                   borderRadius: 6,
                   background: '#F7F9FC',
-                  padding: '3px 6px',
+                  padding: '4px 6px',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
@@ -466,17 +617,21 @@ const DatePickerField: React.FC<{
                   <button
                     key={idx}
                     type="button"
-                    onClick={() => handleSelectDay(item.dateStr)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectDay(item.dateStr);
+                    }}
                     style={{
-                      border: 'none',
+                      border: item.isToday && !isSelected ? '1px solid #0B2C8C' : 'none',
                       borderRadius: 6,
                       padding: '5px 0',
                       fontSize: 11,
-                      fontWeight: isSelected ? 700 : 500,
+                      fontWeight: isSelected ? 700 : item.isToday ? 700 : 500,
                       background: isSelected ? '#0B2C8C' : 'transparent',
                       color: isSelected ? '#FFFFFF' : (item.currentMonth ? '#1A1A1A' : '#C4CDD5'),
                       cursor: 'pointer',
                       transition: 'background 0.1s',
+                      position: 'relative',
                     }}
                     onMouseEnter={(e) => {
                       if (!isSelected) e.currentTarget.style.background = '#EDF2FF';
@@ -492,23 +647,47 @@ const DatePickerField: React.FC<{
             </div>
 
             {/* Footer Buttons */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #F0F4FA', marginTop: 8, paddingTop: 8 }}>
-              <button
-                type="button"
-                onClick={handleSelectToday}
-                style={{
-                  border: 'none',
-                  background: '#EDF2FF',
-                  color: '#0B2C8C',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  padding: '3px 8px',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                }}
-              >
-                Today
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F0F4FA', marginTop: 8, paddingTop: 8 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={handleSelectToday}
+                  style={{
+                    border: 'none',
+                    background: '#EDF2FF',
+                    color: '#0B2C8C',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Today
+                </button>
+                {value && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChange('');
+                      setIsOpen(false);
+                    }}
+                    style={{
+                      border: 'none',
+                      background: '#FEE2E2',
+                      color: '#DC2626',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
@@ -521,7 +700,7 @@ const DatePickerField: React.FC<{
                   cursor: 'pointer',
                 }}
               >
-                Done
+                Close
               </button>
             </div>
           </motion.div>
@@ -540,6 +719,7 @@ const MonthPickerField: React.FC<{
   readOnly?: boolean;
 }> = ({ label, value, onChange, placeholder = 'e.g. July 2026', readOnly }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const initialYear = useMemo(() => {
@@ -554,6 +734,20 @@ const MonthPickerField: React.FC<{
     const match = value?.match(/\b(20\d{2})\b/);
     if (match) setViewYear(parseInt(match[1]));
   }, [value]);
+
+  // Position detection to prevent clipping: open upward if near the bottom of viewport
+  useEffect(() => {
+    if (isOpen && containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      if (spaceBelow < 280 && spaceAbove > 250) {
+        setOpenUpward(true);
+      } else {
+        setOpenUpward(false);
+      }
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -582,6 +776,15 @@ const MonthPickerField: React.FC<{
     { short: 'Dec', full: 'December' },
   ];
 
+  const currentYear = new Date().getFullYear();
+  const yearOptions = useMemo(() => {
+    const years: number[] = [];
+    for (let y = currentYear - 8; y <= currentYear + 6; y++) {
+      years.push(y);
+    }
+    return years;
+  }, [currentYear]);
+
   const handleSelectMonth = (monthName: string) => {
     onChange(`${monthName} ${viewYear}`);
     setIsOpen(false);
@@ -600,7 +803,6 @@ const MonthPickerField: React.FC<{
         {label}
       </label>
       <div
-        onClick={() => !readOnly && setIsOpen(prev => !prev)}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -608,16 +810,37 @@ const MonthPickerField: React.FC<{
           boxShadow: isOpen ? '0 0 0 3px rgba(11,44,140,0.15)' : 'none',
           borderRadius: 8,
           background: readOnly ? 'var(--inv-light-border)' : 'var(--inv-card)',
-          cursor: readOnly ? 'default' : 'pointer',
           padding: '7px 10px',
           transition: 'all 0.2s ease',
         }}
       >
-        <Calendar style={{ width: 14, height: 14, color: '#0B2C8C', marginRight: 8, flexShrink: 0 }} />
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            if (!readOnly) setIsOpen(prev => !prev);
+          }}
+          title="Toggle Month Calendar"
+          style={{
+            border: 'none',
+            background: 'transparent',
+            cursor: readOnly ? 'default' : 'pointer',
+            padding: 0,
+            display: 'flex',
+            alignItems: 'center',
+            marginRight: 8,
+            flexShrink: 0,
+            color: '#0B2C8C',
+          }}
+        >
+          <Calendar style={{ width: 14, height: 14 }} />
+        </button>
+
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onClick={() => { if (!readOnly && !isOpen) setIsOpen(true); }}
           placeholder={placeholder}
           readOnly={readOnly}
           style={{
@@ -628,46 +851,62 @@ const MonthPickerField: React.FC<{
             fontSize: 12,
             fontFamily: 'Poppins, sans-serif',
             color: value ? 'var(--inv-text)' : '#9CA3AF',
-            cursor: readOnly ? 'default' : 'pointer',
+            cursor: readOnly ? 'default' : 'text',
             padding: 0,
           }}
         />
-        <button
-          type="button"
-          onClick={(e) => { e.stopPropagation(); if (!readOnly) setIsOpen(prev => !prev); }}
-          title="Open Month Calendar"
-          style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', color: '#0B2C8C' }}
-        >
-          <Calendar style={{ width: 14, height: 14 }} />
-        </button>
+
+        {value && !readOnly ? (
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onChange(''); }}
+            title="Clear month"
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', color: '#9CA3AF' }}
+          >
+            <X style={{ width: 13, height: 13 }} />
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!readOnly) setIsOpen(prev => !prev);
+            }}
+            title="Open Month Calendar"
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 2, display: 'flex', color: '#0B2C8C' }}
+          >
+            <Calendar style={{ width: 14, height: 14 }} />
+          </button>
+        )}
       </div>
 
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: -6, scale: 0.98 }}
+            initial={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -6, scale: 0.98 }}
+            exit={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
             transition={{ duration: 0.15 }}
             style={{
               position: 'absolute',
-              top: 'calc(100% + 4px)',
+              [openUpward ? 'bottom' : 'top']: 'calc(100% + 6px)',
               left: 0,
-              zIndex: 999,
+              zIndex: 99999,
               background: '#FFFFFF',
               border: '1px solid #D8E3F5',
-              borderRadius: 10,
-              boxShadow: '0 10px 28px rgba(11,44,140,0.18)',
+              borderRadius: 12,
+              boxShadow: '0 12px 36px rgba(11,44,140,0.22), 0 2px 8px rgba(0,0,0,0.06)',
               padding: 12,
-              width: 252,
+              width: 268,
               fontFamily: 'Poppins, sans-serif',
             }}
           >
-            {/* Year navigation */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+            {/* Year navigation & Direct Dropdown */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 6 }}>
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setViewYear(viewYear - 1); }}
+                title="Previous Year"
                 style={{
                   border: '1px solid #DCE7FF',
                   borderRadius: 6,
@@ -679,12 +918,32 @@ const MonthPickerField: React.FC<{
               >
                 <ChevronLeft style={{ width: 14, height: 14, color: '#0B2C8C' }} />
               </button>
-              <div style={{ fontWeight: 700, fontSize: 13, color: '#0B2C8C' }}>
-                {viewYear}
-              </div>
+
+              <select
+                value={viewYear}
+                onChange={(e) => setViewYear(parseInt(e.target.value))}
+                style={{
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: '#0B2C8C',
+                  background: '#F0F4FA',
+                  border: '1px solid #D8E3F5',
+                  borderRadius: 6,
+                  padding: '3px 8px',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  fontFamily: 'Poppins, sans-serif',
+                }}
+              >
+                {yearOptions.map((yr) => (
+                  <option key={yr} value={yr}>{yr}</option>
+                ))}
+              </select>
+
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); setViewYear(viewYear + 1); }}
+                title="Next Year"
                 style={{
                   border: '1px solid #DCE7FF',
                   borderRadius: 6,
@@ -706,7 +965,10 @@ const MonthPickerField: React.FC<{
                   <button
                     key={m.short}
                     type="button"
-                    onClick={() => handleSelectMonth(m.full)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleSelectMonth(m.full);
+                    }}
                     style={{
                       border: isSelected ? '1px solid #0B2C8C' : '1px solid #F0F4FA',
                       borderRadius: 6,
@@ -732,24 +994,48 @@ const MonthPickerField: React.FC<{
               })}
             </div>
 
-            {/* Quick action button */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', borderTop: '1px solid #F0F4FA', paddingTop: 8 }}>
-              <button
-                type="button"
-                onClick={handleSelectThisMonth}
-                style={{
-                  border: 'none',
-                  background: '#EDF2FF',
-                  color: '#0B2C8C',
-                  fontSize: 10,
-                  fontWeight: 600,
-                  padding: '3px 8px',
-                  borderRadius: 4,
-                  cursor: 'pointer',
-                }}
-              >
-                This Month
-              </button>
+            {/* Quick action buttons */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px solid #F0F4FA', paddingTop: 8 }}>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  type="button"
+                  onClick={handleSelectThisMonth}
+                  style={{
+                    border: 'none',
+                    background: '#EDF2FF',
+                    color: '#0B2C8C',
+                    fontSize: 10,
+                    fontWeight: 600,
+                    padding: '3px 8px',
+                    borderRadius: 4,
+                    cursor: 'pointer',
+                  }}
+                >
+                  This Month
+                </button>
+                {value && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChange('');
+                      setIsOpen(false);
+                    }}
+                    style={{
+                      border: 'none',
+                      background: '#FEE2E2',
+                      color: '#DC2626',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: 4,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
@@ -1258,7 +1544,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
   return (
     <div style={{ fontFamily: 'Poppins, sans-serif' }}>
       {/* 1. Invoice Information */}
-      <AccordionSection id="invoice" title="Invoice Information" icon={<FileText style={iconSize} />} isOpen={!!openSections.invoice} onToggle={toggleSection}>
+      <AccordionSection id="invoice" title="Invoice Information" icon={<FileText style={iconSize} />} isOpen={!!openSections.invoice} onToggle={toggleSection} zIndex={80}>
         <InputField label="Invoice Number (Auto-Generated)" icon={<FileText style={iconSize} />} value={data.invoiceNumber} onChange={v => updateField('invoiceNumber', v)} readOnly={true} />
         <DatePickerField label="Invoice Date" value={data.invoiceDate} onChange={v => updateField('invoiceDate', v)} placeholder="DD/MM/YYYY" />
         <MonthPickerField label="Month" value={data.billingPeriodText} onChange={v => updateField('billingPeriodText', v)} placeholder="Select Month (e.g. July 2026)" />
@@ -1281,6 +1567,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
         icon={<Building style={iconSize} />}
         isOpen={!!openSections.client}
         onToggle={toggleSection}
+        zIndex={70}
         badge={
           autoFilledClientName ? (
             <span style={{ fontSize: 10, background: '#DCFCE7', color: '#166534', fontWeight: 700, padding: '2px 8px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 3 }}>
@@ -1380,7 +1667,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       </AccordionSection>
 
       {/* 3. Service Profile */}
-      <AccordionSection id="profile" title="Service Profile" icon={<Briefcase style={iconSize} />} isOpen={!!openSections.profile} onToggle={toggleSection}>
+      <AccordionSection id="profile" title="Service Profile" icon={<Briefcase style={iconSize} />} isOpen={!!openSections.profile} onToggle={toggleSection} zIndex={60}>
         {data.invoiceType === 'MULTI_SERVICE' && (
           <>
             <InputField label="Patient Name" icon={<Heart style={iconSize} />} value={data.patientName || ''} onChange={v => updateField('patientName', v)} />
@@ -1395,7 +1682,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       </AccordionSection>
 
       {/* 4. Other Information */}
-      <AccordionSection id="other" title="Other Information" icon={<DollarSign style={iconSize} />} isOpen={!!openSections.other} onToggle={toggleSection}>
+      <AccordionSection id="other" title="Other Information" icon={<DollarSign style={iconSize} />} isOpen={!!openSections.other} onToggle={toggleSection} zIndex={50}>
         <InputField label="Per Day Charges (Rs.)" icon={<DollarSign style={iconSize} />} type="number" value={data.perDayCharges} onChange={v => updateField('perDayCharges', Number(v))} />
         <InputField label="Advance Amount (Rs.)" icon={<DollarSign style={iconSize} />} type="number" value={data.advanceReceived} onChange={v => updateField('advanceReceived', Number(v))} />
         <InputField
@@ -1411,7 +1698,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       </AccordionSection>
 
       {/* 5. Service Details Table */}
-      <AccordionSection id="table" title="Service Details" icon={<FileText style={iconSize} />} isOpen={!!openSections.table} onToggle={toggleSection}>
+      <AccordionSection id="table" title="Service Details" icon={<FileText style={iconSize} />} isOpen={!!openSections.table} onToggle={toggleSection} zIndex={40}>
         <div style={{ overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
@@ -1488,7 +1775,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       </AccordionSection>
 
       {/* 6. Financial Summary */}
-      <AccordionSection id="financial" title="Financial Summary" icon={<DollarSign style={iconSize} />} isOpen={!!openSections.financial} onToggle={toggleSection}>
+      <AccordionSection id="financial" title="Financial Summary" icon={<DollarSign style={iconSize} />} isOpen={!!openSections.financial} onToggle={toggleSection} zIndex={30}>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
           <InputField
             label="GST Rate (%)"
@@ -1537,13 +1824,13 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       </AccordionSection>
 
       {/* 7. Remarks */}
-      <AccordionSection id="remarks" title="Remarks" icon={<MessageSquare style={iconSize} />} isOpen={!!openSections.remarks} onToggle={toggleSection}>
+      <AccordionSection id="remarks" title="Remarks" icon={<MessageSquare style={iconSize} />} isOpen={!!openSections.remarks} onToggle={toggleSection} zIndex={20}>
         <InputField label="Remarks / Notes" icon={<MessageSquare style={iconSize} />} value={data.remarks} onChange={v => updateField('remarks', v)} isTextarea />
       </AccordionSection>
 
       {/* 8. School Details (only for SCHOOL type) */}
       {data.invoiceType === 'SCHOOL' && (
-        <AccordionSection id="school" title="School Details" icon={<Building style={iconSize} />} isOpen={!!openSections.school} onToggle={toggleSection}>
+        <AccordionSection id="school" title="School Details" icon={<Building style={iconSize} />} isOpen={!!openSections.school} onToggle={toggleSection} zIndex={10}>
           <InputField label="School / College Branch" icon={<Building style={iconSize} />} value={data.schoolBranch || ''} onChange={v => updateField('schoolBranch', v)} />
           <InputField label="Contact Person" icon={<User style={iconSize} />} value={data.contactPerson || ''} onChange={v => updateField('contactPerson', v)} />
         </AccordionSection>
