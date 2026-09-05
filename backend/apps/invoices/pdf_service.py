@@ -260,13 +260,13 @@ def generate_invoice_pdf(invoice) -> bytes:
             gst_no = str(getattr(invoice, 'client_gst', '') or '').strip()
             school_br = str(getattr(invoice, 'school_branch', '') or '').strip()
 
-            def draw_card_row(cx, cy, label, val):
+            def draw_card_row(cx, cy, label, val, val_offset=52):
                 c.setFont("Times-Bold", 7.5)
                 c.setFillColor(colors.HexColor("#1A1A1A"))
                 c.drawString(cx + 8, cy, label)
                 c.setFont("Times-Roman", 7.5)
                 c.setFillColor(colors.HexColor("#333333"))
-                c.drawString(cx + 52, cy, str(val)[:28])
+                c.drawString(cx + val_offset, cy, str(val)[:28])
 
             if inv_type == "SCHOOL":
                 draw_card_row(x1, card1_y, "School:", client_n)
@@ -331,20 +331,20 @@ def generate_invoice_pdf(invoice) -> bytes:
 
             card2_y = cards_top - 27
             
-            if (inv_type in ["MULTI_SERVICE", "REGULAR"]) and pat_name:
-                draw_card_row(x2, card2_y, "Patient:", pat_name)
+            if pat_name:
+                draw_card_row(x2, card2_y, "Patient Name:", pat_name, val_offset=62)
                 card2_y -= 11
-                if pat_age:
-                    draw_card_row(x2, card2_y, "Age/Gender:", pat_age)
+                if pat_age and card2_y >= cards_y + 8:
+                    draw_card_row(x2, card2_y, "Age/Gender:", pat_age, val_offset=54)
                     card2_y -= 11
 
-            if srv_type:
+            if srv_type and card2_y >= cards_y + 8:
                 draw_card_row(x2, card2_y, "Service:", srv_type)
                 card2_y -= 11
-            if consult:
+            if consult and card2_y >= cards_y + 8:
                 draw_card_row(x2, card2_y, "Consultant:", consult)
                 card2_y -= 11
-            if srv_start:
+            if srv_start and card2_y >= cards_y + 8:
                 draw_card_row(x2, card2_y, "Started On:", srv_start)
                 card2_y -= 11
             if rend_days and card2_y >= cards_y + 4:

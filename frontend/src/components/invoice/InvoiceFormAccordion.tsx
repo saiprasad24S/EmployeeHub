@@ -1675,11 +1675,15 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
 
       {/* 3. Service Profile */}
       <AccordionSection id="profile" title="Service Profile" icon={<Briefcase style={iconSize} />} isOpen={!!openSections.profile} onToggle={toggleSection} zIndex={60}>
+        <InputField
+          label="Patient Name (Optional)"
+          icon={<Heart style={iconSize} />}
+          value={data.patientName || ''}
+          onChange={v => updateField('patientName', v)}
+          placeholder="e.g. John Doe (Displayed in invoice if entered)"
+        />
         {data.invoiceType === 'MULTI_SERVICE' && (
-          <>
-            <InputField label="Patient Name" icon={<Heart style={iconSize} />} value={data.patientName || ''} onChange={v => updateField('patientName', v)} />
-            <InputField label="Age / Gender" icon={<User style={iconSize} />} value={data.patientAgeGender || ''} onChange={v => updateField('patientAgeGender', v)} />
-          </>
+          <InputField label="Age / Gender" icon={<User style={iconSize} />} value={data.patientAgeGender || ''} onChange={v => updateField('patientAgeGender', v)} />
         )}
         <InputField label="Service Type" icon={<Briefcase style={iconSize} />} value={data.serviceType || ''} onChange={v => updateField('serviceType', v)} />
         <InputField label="Consultant" icon={<UserCheck style={iconSize} />} value={data.consultant || ''} onChange={v => updateField('consultant', v)} />

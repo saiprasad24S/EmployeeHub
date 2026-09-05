@@ -330,16 +330,22 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
               <Settings size={16} style={{ marginRight: '5px', flexShrink: 0 }} /> SERVICE PROFILE
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {(data.invoiceType === 'MULTI_SERVICE' || data.invoiceType === 'REGULAR') && data.patientName && (
-                <>
-                  <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Patient:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.patientName}</span></div>
-                  {data.patientAgeGender && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Age/Gender:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.patientAgeGender}</span></div>}
-                </>
-              )}
-              {data.serviceType && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Service Type:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.serviceType}</span></div>}
-              {data.consultant && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Consultant:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.consultant}</span></div>}
-              {data.serviceStarted && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Started On:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{formatDisplayDate(data.serviceStarted)}</span></div>}
-              {data.renderedDays && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '82px', minWidth: '82px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Rendered:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.renderedDays}</span></div>}
+              {data.patientName && data.patientName.trim() ? (
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Patient Name:</span>
+                  <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.patientName.trim()}</span>
+                </div>
+              ) : null}
+              {data.patientAgeGender && data.patientAgeGender.trim() ? (
+                <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                  <span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Age/Gender:</span>
+                  <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.patientAgeGender.trim()}</span>
+                </div>
+              ) : null}
+              {data.serviceType && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Service Type:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.serviceType}</span></div>}
+              {data.consultant && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Consultant:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.consultant}</span></div>}
+              {data.serviceStarted && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Started On:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{formatDisplayDate(data.serviceStarted)}</span></div>}
+              {data.renderedDays && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Rendered:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.renderedDays}</span></div>}
             </div>
           </div>
 
