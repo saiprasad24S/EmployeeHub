@@ -1,4 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react'
+import { AlertTriangle } from 'lucide-react'
 
 interface Props {
   children: ReactNode
@@ -37,7 +38,9 @@ export class ErrorBoundary extends Component<Props, State> {
           boxShadow: 'var(--shadow)',
           fontFamily: 'sans-serif'
         }}>
-          <h2 style={{ margin: '0 0 1rem 0', fontFamily: 'Poppins, sans-serif' }}>⚠️ Application Error</h2>
+          <h2 style={{ margin: '0 0 1rem 0', fontFamily: 'Poppins, sans-serif', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <AlertTriangle size={24} /> Application Error
+          </h2>
           <p style={{ fontSize: '0.95rem', lineHeight: 1.6, color: 'var(--text)' }}>
             The application crashed during rendering. This is often caused by missing configuration, uninitialized third-party APIs (like Clerk), or maps loading issues.
           </p>

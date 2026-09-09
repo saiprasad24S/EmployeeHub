@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
+import { AlertCircle, User, Calendar, MapPin } from 'lucide-react'
 
 type Employee = {
   id: number
@@ -345,8 +346,21 @@ export function AssignmentsPage() {
                   </div>
                   <span className={getStatusClass(assignment.status)} style={{ fontSize: '0.72rem', flexShrink: 0 }}>{assignment.status}</span>
                 </div>
-                <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>👤 {assignment.employee_name} ({assignment.employee_employee_id})</div>
-                <div style={{ fontSize: '0.78rem', color: 'var(--muted)' }}>📅 {new Date(assignment.visit_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })} · 📍 {(assignment.radius / 1000).toFixed(2)} km radius</div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <User size={13} />
+                  <span>{assignment.employee_name} ({assignment.employee_employee_id})</span>
+                </div>
+                <div style={{ fontSize: '0.78rem', color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <Calendar size={13} />
+                    <span>{new Date(assignment.visit_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  </span>
+                  <span>·</span>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                    <MapPin size={13} />
+                    <span>{(assignment.radius / 1000).toFixed(2)} km radius</span>
+                  </span>
+                </div>
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                   <button className="btn-secondary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.78rem' }} onClick={() => openEditForm(assignment)}>Edit</button>
                   <button className="btn-secondary" style={{ padding: '0.3rem 0.7rem', fontSize: '0.78rem', background: 'rgba(239,68,68,0.08)', color: 'var(--danger)' }} onClick={() => handleDelete(assignment.id)}>Delete</button>
@@ -364,7 +378,7 @@ export function AssignmentsPage() {
           <div className="camera-modal" style={{ maxWidth: '500px', width: '100%', height: 'auto', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="camera-header">
               <h3 style={{ fontSize: '1.25rem' }}>
-                {editingAssignment ? '✏️ Edit Visit Assignment' : '📅 Schedule Patient Visit'}
+                {editingAssignment ? 'Edit Visit Assignment' : 'Schedule Patient Visit'}
               </h3>
               <button
                 onClick={closeForm}
@@ -382,8 +396,9 @@ export function AssignmentsPage() {
 
             <form onSubmit={handleSubmit} style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {errorMsg && (
-                <div style={{ padding: '0.8rem', background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                  ⚠️ {errorMsg}
+                <div style={{ padding: '0.8rem', background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  <span>{errorMsg}</span>
                 </div>
               )}
 

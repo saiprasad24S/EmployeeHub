@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import { MapContainer, Marker, TileLayer, Popup } from 'react-leaflet'
 import { divIcon } from 'leaflet'
 import type { LatLngExpression } from 'leaflet'
+import { MapPin } from 'lucide-react'
 
 type LiveLocationsMapProps = {
   locations: Array<{ id: number; employee_id: string; name: string; email?: string; department?: string; default_address?: string; profile_photo?: string; latitude: number; longitude: number }>
@@ -19,7 +20,7 @@ export function LiveLocationsMap({ locations }: LiveLocationsMapProps) {
     const normalized = locations.filter((loc) => {
       const latitude = Number(loc.latitude)
       const longitude = Number(loc.longitude)
-      return Number.isFinite(latitude) && Number.isFinite(longitude) && latitude !== 0 && longitude !== 0
+      return !isNaN(latitude) && !isNaN(longitude)
     })
 
     return normalized.map((loc) => ({
@@ -30,13 +31,14 @@ export function LiveLocationsMap({ locations }: LiveLocationsMapProps) {
     }))
   }, [locations])
 
-  const center: LatLngExpression = markers.length > 0
-    ? [markers[0].latitude, markers[0].longitude]
-    : [12.9716, 77.5946]
+  const center: LatLngExpression = useMemo(() => {
+    if (markers.length === 0) return [17.385, 78.4867] // Hyderabad default
+    return [markers[0].latitude, markers[0].longitude]
+  }, [markers])
 
   return (
-    <div className="map-card" style={{ height: '350px', borderRadius: '14px', overflow: 'hidden' }}>
-      <MapContainer key="live-locations-map" center={center} zoom={12} scrollWheelZoom className="map-view" style={{ height: '100%' }}>
+    <div style={{ width: '100%', height: '400px', borderRadius: '16px', overflow: 'hidden' }}>
+      <MapContainer center={center} zoom={13} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           attribution='&copy; OpenStreetMap contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -50,8 +52,8 @@ export function LiveLocationsMap({ locations }: LiveLocationsMapProps) {
                   ID: {loc.employee_id}
                 </p>
                 {loc.email ? <p style={{ margin: '0.15rem 0 0 0', fontSize: '0.75rem', color: 'var(--muted)' }}>{loc.email}</p> : null}
-                <span style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                  📍 {loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}
+                <span style={{ fontSize: '0.75rem', fontFamily: 'monospace', display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
+                  <MapPin size={12} /> {loc.latitude.toFixed(5)}, {loc.longitude.toFixed(5)}
                 </span>
               </div>
             </Popup>

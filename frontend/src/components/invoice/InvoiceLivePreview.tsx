@@ -250,7 +250,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           <div style={{ flex: 1.15, padding: '0 12px', borderRight: '1px solid #DCE7FF', display: 'flex', flexDirection: 'column', gap: '4px', color: '#333' }}>
             <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> +91 96609 66369</div>
             <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> admin@skandanhomecarre.com</div>
-            <div style={{ display: 'flex', alignItems: 'center' }}><Globe size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> www.skandanhomecarre.com</div>
+            <div style={{ display: 'flex', alignItems: 'center' }}><Globe size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> www.skandanhomecarrecclinic.com</div>
             {data.companyGstin && data.companyGstin.trim() ? (
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <FileText size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} />

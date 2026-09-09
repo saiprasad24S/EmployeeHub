@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
@@ -7,6 +8,7 @@ import { LiveLocationsMap } from '../components/LiveLocationsMap'
 import { useSearch } from '../context/SearchContext'
 
 export function DashboardPage() {
+  const navigate = useNavigate()
   const { getToken } = useAuth()
   const { searchQuery } = useSearch()
 
@@ -84,6 +86,100 @@ export function DashboardPage() {
         <MetricCard label="Completed Visits" value={String(metricsQuery.data?.completed_visits ?? 0)} />
         <MetricCard label="Pending Visits" value={String(metricsQuery.data?.pending_visits ?? 0)} />
         <MetricCard label="Distance Covered" value={`${Math.round(metricsQuery.data?.distance_covered_today_meters ?? 0)} m`} />
+      </div>
+
+      {/* Leave Overview Section */}
+      <div className="glass-card card-soft" style={{ padding: '1.5rem', width: '100%', maxWidth: '1100px', margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '0.5rem' }}>
+          <div>
+            <span className="eyebrow" style={{ textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--muted)', fontSize: '0.75rem' }}>
+              LEAVE MANAGEMENT
+            </span>
+            <h4 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0.2rem 0' }}>Leave Overview</h4>
+          </div>
+          <button
+            type="button"
+            className="ghost-button"
+            onClick={() => navigate('/leaves')}
+            style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--primary)', cursor: 'pointer', padding: '0.4rem 0.8rem' }}
+          >
+            View All Leaves →
+          </button>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem' }}>
+          <div
+            onClick={() => navigate('/leaves?status=PENDING')}
+            style={{
+              background: 'rgba(245, 158, 11, 0.08)',
+              border: '2px solid rgba(245, 158, 11, 0.4)',
+              borderRadius: '14px',
+              padding: '1.2rem',
+              cursor: 'pointer',
+              boxShadow: (metricsQuery.data?.pending_leaves ?? 0) > 0 ? '0 4px 14px rgba(245, 158, 11, 0.15)' : 'none',
+              transition: 'transform 0.15s ease',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#D97706', textTransform: 'uppercase' }}>
+                Pending Review
+              </span>
+              {(metricsQuery.data?.pending_leaves ?? 0) > 0 && (
+                <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#D97706' }} />
+              )}
+            </div>
+            <div style={{ fontSize: '2rem', fontWeight: 800, color: '#B45309', marginTop: '0.3rem' }}>
+              {metricsQuery.data?.pending_leaves ?? 0}
+            </div>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', color: 'var(--muted)' }}>
+              Click to view requests requiring action
+            </p>
+          </div>
+
+          <div
+            onClick={() => navigate('/leaves?status=APPROVED')}
+            style={{
+              background: 'rgba(34, 197, 94, 0.06)',
+              border: '1px solid rgba(34, 197, 94, 0.25)',
+              borderRadius: '14px',
+              padding: '1.2rem',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease',
+            }}
+          >
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#16A34A', textTransform: 'uppercase' }}>
+              Approved Leaves
+            </span>
+            <div style={{ fontSize: '2rem', fontWeight: 800, color: '#15803D', marginTop: '0.3rem' }}>
+              {metricsQuery.data?.approved_leaves ?? 0}
+            </div>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', color: 'var(--muted)' }}>
+              Approved requests
+            </p>
+          </div>
+
+          <div
+            onClick={() => navigate('/leaves?status=REJECTED')}
+            style={{
+              background: 'rgba(239, 68, 68, 0.06)',
+              border: '1px solid rgba(239, 68, 68, 0.25)',
+              borderRadius: '14px',
+              padding: '1.2rem',
+              cursor: 'pointer',
+              transition: 'transform 0.15s ease',
+            }}
+          >
+            <span style={{ fontSize: '0.8rem', fontWeight: 600, color: '#DC2626', textTransform: 'uppercase' }}>
+              Rejected Leaves
+            </span>
+            <div style={{ fontSize: '2rem', fontWeight: 800, color: '#B91C1C', marginTop: '0.3rem' }}>
+              {metricsQuery.data?.rejected_leaves ?? 0}
+            </div>
+            <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.75rem', color: 'var(--muted)' }}>
+              Rejected requests
+            </p>
+          </div>
+        </div>
       </div>
       <div style={{ width: '100%', maxWidth: '1100px', margin: '0 auto' }}>
         <div className="glass-card card-soft">

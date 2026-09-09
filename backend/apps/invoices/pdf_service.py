@@ -167,7 +167,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             if company_gstin:
                 c.drawString(215, bar_y + 39, "+91 96609 66369")
                 c.drawString(215, bar_y + 28, "admin@skandanhomecarre.com")
-                c.drawString(215, bar_y + 17, "www.skandanhomecarre.com")
+                c.drawString(215, bar_y + 17, "www.skandanhomecarrecclinic.com")
                 c.setFont("Times-Bold", 8)
                 c.drawString(215, bar_y + 6, "GSTIN: ")
                 c.setFont("Times-Roman", 8)
@@ -175,7 +175,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             else:
                 c.drawString(215, bar_y + 38, "+91 96609 66369")
                 c.drawString(215, bar_y + 26, "admin@skandanhomecarre.com")
-                c.drawString(215, bar_y + 14, "www.skandanhomecarre.com")
+                c.drawString(215, bar_y + 14, "www.skandanhomecarrecclinic.com")
 
             # Divider line 2
             c.line(365, bar_y + 4, 365, bar_y + bar_h - 4)

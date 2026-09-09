@@ -2,7 +2,7 @@ from django.db import models
 from django.db.models.signals import pre_save
 from django.dispatch import receiver
 
-from apps.common.cloudinary_service import delete_image_from_url
+from apps.common.cloudinary_service import delete_image, delete_image_from_url
 
 
 class Admin(models.Model):
@@ -71,5 +71,13 @@ def delete_previous_profile_image(sender, instance, **kwargs):
     previous = Employee.objects.filter(pk=instance.pk).only("profile_photo", "profile_photo_public_id").first()
     if not previous:
         return
-    if previous.profile_photo and previous.profile_photo != instance.profile_photo and previous.profile_photo_public_id:
-        delete_image_from_url(previous.profile_photo)
+    # Only delete previous image if public_id changed to a new non-empty one, or if photo was removed
+    if (
+        previous.profile_photo_public_id
+        and instance.profile_photo_public_id
+        and previous.profile_photo_public_id != instance.profile_photo_public_id
+    ):
+        delete_image(previous.profile_photo_public_id)
+    elif previous.profile_photo_public_id and not instance.profile_photo:
+        delete_image(previous.profile_photo_public_id)
+

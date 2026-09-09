@@ -85,9 +85,16 @@ def delete_patient_visit_photo(sender, instance, **kwargs):
 
 
 class Notification(models.Model):
+    class NotificationType(models.TextChoices):
+        GENERAL = "GENERAL", "General"
+        LEAVE_APPROVED = "LEAVE_APPROVED", "Leave Approved"
+        LEAVE_REJECTED = "LEAVE_REJECTED", "Leave Rejected"
+
     employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="notifications")
     title = models.CharField(max_length=160)
     message = models.TextField()
+    notification_type = models.CharField(max_length=50, choices=NotificationType.choices, default=NotificationType.GENERAL)
+    reference_id = models.PositiveIntegerField(null=True, blank=True)
     is_read = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
 

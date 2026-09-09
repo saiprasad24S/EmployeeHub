@@ -4,6 +4,7 @@ import { AuthenticateWithRedirectCallback, SignedIn, SignedOut, SignOutButton, u
 import { AppShell } from './components/AppShell'
 import { authedFetch } from './lib/api'
 import { useLocationTracker } from './hooks/useLocationTracker'
+import { AlertTriangle } from 'lucide-react'
 
 import { safeStorage } from './lib/storage'
 
@@ -16,6 +17,7 @@ const SignUpPage = lazy(() => import('./pages/SignUpPage').then((m) => ({ defaul
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage').then((m) => ({ default: m.EmployeesPage })))
 const AttendancePage = lazy(() => import('./pages/AttendancePage').then((m) => ({ default: m.AttendancePage })))
 const AssignmentsPage = lazy(() => import('./pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage })))
+const LeavesPage = lazy(() => import('./pages/LeavesPage').then((m) => ({ default: m.LeavesPage })))
 const TrackingPage = lazy(() => import('./pages/TrackingPage').then((m) => ({ default: m.TrackingPage })))
 const InvoicePage = lazy(() => import('./pages/InvoicePage').then((m) => ({ default: m.InvoicePage })))
 const PayslipPage = lazy(() => import('./pages/PayslipPage').then((m) => ({ default: m.PayslipPage })))
@@ -93,7 +95,9 @@ function MainAppSelector() {
     return (
       <div className="unregistered-container">
         <div className="unregistered-card">
-          <div className="unregistered-icon">⚠️</div>
+          <div className="unregistered-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
+            <AlertTriangle size={40} color="#F59E0B" />
+          </div>
           <h2>Access Restricted</h2>
           <p style={{ margin: '1rem 0 1.5rem 0', lineHeight: 1.6 }}>{authError || 'User profile not found.'}</p>
           <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
@@ -131,6 +135,7 @@ function MainAppSelector() {
           <Route path="employees" element={<EmployeesPage />} />
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="assignments" element={<AssignmentsPage />} />
+          <Route path="leaves" element={<LeavesPage />} />
           <Route path="tracking" element={<TrackingPage />} />
           <Route path="tracking/:employeeId" element={<TrackingPage />} />
           <Route path="invoice" element={<InvoicePage />} />

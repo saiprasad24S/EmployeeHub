@@ -231,6 +231,7 @@ def upload_image(
         public_id=public_id,
         resource_type="image",
         overwrite=True,
+        invalidate=True,
         unique_filename=False,
         use_filename=False,
     )
@@ -277,9 +278,11 @@ def upload_attendance_image(image_file, *, employee_id: str, attendance_type: st
 
 
 def upload_profile_image(image_file, *, employee_id: str, employee_name: str | None = None) -> dict[str, Any]:
-    file_name = f"{employee_id}_profile.jpg"
+    dt = datetime.now()
+    file_name = f"{employee_id}_profile_{dt.strftime('%Y%m%d_%H%M%S')}.jpg"
     metadata = {"employee_name": employee_name or employee_id, "employee_id": employee_id}
     return upload_image(image_file, kind="profile", employee_id=employee_id, file_name=file_name, metadata=metadata)
+
 
 
 def upload_patient_visit_image(image_file, *, employee_id: str, patient_id: str, employee_name: str | None = None) -> dict[str, Any]:

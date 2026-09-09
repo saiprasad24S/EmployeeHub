@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useAuth } from '@clerk/clerk-react'
 import { authedFetch, API_BASE_URL } from '../lib/api'
+import { AlertCircle, CheckCircle2 } from 'lucide-react'
 
 type Employee = {
   id: number
@@ -1024,13 +1025,15 @@ export function AttendancePage() {
             </div>
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               {downloadError && (
-                <div style={{ padding: '0.75rem', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', fontSize: '0.85rem' }}>
-                  ⚠️ {downloadError}
+                <div style={{ padding: '0.75rem', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.1)', color: 'var(--danger)', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <AlertCircle size={16} style={{ flexShrink: 0 }} />
+                  <span>{downloadError}</span>
                 </div>
               )}
               {downloadSuccess && (
-                <div style={{ padding: '0.75rem', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', fontSize: '0.85rem', fontWeight: 600 }}>
-                  ✓ Excel report generated and downloaded successfully!
+                <div style={{ padding: '0.75rem', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', fontSize: '0.85rem', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <CheckCircle2 size={16} style={{ flexShrink: 0 }} />
+                  <span>Excel report generated and downloaded successfully!</span>
                 </div>
               )}
               <div className="stack" style={{ gap: '0.4rem' }}>

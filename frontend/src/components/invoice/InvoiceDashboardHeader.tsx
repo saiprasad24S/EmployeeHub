@@ -2,7 +2,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, FileText, Search, ShieldCheck, Save, Download,
-  Printer, RefreshCw, Layers
+  RefreshCw, Layers
 } from 'lucide-react'
 
 interface InvoiceDashboardHeaderProps {
@@ -14,7 +14,6 @@ interface InvoiceDashboardHeaderProps {
   onSaveDraft: () => void
   onSaveInvoice: () => void
   onVerifyModal: () => void
-  onPrint: () => void
   invoiceNumber: string
   templateType: 'REGULAR' | 'SCHOOL' | 'MULTI_SERVICE'
   isSaving: boolean
@@ -36,7 +35,6 @@ export const InvoiceDashboardHeader: React.FC<InvoiceDashboardHeaderProps> = ({
   onSaveDraft,
   onSaveInvoice,
   onVerifyModal,
-  onPrint,
   invoiceNumber,
   templateType,
   isSaving,
@@ -243,28 +241,6 @@ export const InvoiceDashboardHeader: React.FC<InvoiceDashboardHeaderProps> = ({
           >
             <Download style={{ width: 14, height: 14 }} />
             PDF
-          </motion.button>
-
-          <motion.button
-            whileHover={{ y: -1 }}
-            whileTap={{ scale: 0.96 }}
-            onClick={onPrint}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              padding: '7px 10px',
-              borderRadius: 8,
-              fontSize: 11,
-              fontWeight: 600,
-              color: '#374151',
-              background: '#fff',
-              border: '1px solid #D8E3F5',
-              cursor: 'pointer',
-              fontFamily: 'Poppins, sans-serif',
-            }}
-          >
-            <Printer style={{ width: 14, height: 14 }} />
           </motion.button>
         </div>
       </div>

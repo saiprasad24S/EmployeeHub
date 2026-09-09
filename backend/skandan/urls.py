@@ -58,6 +58,8 @@ urlpatterns = [
     path("api/dashboard/", include("apps.analytics.urls")),
     path("api/invoices/", include("apps.invoices.urls")),
     path("api/payslips/", include("apps.payslips.urls")),
+    path("api/leaves/", include("apps.leaves.urls")),
+    path("api/notifications/", include("apps.leaves.notification_urls")),
     path("api/health/database", health_view, name="database-health"),
     path("api/health/cloudinary", cloudinary_health_view, name="cloudinary-health"),
 ]

@@ -281,11 +281,6 @@ export function InvoicePage() {
     setActiveTab('EDITOR')
   }
 
-  // Print Handlers
-  const handlePrint = () => {
-    window.print()
-  }
-
   const handleSaveInvoice = async (): Promise<Invoice | null> => {
     const { subtotal, gstRate, gstAmount: computedGstAmount, discountAmount, totalAfterGst, balanceDue, grandTotal } = computeInvoiceTotals(invoiceData)
 
@@ -493,7 +488,6 @@ export function InvoicePage() {
         }}
         onSaveInvoice={handleSaveInvoice}
         onVerifyModal={() => setActiveTab('VERIFY')}
-        onPrint={handlePrint}
         invoiceNumber={invoiceData.invoiceNumber}
         templateType={invoiceData.invoiceType}
         isSaving={saveMutation.isPending}

@@ -4,6 +4,7 @@ import { useAuth } from '@clerk/clerk-react'
 import { authedFetch, API_BASE_URL } from '../lib/api'
 import { useSearch } from '../context/SearchContext'
 import { RouteMap } from '../components/RouteMap'
+import { AlertCircle, Search, MapPin } from 'lucide-react'
 
 type Employee = {
   id: number
@@ -221,10 +222,11 @@ export function EmployeesPage() {
     setDefaultAddress(employee.default_address || '')
     setLatitude(employee.default_latitude ? String(employee.default_latitude) : '')
     setLongitude(employee.default_longitude ? String(employee.default_longitude) : '')
-    setRadius(String(employee.default_radius ?? 100))
+    const initialRadius = employee.default_radius ? (employee.default_radius > 10 ? String(employee.default_radius / 1000) : String(employee.default_radius)) : '1'
+    setRadius(initialRadius)
     setShiftName(employee.shift_name || 'General Shift')
-    setShiftStartTime(employee.shift_start_time || '09:00')
-    setShiftEndTime(employee.shift_end_time || '18:00')
+    setShiftStartTime(employee.shift_start_time ? String(employee.shift_start_time).slice(0, 5) : '09:00')
+    setShiftEndTime(employee.shift_end_time ? String(employee.shift_end_time).slice(0, 5) : '18:00')
     setWeeklyOffDays(employee.weekly_off_days || 'Sunday')
     setIsActive(employee.is_active)
     setProfilePhotoFile(null)
@@ -334,9 +336,13 @@ export function EmployeesPage() {
     if (finalAddress.trim() && (!finalLat || !finalLon || (editingEmployee && finalAddress.trim() !== (editingEmployee.default_address || '').trim()))) {
       setIsGeocoding(true)
       try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 2500)
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(finalAddress)}&limit=1`
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(finalAddress)}&limit=1`,
+          { signal: controller.signal }
         )
+        clearTimeout(timeoutId)
         if (res.ok) {
           const data = await res.json()
           if (data && data.length > 0) {
@@ -354,9 +360,13 @@ export function EmployeesPage() {
     } else if (finalLat && finalLon && !finalAddress.trim()) {
       setIsGeocoding(true)
       try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 2500)
         const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLon)}`
+          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLon)}`,
+          { signal: controller.signal }
         )
+        clearTimeout(timeoutId)
         if (res.ok) {
           const data = await res.json()
           if (data && data.display_name) {
@@ -789,7 +799,7 @@ export function EmployeesPage() {
           <div className="camera-modal" style={{ maxWidth: '520px', width: '100%', height: 'auto', maxHeight: '90vh', overflowY: 'auto' }}>
             <div className="camera-header">
               <h3 style={{ fontSize: '1.25rem' }}>
-                {editingEmployee ? '✏️ Edit Employee Profile' : '👤 Register New Employee'}
+                {editingEmployee ? 'Edit Employee Profile' : 'Register New Employee'}
               </h3>
               <button
                 onClick={closeForm}
@@ -807,8 +817,9 @@ export function EmployeesPage() {
 
             <form onSubmit={handleSubmit} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.9rem' }}>
               {errorMsg && (
-                <div style={{ padding: '0.8rem', background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', borderRadius: '8px', fontSize: '0.85rem' }}>
-                  ⚠️ {errorMsg}
+                <div style={{ padding: '0.8rem', background: 'rgba(239, 68, 68, 0.08)', color: 'var(--danger)', borderRadius: '8px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <AlertCircle size={15} style={{ flexShrink: 0 }} />
+                  <span>{errorMsg}</span>
                 </div>
               )}
 
@@ -849,11 +860,13 @@ export function EmployeesPage() {
                 <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Default Address</label>
                 <textarea value={defaultAddress} onChange={(e) => setDefaultAddress(e.target.value)} placeholder="e.g. Madhapur, Hyderabad" rows={2} style={{ padding: '0.6rem', borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)', resize: 'vertical', width: '100%' }} />
                 <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                  <button type="button" onClick={handleGeocode} disabled={isGeocoding} style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(107, 47, 160, 0.08)', color: 'var(--primary)', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                    {isGeocoding ? 'Locating...' : '🔍 Fetch Address / Coordinates'}
+                  <button type="button" onClick={handleGeocode} disabled={isGeocoding} style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(107, 47, 160, 0.08)', color: 'var(--primary)', border: 'none', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <Search size={13} />
+                    <span>{isGeocoding ? 'Locating...' : 'Fetch Address / Coordinates'}</span>
                   </button>
-                  <button type="button" onClick={handleUseCurrentLocation} disabled={isGeocoding} style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', color: '#10B981', border: 'none', cursor: 'pointer', fontWeight: 600 }}>
-                    📍 Use Current GPS Location
+                  <button type="button" onClick={handleUseCurrentLocation} disabled={isGeocoding} style={{ padding: '0.4rem 0.85rem', fontSize: '0.8rem', borderRadius: '8px', background: 'rgba(16, 185, 129, 0.08)', color: '#10B981', border: 'none', cursor: 'pointer', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
+                    <MapPin size={13} />
+                    <span>Use Current GPS Location</span>
                   </button>
                 </div>
               </div>

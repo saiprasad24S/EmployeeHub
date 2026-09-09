@@ -5,6 +5,7 @@ import { useAuth } from '@clerk/clerk-react'
 import { authedFetch } from '../lib/api'
 import { RouteMap } from '../components/RouteMap'
 import { LiveLocationsMap } from '../components/LiveLocationsMap'
+import { MapPin, Navigation } from 'lucide-react'
 
 type Employee = {
   id: number
@@ -295,11 +296,13 @@ export function TrackingPage() {
             {routeQuery.data.route && routeQuery.data.route.length > 0 && (
               <div style={{ background: 'var(--accent-soft)', padding: '1rem', borderRadius: '12px', marginTop: 'auto' }}>
                 <h5 style={{ margin: '0 0 0.5rem 0', color: 'var(--primary)' }}>Route Snapshot</h5>
-                <p style={{ margin: '0.2rem 0', fontSize: '0.8rem' }}>
-                  🏁 <strong>Start Point:</strong> {routeQuery.data.route[0].latitude.toFixed(5)}, {routeQuery.data.route[0].longitude.toFixed(5)}
+                <p style={{ margin: '0.35rem 0', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <Navigation size={13} color="#10B981" />
+                  <span><strong>Start Point:</strong> {routeQuery.data.route[0].latitude.toFixed(5)}, {routeQuery.data.route[0].longitude.toFixed(5)}</span>
                 </p>
-                <p style={{ margin: '0.2rem 0', fontSize: '0.8rem' }}>
-                  📍 <strong>Last Location:</strong> {routeQuery.data.route[routeQuery.data.route.length - 1].latitude.toFixed(5)}, {routeQuery.data.route[routeQuery.data.route.length - 1].longitude.toFixed(5)}
+                <p style={{ margin: '0.35rem 0', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                  <MapPin size={13} color="var(--primary)" />
+                  <span><strong>Last Location:</strong> {routeQuery.data.route[routeQuery.data.route.length - 1].latitude.toFixed(5)}, {routeQuery.data.route[routeQuery.data.route.length - 1].longitude.toFixed(5)}</span>
                 </p>
               </div>
             )}

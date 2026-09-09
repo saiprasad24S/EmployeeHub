@@ -62,6 +62,11 @@ class DashboardMetricsView(APIView):
             if employee:
                 distance = get_today_distance(employee)
 
+        from apps.leaves.models import Leave
+        pending_leaves = Leave.objects.filter(status=Leave.Status.PENDING).count()
+        approved_leaves = Leave.objects.filter(status=Leave.Status.APPROVED).count()
+        rejected_leaves = Leave.objects.filter(status=Leave.Status.REJECTED).count()
+
         return Response(
             {
                 "total_employees": total_employees,
@@ -71,5 +76,8 @@ class DashboardMetricsView(APIView):
                 "completed_visits": completed_visits,
                 "pending_visits": pending_visits,
                 "distance_covered_today_meters": distance,
+                "pending_leaves": pending_leaves,
+                "approved_leaves": approved_leaves,
+                "rejected_leaves": rejected_leaves,
             }
         )

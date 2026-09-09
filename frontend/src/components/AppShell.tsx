@@ -7,7 +7,7 @@ const navItems = [
   { label: 'Dashboard', to: '/' },
   { label: 'Employees', to: '/employees' },
   { label: 'Attendance', to: '/attendance' },
-  { label: 'Assignments', to: '/assignments' },
+  { label: 'Leaves', to: '/leaves' },
   { label: 'Live Tracking', to: '/tracking' },
   { label: 'Invoice', to: '/invoice' },
   { label: 'Payslip', to: '/payslip' },

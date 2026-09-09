@@ -110,6 +110,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
 
 
 class EmployeeCreateSerializer(serializers.ModelSerializer):
+    default_radius = serializers.FloatField(required=False, allow_null=True)
+    default_latitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
+    default_longitude = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
+
     class Meta:
         model = Employee
         fields = [
@@ -131,6 +135,25 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
             "shift_end_time",
             "weekly_off_days",
         ]
+
+    def to_internal_value(self, data):
+        if hasattr(data, "copy"):
+            data = data.copy()
+        elif isinstance(data, dict):
+            data = dict(data)
+        for field in ("default_latitude", "default_longitude", "default_radius"):
+            if field in data and data[field] == "":
+                data[field] = None
+        return super().to_internal_value(data)
+
+    def validate_default_radius(self, value):
+        if value is None:
+            return 100
+        f_val = float(value)
+        if f_val <= 10 and not f_val.is_integer():
+            return int(round(f_val * 1000))
+        return int(round(f_val))
+
 
 
 class AdminSerializer(serializers.ModelSerializer):

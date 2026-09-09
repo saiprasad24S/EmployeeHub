@@ -78,7 +78,7 @@ export function RouteMap({ points, isLive = false }: RouteMapProps) {
               <Marker position={[startPoint.latitude, startPoint.longitude]} icon={startIcon}>
                 <Popup>
                   <div style={{ padding: '0.2rem' }}>
-                    <strong style={{ color: '#10B981', fontSize: '0.9rem' }}>🏁 Route Start Location</strong>
+                    <strong style={{ color: '#10B981', fontSize: '0.9rem' }}>Route Start Location</strong>
                     {startPoint.timestamp && (
                       <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>
                         Time: {formatTimestamp(startPoint.timestamp)}
@@ -96,7 +96,7 @@ export function RouteMap({ points, isLive = false }: RouteMapProps) {
                 <Popup>
                   <div style={{ padding: '0.2rem' }}>
                     <strong style={{ color: isLive ? '#6B2FA0' : '#EF4444', fontSize: '0.9rem' }}>
-                      {isLive ? '📍 Live Location' : '🏁 Route End Location'}
+                      {isLive ? 'Live Location' : 'Route End Location'}
                     </strong>
                     {endPoint.timestamp && (
                       <div style={{ fontSize: '0.75rem', color: 'var(--muted)', marginTop: '0.2rem' }}>

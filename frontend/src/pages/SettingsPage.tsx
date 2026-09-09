@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { CheckCircle2, MapPin, Cloud, Database } from 'lucide-react'
 
 export function SettingsPage() {
   const [defaultRadius, setDefaultRadius] = useState(0.1)
@@ -24,8 +25,9 @@ export function SettingsPage() {
         </div>
 
         {saveSuccess && (
-          <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', borderRadius: '12px', fontWeight: 600, marginBottom: '1.5rem' }}>
-            ✅ System settings successfully updated!
+          <div style={{ padding: '1rem', background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', borderRadius: '12px', fontWeight: 600, marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <CheckCircle2 size={18} />
+            <span>System settings successfully updated!</span>
           </div>
         )}
 
@@ -33,7 +35,7 @@ export function SettingsPage() {
           {/* Section 1: Geofencing & Attendance Policies */}
           <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem' }}>
             <h4 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              📍 Geofencing & Attendance Controls
+              <MapPin size={18} /> Geofencing & Attendance Controls
             </h4>
 
             <div className="settings-grid-2col">
@@ -58,7 +60,7 @@ export function SettingsPage() {
               </div>
 
               <div className="stack" style={{ gap: '0.5rem' }}>
-                <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Face Liveness Verification Threshold</label>
+                <label style={{ fontWeight: 600, fontSize: '0.9rem' }}>Face Verification Threshold</label>
                 <select
                   value={livenessStrictness}
                   onChange={(e) => setLivenessStrictness(e.target.value)}
@@ -70,23 +72,23 @@ export function SettingsPage() {
                     color: 'var(--text)',
                   }}
                 >
-                  <option value="Normal">Normal (Recommended)</option>
-                  <option value="Strict">Strict (High Confidence)</option>
-                  <option value="Relaxed">Relaxed (Low Lighting)</option>
+                  <option value="Relaxed">Relaxed (0.60 Euclidean Distance)</option>
+                  <option value="Normal">Normal (0.55 Euclidean Distance - Recommended)</option>
+                  <option value="Strict">Strict (0.48 Euclidean Distance)</option>
                 </select>
                 <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>
-                  Controls client-side face embedding matching strictness during selfie capture.
+                  Face matching accuracy tolerance verified during check-in / check-out.
                 </span>
               </div>
             </div>
 
-            <div className="stack" style={{ gap: '0.5rem', marginTop: '1rem', flexDirection: 'row', alignItems: 'center' }}>
+            <div style={{ marginTop: '1.25rem', display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
               <input
                 type="checkbox"
                 id="noAssignmentCheck"
                 checked={allowNoAssignment}
                 onChange={(e) => setAllowNoAssignment(e.target.checked)}
-                style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                style={{ width: '18px', height: '18px', accentColor: 'var(--primary)', cursor: 'pointer' }}
               />
               <label htmlFor="noAssignmentCheck" style={{ cursor: 'pointer', fontSize: '0.9rem', fontWeight: 600 }}>
                 Allow check-in at employee default address when no patient assignment is scheduled
@@ -97,7 +99,7 @@ export function SettingsPage() {
           {/* Section 2: Cloudinary Storage Integration */}
           <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem' }}>
             <h4 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              ☁️ Cloudinary Media Cloud Storage
+              <Cloud size={18} /> Cloudinary Media Cloud Storage
             </h4>
             <div className="settings-grid-3col">
               <div>
@@ -110,7 +112,10 @@ export function SettingsPage() {
               </div>
               <div>
                 <span style={{ fontSize: '0.75rem', color: 'var(--muted)', display: 'block' }}>CONNECTION STATUS</span>
-                <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.9rem' }}>🟢 Connected & Active</span>
+                <span style={{ color: '#10B981', fontWeight: 600, fontSize: '0.9rem', display: 'inline-flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+                  Connected & Active
+                </span>
               </div>
             </div>
           </div>
@@ -118,7 +123,7 @@ export function SettingsPage() {
           {/* Section 3: Database & Hosting Environment */}
           <div style={{ borderBottom: '1px solid var(--border)', paddingBottom: '1.5rem' }}>
             <h4 style={{ fontSize: '1.1rem', color: 'var(--primary)', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              🗄️ Database & Environment Specs
+              <Database size={18} /> Database & Environment Specs
             </h4>
             <div className="settings-grid-3col">
               <div>
