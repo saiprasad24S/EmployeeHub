@@ -406,6 +406,8 @@ export function EmployeePortal() {
     placeholderData: (previousData) => previousData,
     staleTime: 1000 * 60 * 2,
     refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   })
 
   const profile = profileQuery.data?.employee ?? null
@@ -1156,24 +1158,53 @@ export function EmployeePortal() {
   }
 
   if (profileQuery.isError) {
-    const errorMessage = profileQuery.error instanceof Error ? profileQuery.error.message : 'Verification failed.'
+    const rawError = profileQuery.error instanceof Error ? profileQuery.error.message : 'Verification failed.'
+    const isNetworkError =
+      rawError.toLowerCase().includes('failed to fetch') ||
+      rawError.toLowerCase().includes('unable to connect') ||
+      rawError.toLowerCase().includes('network') ||
+      rawError.toLowerCase().includes('server availability')
+
     return (
       <div className="unregistered-container">
         <div className="unregistered-card">
           <div className="unregistered-icon" style={{ display: 'flex', justifyContent: 'center', marginBottom: '1rem' }}>
             <AlertCircle size={44} color="#F59E0B" />
           </div>
-          <h2>Access Restricted</h2>
-          <p style={{ margin: '1rem 0 2rem 0', lineHeight: 1.6 }}>{errorMessage}</p>
-          <button
-            className="btn-primary"
-            style={{ background: 'var(--danger)' }}
-            onClick={() => {
-              void signOut()
-            }}
-          >
-            Log Out / Switch Account
-          </button>
+          <h2>{isNetworkError ? 'Connection Issue' : 'Access Restricted'}</h2>
+          <p style={{ margin: '1rem 0 1.5rem 0', lineHeight: 1.6 }}>
+            {isNetworkError
+              ? 'Unable to connect to the backend server. Please verify your internet connection or try connecting again.'
+              : rawError}
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button
+              className="btn-primary"
+              style={{ width: 'auto', padding: '0.8rem 1.6rem', fontWeight: 600 }}
+              onClick={() => {
+                void profileQuery.refetch()
+              }}
+              disabled={profileQuery.isFetching}
+            >
+              {profileQuery.isFetching ? 'Connecting...' : 'Retry Connection'}
+            </button>
+            <button
+              className="btn-secondary"
+              style={{
+                width: 'auto',
+                padding: '0.8rem 1.6rem',
+                background: 'transparent',
+                border: '1px solid var(--danger, #EF4444)',
+                color: 'var(--danger, #EF4444)',
+                fontWeight: 600,
+              }}
+              onClick={() => {
+                void signOut()
+              }}
+            >
+              Log Out / Switch Account
+            </button>
+          </div>
         </div>
       </div>
     )

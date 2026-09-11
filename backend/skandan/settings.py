@@ -76,6 +76,10 @@ def _database_config(url: str) -> dict:
 SECRET_KEY = _env("SECRET_KEY", default="replace-me")
 DEBUG = _env_bool("DEBUG", default=False)
 ALLOWED_HOSTS = [host.strip() for host in _env("ALLOWED_HOSTS", default="*").split(",") if host.strip()]
+if "*" not in ALLOWED_HOSTS:
+    for default_host in [".vercel.app", "localhost", "127.0.0.1"]:
+        if default_host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(default_host)
 
 INSTALLED_APPS = [
     "daphne",
@@ -278,14 +282,24 @@ CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 
-CHANNEL_LAYERS = {
-    "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [_env("REDIS_URL", default="redis://127.0.0.1:6379/0")],
+redis_host = _env("REDIS_URL", default="redis://127.0.0.1:6379/0")
+is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
+if is_serverless and ("127.0.0.1" in redis_host or "localhost" in redis_host):
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels.layers.InMemoryChannelLayer",
         },
-    },
-}
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [redis_host],
+            },
+        },
+    }
+
 
 LOGGING = {
     "version": 1,

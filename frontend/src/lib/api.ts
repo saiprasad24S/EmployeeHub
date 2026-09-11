@@ -40,6 +40,10 @@ export async function authedFetch(input: string, token: string, init?: RequestIn
         }
       }
     }
+    if (primaryErr instanceof TypeError && (primaryErr.message === 'Failed to fetch' || primaryErr.message.includes('fetch'))) {
+      const target = primaryUrl || (typeof window !== 'undefined' ? `${window.location.origin}${input}` : input)
+      throw new Error(`Unable to connect to backend server at ${target} (Failed to fetch). Please check your internet connection or server availability.`)
+    }
     throw primaryErr
   }
 }
