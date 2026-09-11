@@ -357,15 +357,6 @@ class EmployeeMonthAttendanceView(APIView):
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
 
-        # Authorization: Employees can only view their own attendance
-        user_role = getattr(request.user, "role", None)
-        user_emp_id = getattr(request.user, "employee_id", None)
-        if user_role == "EMPLOYEE" and user_emp_id != employee.id:
-            return Response(
-                {"detail": "You do not have permission to view another employee's attendance."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         num_days = calendar.monthrange(year, month)[1]
         start_date = date(year, month, 1)
         end_date = date(year, month, num_days)

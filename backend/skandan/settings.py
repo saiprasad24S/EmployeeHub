@@ -76,14 +76,8 @@ def _database_config(url: str) -> dict:
 SECRET_KEY = _env("SECRET_KEY", default="replace-me")
 DEBUG = _env_bool("DEBUG", default=False)
 ALLOWED_HOSTS = [host.strip() for host in _env("ALLOWED_HOSTS", default="*").split(",") if host.strip()]
-if "*" not in ALLOWED_HOSTS:
-    for default_host in [".vercel.app", "localhost", "127.0.0.1"]:
-        if default_host not in ALLOWED_HOSTS:
-            ALLOWED_HOSTS.append(default_host)
 
 INSTALLED_APPS = [
-    "daphne",
-    "channels",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -105,7 +99,6 @@ INSTALLED_APPS = [
     "apps.invoices",
     "apps.payslips",
     "apps.leaves",
-    "apps.communication",
 ]
 
 MIDDLEWARE = [
@@ -268,38 +261,11 @@ CLERK_ISSUER = _env("CLERK_ISSUER", default="")
 CLERK_AUDIENCE = _env("CLERK_AUDIENCE", default="skandan-backend")
 DEFAULT_GEOFENCE_RADIUS_METERS = _env_int("DEFAULT_GEOFENCE_RADIUS_METERS", default=100)
 
-EMAIL_BACKEND = _env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
-EMAIL_HOST = _env("EMAIL_HOST", default="smtp.gmail.com")
-EMAIL_PORT = _env_int("EMAIL_PORT", default=587)
-EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", default=True)
-EMAIL_HOST_USER = _env("EMAIL_HOST_USER", default="")
-EMAIL_HOST_PASSWORD = _env("EMAIL_HOST_PASSWORD", default="")
-DEFAULT_FROM_EMAIL = _env("DEFAULT_FROM_EMAIL", default="Skandan EmployeeHub <skandanhomecarre@gmail.com>")
-
 CELERY_BROKER_URL = _env("REDIS_URL", default="redis://127.0.0.1:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
-
-redis_host = _env("REDIS_URL", default="redis://127.0.0.1:6379/0")
-is_serverless = bool(os.getenv("VERCEL") or os.getenv("AWS_LAMBDA_FUNCTION_NAME"))
-if is_serverless and ("127.0.0.1" in redis_host or "localhost" in redis_host):
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels.layers.InMemoryChannelLayer",
-        },
-    }
-else:
-    CHANNEL_LAYERS = {
-        "default": {
-            "BACKEND": "channels_redis.core.RedisChannelLayer",
-            "CONFIG": {
-                "hosts": [redis_host],
-            },
-        },
-    }
-
 
 LOGGING = {
     "version": 1,

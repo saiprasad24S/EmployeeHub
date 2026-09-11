@@ -11,7 +11,6 @@ const navItems = [
   { label: 'Live Tracking', to: '/tracking' },
   { label: 'Invoice', to: '/invoice' },
   { label: 'Payslip', to: '/payslip' },
-  { label: 'Chat', to: '/chat' },
 ]
 
 import { safeStorage } from '../lib/storage'

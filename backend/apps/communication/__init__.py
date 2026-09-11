@@ -1,3 +1,0 @@
-"""
-Apps.communication module
-"""

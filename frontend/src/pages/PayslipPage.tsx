@@ -7,7 +7,6 @@ import { PayslipDashboardHeader } from '../components/payslip/PayslipDashboardHe
 import { PayslipLivePreview, computePayslipTotals, formatCurrency } from '../components/payslip/PayslipLivePreview';
 import type { PayslipData } from '../components/payslip/PayslipLivePreview';
 import { PayslipFormAccordion } from '../components/payslip/PayslipFormAccordion';
-import { exportPagesToPDF } from '../lib/pdfExport';
 import { 
   ZoomIn, ZoomOut, Printer, Download,
   Trash2, Eye, CheckCircle2,
@@ -257,79 +256,64 @@ export function PayslipPage() {
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
 
   const handleDirectDownloadPdf = async () => {
-    setIsDownloadingPdf(true);
-    const fileName = `Payslip_${payslipData.employeeId || 'EMP'}_${payslipData.month}_${payslipData.year}.pdf`;
-
     try {
-      // 1. Try server-side PDF generation if token is available
+      setIsDownloadingPdf(true);
       const token = await getToken();
-      if (token) {
-        try {
-          const payload = {
-            month: payslipData.month,
-            year: payslipData.year,
-            generation_date: payslipData.generationDate,
-            generation_time: payslipData.generationTime,
-            employee_code: payslipData.employeeId,
-            employee_name: payslipData.employeeName,
-            designation: payslipData.designation,
-            grade_level: payslipData.gradeLevel,
-            location: payslipData.location,
-            department: payslipData.department,
-            bank_name: payslipData.bankName,
-            bank_account_number: payslipData.bankAccountNumber,
-            pan_number: payslipData.panNumber,
-            pf_account_number: payslipData.pfAccountNumber,
-            date_of_joining: payslipData.dateOfJoining,
-            days_worked: payslipData.daysWorked,
-            lop_days: payslipData.lopDays,
-            arrears_days: payslipData.arrearsDays,
-            esic_account_number: payslipData.esicAccountNumber,
-            uan_number: payslipData.uanNumber,
-            basic_salary: payslipData.basicSalary,
-            conveyance_allowance: payslipData.conveyanceAllowance,
-            house_rent_allowance: payslipData.houseRentAllowance,
-            others_allowance: payslipData.othersAllowance,
-            incentives: payslipData.incentives,
-            professional_tax: payslipData.professionalTax,
-            provident_fund: payslipData.providentFund,
-            esic_deduction: payslipData.esicDeduction || 0,
-            tds_deduction: payslipData.tdsDeduction || 0,
-            other_deductions: payslipData.otherDeductions || 0,
-          };
+      if (!token) throw new Error('Authentication token missing');
 
-          const res = await authedFetch('/api/payslips/generate-pdf/', token, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload),
-          });
+      const payload = {
+        month: payslipData.month,
+        year: payslipData.year,
+        generation_date: payslipData.generationDate,
+        generation_time: payslipData.generationTime,
+        employee_code: payslipData.employeeId,
+        employee_name: payslipData.employeeName,
+        designation: payslipData.designation,
+        grade_level: payslipData.gradeLevel,
+        location: payslipData.location,
+        department: payslipData.department,
+        bank_name: payslipData.bankName,
+        bank_account_number: payslipData.bankAccountNumber,
+        pan_number: payslipData.panNumber,
+        pf_account_number: payslipData.pfAccountNumber,
+        date_of_joining: payslipData.dateOfJoining,
+        days_worked: payslipData.daysWorked,
+        lop_days: payslipData.lopDays,
+        arrears_days: payslipData.arrearsDays,
+        esic_account_number: payslipData.esicAccountNumber,
+        uan_number: payslipData.uanNumber,
+        basic_salary: payslipData.basicSalary,
+        conveyance_allowance: payslipData.conveyanceAllowance,
+        house_rent_allowance: payslipData.houseRentAllowance,
+        others_allowance: payslipData.othersAllowance,
+        incentives: payslipData.incentives,
+        professional_tax: payslipData.professionalTax,
+        provident_fund: payslipData.providentFund,
+        esic_deduction: payslipData.esicDeduction || 0,
+        tds_deduction: payslipData.tdsDeduction || 0,
+        other_deductions: payslipData.otherDeductions || 0,
+      };
 
-          if (res.ok) {
-            const blob = await res.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-            return;
-          }
-        } catch (serverErr) {
-          console.warn('Backend server payslip PDF generation failed, falling back to client PDF export:', serverErr);
-        }
+      const res = await authedFetch('/api/payslips/generate-pdf/', token, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to generate clean PDF');
       }
 
-      // 2. Client-side PDF export fallback
-      const payslipContainer = document.querySelector('.payslip-preview-card') as HTMLElement;
-      if (payslipContainer) {
-        await exportPagesToPDF([payslipContainer], fileName, { scale: 2 });
-        return;
-      }
-
-      // 3. Fallback to print
-      window.print();
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const fileName = `Payslip_${payslipData.employeeId || 'EMP'}_${payslipData.month}_${payslipData.year}.pdf`;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
     } catch (err: any) {
       setSaveErrorMsg(err.message || 'Failed to download PDF.');
       setTimeout(() => setSaveErrorMsg(null), 5000);
