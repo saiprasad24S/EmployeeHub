@@ -1,10 +1,12 @@
-import { memo, useEffect, useRef, useState, useMemo } from 'react'
+import { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import * as faceapi from 'face-api.js'
 import { SignOutButton, useAuth } from '@clerk/clerk-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bell, Calendar, CheckCircle2, XCircle, AlertCircle, Plus, Clock, MapPin, RotateCcw } from 'lucide-react'
+import { Bell, Calendar, CheckCircle2, XCircle, AlertCircle, Plus, Clock, MapPin, RotateCcw, User, Home, MessageSquare } from 'lucide-react'
 import { authedFetch, API_BASE_URL } from '../lib/api'
 import { safeStorage } from '../lib/storage'
+import { ChatContainer } from '../components/chat/ChatContainer'
+import { getUnreadCount } from '../components/chat/chatApi'
 
 function formatRelativeTime(dateStr: string) {
   try {
@@ -76,6 +78,88 @@ const ActiveDutyTimer = memo(function ActiveDutyTimer({ checkInTimeStr }: { chec
       <div style={{ fontSize: '1.25rem', fontWeight: 800, color: '#10B981', fontFamily: 'monospace' }}>
         {durationText}
       </div>
+    </div>
+  )
+})
+
+const AttendanceMiniPieChart = memo(function AttendanceMiniPieChart({
+  present,
+  absent,
+  size = 64,
+}: {
+  present: number
+  absent: number
+  size?: number
+}) {
+  const total = present + absent
+  const radius = 14
+  const circumference = 2 * Math.PI * radius // ~87.96
+
+  if (total === 0) {
+    return (
+      <svg width={size} height={size} viewBox="0 0 36 36">
+        <circle cx="18" cy="18" r={radius} fill="none" stroke="var(--border, #E2E8F0)" strokeWidth="5" />
+      </svg>
+    )
+  }
+
+  const presentRatio = present / total
+  const presentStroke = presentRatio * circumference
+  const presentPercent = Math.round(presentRatio * 100)
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        width: size,
+        height: size,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+      title={`Present: ${present} (${presentPercent}%), Absent: ${absent}`}
+    >
+      <svg
+        width={size}
+        height={size}
+        viewBox="0 0 36 36"
+        style={{ transform: 'rotate(-90deg)', overflow: 'visible' }}
+      >
+        {/* Background ring representing Absent (Red) */}
+        <circle
+          cx="18"
+          cy="18"
+          r={radius}
+          fill="none"
+          stroke="#EF4444"
+          strokeWidth="5"
+        />
+        {/* Foreground slice representing Present (Green) */}
+        {present > 0 && (
+          <circle
+            cx="18"
+            cy="18"
+            r={radius}
+            fill="none"
+            stroke="#10B981"
+            strokeWidth="5"
+            strokeDasharray={`${presentStroke} ${circumference}`}
+            strokeDashoffset="0"
+          />
+        )}
+      </svg>
+      <span
+        style={{
+          position: 'absolute',
+          fontSize: '0.68rem',
+          fontWeight: 800,
+          color: 'var(--text)',
+          textAlign: 'center',
+          userSelect: 'none',
+        }}
+      >
+        {presentPercent}%
+      </span>
     </div>
   )
 })
@@ -156,6 +240,61 @@ export function EmployeePortal() {
 
   const [attendanceError, setAttendanceError] = useState<string | null>(null)
   const [cameraError, setCameraError] = useState<string | null>(null)
+
+  // Portal tab navigation state: 'home' (profile + attendance marking) | 'chat' | 'attendance' (calendar) | 'leaves'
+  const [portalTab, setPortalTab] = useState<'home' | 'chat' | 'attendance' | 'leaves'>('home')
+
+  // Calendar month/year navigation state (defaults to current month)
+  const [calendarYear, setCalendarYear] = useState(() => new Date().getFullYear())
+  const [calendarMonth, setCalendarMonth] = useState(() => new Date().getMonth())
+
+  const handlePrevMonth = useCallback(() => {
+    setCalendarMonth((prev) => {
+      if (prev === 0) {
+        setCalendarYear((y) => y - 1)
+        return 11
+      }
+      return prev - 1
+    })
+  }, [])
+
+  const handleNextMonth = useCallback(() => {
+    setCalendarMonth((prev) => {
+      if (prev === 11) {
+        setCalendarYear((y) => y + 1)
+        return 0
+      }
+      return prev + 1
+    })
+  }, [])
+
+  // --- Mobile back button fix: push history state on tab changes, handle popstate ---
+  const setPortalTabWithHistory = useCallback((tab: 'home' | 'chat' | 'attendance' | 'leaves') => {
+    if (tab !== 'home') {
+      window.history.pushState({ portalTab: tab }, '')
+    }
+    setPortalTab(tab)
+  }, [])
+
+  useEffect(() => {
+    // Replace current history entry with home state on mount
+    window.history.replaceState({ portalTab: 'home' }, '')
+
+    const handlePopState = (e: PopStateEvent) => {
+      const state = e.state as { portalTab?: string } | null
+      if (state?.portalTab) {
+        setPortalTab(state.portalTab as 'home' | 'chat' | 'attendance' | 'leaves')
+      } else {
+        // No portal state means user pressed back from the 'home' tab
+        // Push home state back so they don't leave the app
+        setPortalTab('home')
+        window.history.pushState({ portalTab: 'home' }, '')
+      }
+    }
+
+    window.addEventListener('popstate', handlePopState)
+    return () => window.removeEventListener('popstate', handlePopState)
+  }, [])
 
   // Leave & Notification state
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
@@ -427,6 +566,19 @@ export function EmployeePortal() {
     ? notifications.filter((n) => !n.is_read).length
     : 0
 
+  // Chat unread count query
+  const chatUnreadQuery = useQuery({
+    queryKey: ['communication-unread-count'],
+    enabled: !!profile,
+    queryFn: async () => {
+      const token = await getToken()
+      if (!token) return 0
+      return getUnreadCount(token)
+    },
+    refetchInterval: 5000,
+  })
+  const chatUnreadCount = chatUnreadQuery.data || 0
+
   // My leaves queries
   const myLeavesQuery = useQuery({
     queryKey: ['my-leaves'],
@@ -573,8 +725,8 @@ export function EmployeePortal() {
 
   const calendarData = useMemo(() => {
     const now = new Date()
-    const year = now.getFullYear()
-    const month = now.getMonth()
+    const year = calendarYear
+    const month = calendarMonth
 
     const firstDay = new Date(year, month, 1)
     const lastDay = new Date(year, month + 1, 0)
@@ -590,7 +742,9 @@ export function EmployeePortal() {
       })
     )
 
-    const monthName = now.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const viewDate = new Date(year, month, 1)
+    const monthName = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+    const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
 
     const days = []
     for (let i = 0; i < startingDayOfWeek; i++) {
@@ -603,7 +757,7 @@ export function EmployeePortal() {
       const isToday = dateStr === now.toDateString()
       const isPast = d < new Date(now.getFullYear(), now.getMonth(), now.getDate())
 
-      const isCheckedInToday = Boolean(
+      const isCheckedInToday = isCurrentMonth && isToday && Boolean(
         sessionActive || sessionSummary?.status === 'Present' || sessionSummary?.status === 'Checked Out'
       )
       const isPresent = presentDates.has(dateStr) || (isToday && (isCheckedInToday || presentDates.has(dateStr)))
@@ -617,8 +771,15 @@ export function EmployeePortal() {
       })
     }
 
-    return { monthName, days }
-  }, [attendanceHistoryQuery.data, sessionActive, sessionSummary])
+    return { monthName, days, year, month, isCurrentMonth }
+  }, [calendarYear, calendarMonth, attendanceHistoryQuery.data, sessionActive, sessionSummary])
+
+  const attendanceMonthStats = useMemo(() => {
+    const pastAndToday = calendarData.days.filter((d) => d && (d.isPast || d.isToday))
+    const present = pastAndToday.filter((d) => d?.isPresent).length
+    const absent = pastAndToday.filter((d) => !d?.isPresent).length
+    return { present, absent, total: pastAndToday.length }
+  }, [calendarData])
 
   // Background tracker: fires coordinate posts every 45s when session is active
   useEffect(() => {
@@ -933,7 +1094,7 @@ export function EmployeePortal() {
   }
 
   return (
-    <div className="portal-layout">
+    <div className={`portal-layout ${portalTab === 'chat' ? 'portal-chat-active' : ''}`}>
       <header className="portal-header">
         <div className="portal-logo-area">
           <img
@@ -942,14 +1103,15 @@ export function EmployeePortal() {
             style={{ height: '42px', objectFit: 'contain' }}
           />
           <div>
-            <h2 style={{ fontSize: '1.25rem', color: 'var(--primary)' }}>Skandan Portal</h2>
+            <h2 style={{ fontSize: '1.25rem', color: 'var(--primary)', margin: 0 }}>Skandan Portal</h2>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+        <div className="portal-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexShrink: 0, marginLeft: 'auto' }}>
           {/* Notification Bell */}
-          <div style={{ position: 'relative' }} ref={notificationDropdownRef}>
+          <div style={{ position: 'relative', flexShrink: 0 }} ref={notificationDropdownRef}>
             <button
               type="button"
+              className="portal-notification-bell-btn"
               onClick={() => setIsNotificationOpen((prev) => !prev)}
               aria-label="Notifications"
               style={{
@@ -957,13 +1119,17 @@ export function EmployeePortal() {
                 background: isNotificationOpen ? 'rgba(107, 47, 160, 0.12)' : 'var(--panel)',
                 border: '1px solid var(--border)',
                 borderRadius: '12px',
-                padding: '0.6rem',
+                padding: '0.5rem',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 color: 'var(--text)',
                 transition: 'all 0.2s ease',
+                width: '38px',
+                height: '38px',
+                minWidth: '38px',
+                flexShrink: 0,
               }}
             >
               <Bell size={20} />
@@ -995,12 +1161,8 @@ export function EmployeePortal() {
             {/* Dropdown Flyout */}
             {isNotificationOpen && (
               <div
+                className="portal-notification-dropdown"
                 style={{
-                  position: 'absolute',
-                  right: 0,
-                  top: 'calc(100% + 8px)',
-                  width: '360px',
-                  maxWidth: 'calc(100vw - 32px)',
                   background: 'var(--panel, #ffffff)',
                   border: '1px solid var(--border, #e2e8f0)',
                   borderRadius: '16px',
@@ -1146,7 +1308,13 @@ export function EmployeePortal() {
 
           <button
             className="ghost-button danger"
-            style={{ padding: '0.6rem 1.2rem', borderRadius: '12px' }}
+            style={{
+              padding: '0.55rem 1rem',
+              borderRadius: '12px',
+              width: 'auto',
+              flexShrink: 0,
+              whiteSpace: 'nowrap',
+            }}
             onClick={() => {
               void signOut()
             }}
@@ -1156,7 +1324,7 @@ export function EmployeePortal() {
         </div>
       </header>
 
-      <main className="portal-content">
+      <main className={`portal-content ${portalTab === 'chat' ? 'portal-content-chat' : ''}`}>
         {attendanceError && (
           <div
             style={{
@@ -1175,9 +1343,61 @@ export function EmployeePortal() {
             <strong>{attendanceError}</strong>
           </div>
         )}
-        <div className="portal-grid">
-          {/* Profile and clock */}
-          <div className="stack">
+        {/* Desktop / Tablet Top Tabs */}
+        <div className="portal-tabs-top">
+          <button
+            type="button"
+            className={`portal-tab-btn ${portalTab === 'home' ? 'active' : ''}`}
+            onClick={() => setPortalTabWithHistory('home')}
+          >
+            <Home size={16} />
+            <span>Home</span>
+          </button>
+          <button
+            type="button"
+            className={`portal-tab-btn ${portalTab === 'chat' ? 'active' : ''}`}
+            onClick={() => setPortalTabWithHistory('chat')}
+            style={{ position: 'relative' }}
+          >
+            <MessageSquare size={16} />
+            <span>Chat</span>
+            {chatUnreadCount > 0 && (
+              <span
+                style={{
+                  background: '#EF4444',
+                  color: '#ffffff',
+                  fontSize: '0.65rem',
+                  fontWeight: 700,
+                  borderRadius: '9999px',
+                  padding: '0.1rem 0.4rem',
+                  marginLeft: '0.35rem',
+                }}
+              >
+                {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+              </span>
+            )}
+          </button>
+          <button
+            type="button"
+            className={`portal-tab-btn ${portalTab === 'attendance' ? 'active' : ''}`}
+            onClick={() => setPortalTabWithHistory('attendance')}
+          >
+            <Clock size={16} />
+            <span>Attendance</span>
+          </button>
+          <button
+            type="button"
+            className={`portal-tab-btn ${portalTab === 'leaves' ? 'active' : ''}`}
+            onClick={() => setPortalTabWithHistory('leaves')}
+          >
+            <Calendar size={16} />
+            <span>Apply Leave</span>
+          </button>
+        </div>
+
+        {/* Tab 1: Home View (Profile details + Live Clock + Schedule + Mark Attendance) */}
+        {portalTab === 'home' && (
+          <div className="stack" style={{ gap: '1.5rem' }}>
             {profile && (
               <div className="glass-card card-soft employee-card">
                 <div className="employee-avatar-wrapper">
@@ -1201,134 +1421,290 @@ export function EmployeePortal() {
               </div>
             )}
 
-            <DigitalClockCard />
-          </div>
-
-          {/* Attendance actions */}
-            <div className="stack">
-              <div className="glass-card card-soft stack" style={{ padding: '1.75rem' }}>
-                <span className="eyebrow">Attendance</span>
-                {assignmentQuery.isLoading ? (
-                  <p>Loading schedule...</p>
-                ) : (
-                  <div>
-                    {assignmentQuery.data && (
-                      <div style={{ marginBottom: '1.5rem' }}>
-                        <h4 style={{ color: 'var(--text)', fontSize: '1.15rem' }}>Patient: {assignmentQuery.data.patient_name}</h4>
-                        <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
-                          <MapPin size={15} color="var(--primary)" style={{ flexShrink: 0 }} />
-                          <span>{assignmentQuery.data.patient_address}</span>
-                        </p>
-                      </div>
-                    )}
-
-                    {locationPermGranted === false && (
-                      <div
-                        style={{
-                          background: 'rgba(239, 68, 68, 0.08)',
-                          color: 'var(--danger)',
-                          padding: '0.8rem 1rem',
-                          borderRadius: '10px',
-                          fontSize: '0.85rem',
-                          marginBottom: '1rem',
-                          fontWeight: 600,
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: '0.75rem',
-                          flexWrap: 'wrap',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                          <AlertCircle size={18} style={{ flexShrink: 0 }} />
-                          <span>Location permissions are disabled or unavailable. Please enable GPS and allow location access to continue.</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => void ensureLocationPermission()}
-                          style={{
-                            background: '#0B2C8C',
-                            color: '#ffffff',
-                            border: 'none',
-                            borderRadius: '8px',
-                            padding: '0.4rem 0.85rem',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                            cursor: 'pointer',
-                            whiteSpace: 'nowrap',
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '0.35rem',
-                          }}
-                        >
-                          <RotateCcw size={14} /> Retry Location Access
-                        </button>
-                      </div>
-                    )}
-
-                    {sessionActive && (
-                      <div
-                        style={{
-                          background: 'rgba(16, 185, 129, 0.08)',
-                          border: '1px solid rgba(16, 185, 129, 0.25)',
-                          borderRadius: '12px',
-                          padding: '1rem',
-                          marginBottom: '1.25rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          flexWrap: 'wrap',
-                          gap: '0.75rem',
-                        }}
-                      >
-                        <div>
-                          <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#065F46', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
-                            <span>Active Duty Session</span>
-                          </div>
-                          {checkInTimeStr && (
-                            <div style={{ fontSize: '0.85rem', color: 'var(--text)', marginTop: '0.2rem', fontWeight: 600 }}>
-                              Check-in Time: {new Date(checkInTimeStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                            </div>
-                          )}
-                        </div>
-                        <ActiveDutyTimer checkInTimeStr={checkInTimeStr} />
-                      </div>
-                    )}
-
-                    <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
-                      {!sessionActive ? (
-                        <button
-                          className="btn-primary pulse-button"
-                          disabled={locationPermGranted === false}
-                          onClick={() => startCamera('checkin')}
-                          style={{ flex: 1, minWidth: '200px' }}
-                        >
-                          Mark Attendance (Check In)
-                        </button>
-                      ) : (
-                        <button
-                          className="btn-primary"
-                          style={{ background: 'var(--danger)', flex: 1, minWidth: '200px' }}
-                          onClick={() => startCamera('checkout')}
-                        >
-                          Attendance Logout (Check Out)
-                        </button>
-                      )}
+            {/* Attendance actions: Mark Attendance Check-In / Check-Out */}
+            <div className="glass-card card-soft stack" style={{ padding: '1.75rem' }}>
+              <span className="eyebrow">Attendance & Duty</span>
+              {assignmentQuery.isLoading ? (
+                <p>Loading schedule...</p>
+              ) : (
+                <div>
+                  {assignmentQuery.data && (
+                    <div style={{ marginBottom: '1.5rem' }}>
+                      <h4 style={{ color: 'var(--text)', fontSize: '1.15rem' }}>Patient: {assignmentQuery.data.patient_name}</h4>
+                      <p style={{ color: 'var(--muted)', fontSize: '0.9rem', marginTop: '0.25rem', display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
+                        <MapPin size={15} color="var(--primary)" style={{ flexShrink: 0 }} />
+                        <span>{assignmentQuery.data.patient_address}</span>
+                      </p>
                     </div>
+                  )}
+
+                  {locationPermGranted === false && (
+                    <div
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.08)',
+                        color: 'var(--danger)',
+                        padding: '0.8rem 1rem',
+                        borderRadius: '10px',
+                        fontSize: '0.85rem',
+                        marginBottom: '1rem',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '0.75rem',
+                        flexWrap: 'wrap',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <AlertCircle size={18} style={{ flexShrink: 0 }} />
+                        <span>Location permissions are disabled or unavailable. Please enable GPS and allow location access to continue.</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => void ensureLocationPermission()}
+                        style={{
+                          background: '#0B2C8C',
+                          color: '#ffffff',
+                          border: 'none',
+                          borderRadius: '8px',
+                          padding: '0.4rem 0.85rem',
+                          fontSize: '0.8rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          whiteSpace: 'nowrap',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.35rem',
+                        }}
+                      >
+                        <RotateCcw size={14} /> Retry Location Access
+                      </button>
+                    </div>
+                  )}
+
+                  {sessionActive && (
+                    <div
+                      style={{
+                        background: 'rgba(16, 185, 129, 0.08)',
+                        border: '1px solid rgba(16, 185, 129, 0.25)',
+                        borderRadius: '12px',
+                        padding: '1rem',
+                        marginBottom: '1.25rem',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        flexWrap: 'wrap',
+                        gap: '0.75rem',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '0.8rem', fontWeight: 700, color: '#065F46', textTransform: 'uppercase', letterSpacing: '0.05em', display: 'flex', alignItems: 'center', gap: '0.45rem' }}>
+                          <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981', display: 'inline-block' }} />
+                          <span>Active Duty Session</span>
+                        </div>
+                        {checkInTimeStr && (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text)', marginTop: '0.2rem', fontWeight: 600 }}>
+                            Check-in Time: {new Date(checkInTimeStr).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </div>
+                        )}
+                      </div>
+                      <ActiveDutyTimer checkInTimeStr={checkInTimeStr} />
+                    </div>
+                  )}
+
+                  <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap' }}>
+                    {!sessionActive ? (
+                      <button
+                        className="btn-primary pulse-button"
+                        disabled={locationPermGranted === false}
+                        onClick={() => startCamera('checkin')}
+                        style={{ flex: 1, minWidth: '200px' }}
+                      >
+                        Mark Attendance (Check In)
+                      </button>
+                    ) : (
+                      <button
+                        className="btn-primary"
+                        style={{ background: 'var(--danger)', flex: 1, minWidth: '200px' }}
+                        onClick={() => startCamera('checkout')}
+                      >
+                        Attendance Logout (Check Out)
+                      </button>
+                    )}
                   </div>
-                )}
+                </div>
+              )}
             </div>
 
-            {/* Employee Monthly Attendance Calendar View */}
-            <div className="glass-card card-soft" style={{ marginTop: '1.5rem', padding: '1.5rem' }}>
+            <DigitalClockCard />
+          </div>
+        )}
+
+        {portalTab === 'chat' && (
+          <ChatContainer
+            isEmployeePortal
+            employeeProfile={profile}
+            onHomeClick={() => setPortalTabWithHistory('home')}
+          />
+        )}
+
+        {/* Tab 3: Attendance Calendar View */}
+        {portalTab === 'attendance' && (
+          <div className="stack" style={{ gap: '1.5rem' }}>
+            <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <h4 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem' }}>
-                  Attendance Calendar
+                  <Clock size={18} /> Attendance Calendar
                 </h4>
-                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text)', background: 'var(--panel)', padding: '0.4rem 0.8rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                  {calendarData.monthName}
-                </span>
+                <div
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.2rem',
+                    background: 'var(--panel)',
+                    padding: '0.25rem 0.35rem',
+                    borderRadius: '10px',
+                    border: '1px solid var(--border)',
+                    boxShadow: '0 1px 3px rgba(0, 0, 0, 0.04)',
+                  }}
+                >
+                  <button
+                    type="button"
+                    onClick={handlePrevMonth}
+                    title="Previous Month"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.95rem',
+                      fontWeight: 800,
+                      padding: '0.2rem 0.5rem',
+                      color: 'var(--primary)',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: 1,
+                    }}
+                  >
+                    ◀
+                  </button>
+                  <span
+                    style={{
+                      fontSize: '0.88rem',
+                      fontWeight: 700,
+                      color: 'var(--text)',
+                      padding: '0.15rem 0.4rem',
+                      minWidth: '115px',
+                      textAlign: 'center',
+                      userSelect: 'none',
+                    }}
+                  >
+                    {calendarData.monthName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleNextMonth}
+                    title="Next Month"
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '0.95rem',
+                      fontWeight: 800,
+                      padding: '0.2rem 0.5rem',
+                      color: 'var(--primary)',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      lineHeight: 1,
+                    }}
+                  >
+                    ▶
+                  </button>
+                </div>
+              </div>
+
+              {/* Attendance Summary Banner: Left = Present/Absent counts, Right = Small Pie Chart */}
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '1rem',
+                  padding: '0.75rem 1rem',
+                  marginBottom: '1.25rem',
+                  background: 'var(--panel, #ffffff)',
+                  borderRadius: '12px',
+                  border: '1px solid var(--border)',
+                  boxShadow: '0 2px 6px rgba(0, 0, 0, 0.03)',
+                }}
+              >
+                {/* Left Part: Total Days Present & Absent */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+                  <span
+                    style={{
+                      fontSize: '0.75rem',
+                      fontWeight: 700,
+                      color: 'var(--muted)',
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.04em',
+                    }}
+                  >
+                    Monthly Attendance
+                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span
+                        style={{
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          background: '#10B981',
+                          display: 'inline-block',
+                          boxShadow: '0 0 6px rgba(16, 185, 129, 0.5)',
+                        }}
+                      />
+                      <span style={{ fontSize: '0.86rem', color: 'var(--text)' }}>
+                        Present:{' '}
+                        <strong style={{ color: '#10B981', fontWeight: 800, fontSize: '0.96rem' }}>
+                          {attendanceMonthStats.present}
+                        </strong>{' '}
+                        {attendanceMonthStats.present === 1 ? 'day' : 'days'}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                      <span
+                        style={{
+                          width: '10px',
+                          height: '10px',
+                          borderRadius: '50%',
+                          background: '#EF4444',
+                          display: 'inline-block',
+                          boxShadow: '0 0 6px rgba(239, 68, 68, 0.5)',
+                        }}
+                      />
+                      <span style={{ fontSize: '0.86rem', color: 'var(--text)' }}>
+                        Absent:{' '}
+                        <strong style={{ color: '#EF4444', fontWeight: 800, fontSize: '0.96rem' }}>
+                          {attendanceMonthStats.absent}
+                        </strong>{' '}
+                        {attendanceMonthStats.absent === 1 ? 'day' : 'days'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Part: Small Pie Chart */}
+                <div style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+                  <AttendanceMiniPieChart
+                    present={attendanceMonthStats.present}
+                    absent={attendanceMonthStats.absent}
+                    size={64}
+                  />
+                </div>
               </div>
 
               {/* Day Name Headers */}
@@ -1392,13 +1768,20 @@ export function EmployeePortal() {
                 })}
               </div>
             </div>
+          </div>
+        )}
 
+        {/* Tab 4: Apply Leave View */}
+        {portalTab === 'leaves' && (
+          <div className="stack" style={{ gap: '1.5rem' }}>
             {/* My Leave Requests History */}
-            <div className="glass-card card-soft" style={{ marginTop: '1.5rem', padding: '1.5rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', flexWrap: 'wrap', gap: '0.5rem' }}>
-                <h4 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem' }}>
-                  <Calendar size={18} /> My Leave Requests
-                </h4>
+            <div className="glass-card card-soft" style={{ padding: '1.75rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div>
+                  <h4 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.25rem' }}>
+                    <Calendar size={20} /> My Leave Requests
+                  </h4>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -1410,26 +1793,50 @@ export function EmployeePortal() {
                     background: 'var(--primary)',
                     color: '#ffffff',
                     border: 'none',
-                    borderRadius: '8px',
-                    padding: '0.4rem 0.85rem',
-                    fontSize: '0.8rem',
+                    borderRadius: '10px',
+                    padding: '0.6rem 1.15rem',
+                    fontSize: '0.85rem',
                     fontWeight: 700,
                     cursor: 'pointer',
                     display: 'flex',
                     alignItems: 'center',
-                    gap: '0.4rem',
-                    boxShadow: '0 2px 8px rgba(107, 47, 160, 0.25)',
+                    gap: '0.45rem',
+                    boxShadow: '0 4px 12px rgba(107, 47, 160, 0.25)',
                   }}
                 >
-                  <Plus size={15} /> Apply for Leave
+                  <Plus size={16} /> Apply for Leave
                 </button>
               </div>
 
               {myLeavesQuery.isLoading ? (
                 <p style={{ color: 'var(--muted)', fontSize: '0.9rem' }}>Loading leave requests...</p>
               ) : myLeaves.length === 0 ? (
-                <div style={{ textAlign: 'center', padding: '2rem 1rem', color: 'var(--muted)', fontSize: '0.9rem' }}>
-                  No leave requests submitted yet. Click "Apply for Leave" above to submit a new request.
+                <div style={{ textAlign: 'center', padding: '2.5rem 1rem', color: 'var(--muted)', fontSize: '0.9rem' }}>
+                  <Calendar size={36} style={{ opacity: 0.3, margin: '0 auto 0.75rem', display: 'block' }} />
+                  <p style={{ margin: '0 0 1rem 0' }}>No leave requests submitted yet.</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setApplyError(null)
+                      setShowApplyConfirm(false)
+                      setIsApplyModalOpen(true)
+                    }}
+                    style={{
+                      background: 'var(--primary)',
+                      color: '#ffffff',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '0.5rem 1rem',
+                      fontSize: '0.82rem',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: '0.35rem',
+                    }}
+                  >
+                    <Plus size={15} /> Apply for Leave
+                  </button>
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
@@ -1544,7 +1951,7 @@ export function EmployeePortal() {
               )}
             </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Camera Capture Modal */}
@@ -1999,6 +2406,80 @@ export function EmployeePortal() {
             )}
           </div>
         </div>
+      )}
+
+      {/* Mobile Fixed Bottom Navigation (Only visible when NOT in chat) */}
+      {portalTab !== 'chat' && (
+        <nav className="portal-bottom-nav" aria-label="Bottom Navigation">
+          <button
+            type="button"
+            className={`portal-nav-item ${portalTab === 'home' ? 'active' : ''}`}
+            onClick={() => setPortalTabWithHistory('home')}
+          >
+            {portalTab === 'home' && <div className="portal-nav-indicator" />}
+            <div className="portal-nav-icon-wrapper">
+              <Home size={20} />
+            </div>
+            <span>Home</span>
+          </button>
+
+          <button
+            type="button"
+            className="portal-nav-item"
+            onClick={() => setPortalTabWithHistory('chat')}
+          >
+            <div className="portal-nav-icon-wrapper" style={{ position: 'relative' }}>
+              <MessageSquare size={20} />
+              {chatUnreadCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-6px',
+                    background: '#EF4444',
+                    color: '#ffffff',
+                    fontSize: '0.62rem',
+                    fontWeight: 700,
+                    borderRadius: '9999px',
+                    padding: '0 4px',
+                    minWidth: '15px',
+                    height: '15px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  {chatUnreadCount > 9 ? '9+' : chatUnreadCount}
+                </span>
+              )}
+            </div>
+            <span>Chat</span>
+          </button>
+
+          <button
+            type="button"
+            className={`portal-nav-item ${portalTab === 'attendance' ? 'active' : ''}`}
+            onClick={() => setPortalTabWithHistory('attendance')}
+          >
+            {portalTab === 'attendance' && <div className="portal-nav-indicator" />}
+            <div className="portal-nav-icon-wrapper">
+              <Clock size={20} />
+            </div>
+            <span>Attendance</span>
+          </button>
+
+          <button
+            type="button"
+            className={`portal-nav-item ${portalTab === 'leaves' ? 'active' : ''}`}
+            onClick={() => setPortalTabWithHistory('leaves')}
+          >
+            {portalTab === 'leaves' && <div className="portal-nav-indicator" />}
+            <div className="portal-nav-icon-wrapper">
+              <Calendar size={20} />
+            </div>
+            <span>Apply Leave</span>
+          </button>
+        </nav>
       )}
     </div>
   )

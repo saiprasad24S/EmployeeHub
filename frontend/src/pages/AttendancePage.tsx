@@ -799,9 +799,27 @@ export function AttendancePage() {
                     Attendance Calendar
                   </h4>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', background: 'var(--bg)', padding: '0.35rem 0.75rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
-                      {monthStats.monthName}
-                    </span>
+                    <div style={{ display: 'inline-flex', alignItems: 'center', gap: '0.2rem', background: 'var(--bg)', padding: '0.2rem 0.35rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+                      <button
+                        type="button"
+                        onClick={handlePrevMonth}
+                        title="Previous Month"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 800, padding: '0.2rem 0.4rem', color: 'var(--primary)' }}
+                      >
+                        ◀
+                      </button>
+                      <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', padding: '0.1rem 0.3rem', minWidth: '95px', textAlign: 'center', userSelect: 'none' }}>
+                        {monthStats.monthName}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleNextMonth}
+                        title="Next Month"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 800, padding: '0.2rem 0.4rem', color: 'var(--primary)' }}
+                      >
+                        ▶
+                      </button>
+                    </div>
                     <div style={{ display: 'flex', gap: '0.4rem', fontSize: '0.75rem' }}>
                       <button
                         type="button"

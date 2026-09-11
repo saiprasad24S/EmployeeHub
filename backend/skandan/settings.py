@@ -99,6 +99,7 @@ INSTALLED_APPS = [
     "apps.invoices",
     "apps.payslips",
     "apps.leaves",
+    "apps.communication",
 ]
 
 MIDDLEWARE = [
@@ -260,6 +261,14 @@ CLERK_JWKS_URL = _env("CLERK_JWKS_URL", default="https://noble-vervet-62.clerk.a
 CLERK_ISSUER = _env("CLERK_ISSUER", default="")
 CLERK_AUDIENCE = _env("CLERK_AUDIENCE", default="skandan-backend")
 DEFAULT_GEOFENCE_RADIUS_METERS = _env_int("DEFAULT_GEOFENCE_RADIUS_METERS", default=100)
+
+EMAIL_BACKEND = _env("EMAIL_BACKEND", default="django.core.mail.backends.smtp.EmailBackend")
+EMAIL_HOST = _env("EMAIL_HOST", default="smtp.gmail.com")
+EMAIL_PORT = _env_int("EMAIL_PORT", default=587)
+EMAIL_USE_TLS = _env_bool("EMAIL_USE_TLS", default=True)
+EMAIL_HOST_USER = _env("EMAIL_HOST_USER", default="")
+EMAIL_HOST_PASSWORD = _env("EMAIL_HOST_PASSWORD", default="")
+DEFAULT_FROM_EMAIL = _env("DEFAULT_FROM_EMAIL", default="Skandan EmployeeHub <skandanhomecarre@gmail.com>")
 
 CELERY_BROKER_URL = _env("REDIS_URL", default="redis://127.0.0.1:6379/0")
 CELERY_RESULT_BACKEND = CELERY_BROKER_URL
