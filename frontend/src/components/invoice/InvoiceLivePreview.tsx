@@ -68,6 +68,7 @@ export function computeInvoiceTotals(data: InvoicePreviewData) {
 interface InvoiceLivePreviewProps {
   data: InvoicePreviewData;
   zoom: number;
+  containerId?: string;
 }
 
 function numToWords(amount: number): string {
@@ -141,7 +142,7 @@ export const formatDisplayDate = (dateStr: string | null | undefined): string =>
 
 const ROWS_PER_PAGE = 3;
 
-function generatePreviewHash(data: InvoicePreviewData): string {
+export function generatePreviewHash(data: InvoicePreviewData): string {
   if (data.displayHash) return data.displayHash;
   const str = `${data.invoiceNumber}-${data.clientName}-${data.invoiceDate}-${data.services.length}-${data.perDayCharges}`;
   let hash = 0;
@@ -155,7 +156,7 @@ function generatePreviewHash(data: InvoicePreviewData): string {
   return (hex + invClean + '91C2').slice(0, 16);
 }
 
-export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zoom }) => {
+export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zoom, containerId }) => {
   const { subtotal, gstRate, gstAmount, discountAmount, totalAfterGst, advanceReceived, balanceDue, grandTotal } = computeInvoiceTotals(data);
   const amountInWords = numToWords(grandTotal);
   const currentDisplayHash = generatePreviewHash(data);
@@ -182,6 +183,8 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
 
   const PageTemplate = ({ pageServices, pageNumber, isLastPage }: { pageServices: ServiceItem[], pageNumber: number, isLastPage: boolean }) => (
     <div 
+      className="invoice-page-sheet"
+      data-page-number={pageNumber}
       style={{ 
         width: '794px', 
         minHeight: '1123px', 
@@ -558,7 +561,11 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
   );
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
+    <div 
+      id={containerId || "invoice-live-preview-pages"}
+      className="invoice-preview-container"
+      style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}
+    >
       {pages.map((pageServices, index) => (
         <PageTemplate 
           key={index} 
