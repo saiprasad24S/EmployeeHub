@@ -31,6 +31,7 @@ from apps.communication.serializers import (
     GroupSerializer,
 )
 from apps.communication.email_service import send_admin_chat_notification_async
+from apps.common.push import send_push_notification
 
 
 def _get_or_create_authenticated_employee(request) -> Employee | None:
@@ -367,6 +368,12 @@ class ConversationMessageListView(APIView):
                     message=snippet,
                     notification_type=Notification.NotificationType.GENERAL,
                     reference_id=conversation.id,
+                )
+                send_push_notification(
+                    recipient,
+                    title=f"{current_employee.name}",
+                    body=snippet,
+                    data={"type": "CHAT_MESSAGE", "conversation_id": conversation.id},
                 )
                 # Dispatch email notification to admin emails if message is sent to Admin
                 send_admin_chat_notification_async(current_employee, recipient, content)

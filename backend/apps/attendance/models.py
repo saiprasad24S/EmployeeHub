@@ -110,3 +110,19 @@ class ActivityLog(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class DevicePushToken(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, related_name="push_tokens")
+    token = models.CharField(max_length=255, unique=True)
+    device_type = models.CharField(max_length=20, default="android")
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return f"{self.employee.name} - {self.device_type} ({self.token[:12]}...)"
+

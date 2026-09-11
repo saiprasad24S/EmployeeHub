@@ -81,12 +81,24 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({
     0
   )
 
-  // Keep active conversation reference updated with latest data
+  // Keep active conversation reference updated with latest data only when relevant fields change
   useEffect(() => {
     if (activeConversation) {
       const updated = conversations.find((c) => c.id === activeConversation.id)
       if (updated) {
-        setActiveConversation(updated)
+        setActiveConversation((prev) => {
+          if (!prev) return updated
+          if (
+            prev.unread_count !== updated.unread_count ||
+            prev.last_message?.id !== updated.last_message?.id ||
+            prev.last_message?.status !== updated.last_message?.status ||
+            prev.other_member?.is_online !== updated.other_member?.is_online ||
+            prev.other_member?.last_seen_at !== updated.other_member?.last_seen_at
+          ) {
+            return updated
+          }
+          return prev
+        })
       }
     }
   }, [conversations])

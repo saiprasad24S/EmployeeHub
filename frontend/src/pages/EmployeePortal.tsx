@@ -281,12 +281,17 @@ export function EmployeePortal() {
     window.history.replaceState({ portalTab: 'home' }, '')
 
     const handlePopState = (e: PopStateEvent) => {
-      const state = e.state as { portalTab?: string } | null
+      const state = e.state as { portalTab?: string; inChatConversation?: boolean; profileDrawerOpen?: boolean } | null
+      // If the back button was pressed to close a chat conversation or profile drawer inside chat,
+      // stay on the chat tab!
+      if (state?.inChatConversation || (e.state && 'inChatConversation' in e.state)) {
+        setPortalTab('chat')
+        return
+      }
       if (state?.portalTab) {
         setPortalTab(state.portalTab as 'home' | 'chat' | 'attendance' | 'leaves')
       } else {
         // No portal state means user pressed back from the 'home' tab
-        // Push home state back so they don't leave the app
         setPortalTab('home')
         window.history.pushState({ portalTab: 'home' }, '')
       }

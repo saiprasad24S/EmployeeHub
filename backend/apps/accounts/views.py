@@ -211,6 +211,16 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", True)
         instance = self.get_object()
+
+        # Authorization: Only admin or the employee themselves can edit profile
+        user_role = getattr(request.user, "role", None)
+        user_emp_id = getattr(request.user, "employee_id", None)
+        if user_role != "ADMIN" and user_emp_id != instance.id:
+            return Response(
+                {"detail": "You do not have permission to edit another employee's profile."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
@@ -243,6 +253,15 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="upload-photo")
     def upload_photo(self, request, pk=None):
         employee = self.get_object()
+
+        # Authorization: Only admin or the employee themselves can change photo
+        user_role = getattr(request.user, "role", None)
+        user_emp_id = getattr(request.user, "employee_id", None)
+        if user_role != "ADMIN" and user_emp_id != employee.id:
+            return Response(
+                {"detail": "You do not have permission to update another employee's photo."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
         photo_file = request.FILES.get("profile_photo_file") or request.data.get("profile_photo_file")
         if not photo_file or not hasattr(photo_file, "read"):
             return Response({"detail": "No valid profile_photo_file provided."}, status=status.HTTP_400_BAD_REQUEST)
@@ -283,6 +302,15 @@ class UploadProfilePhotoView(APIView):
         employee = Employee.objects.filter(pk=pk).first()
         if not employee:
             return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        # Authorization: Only admin or the employee themselves can update photo
+        user_role = getattr(request.user, "role", None)
+        user_emp_id = getattr(request.user, "employee_id", None)
+        if user_role != "ADMIN" and user_emp_id != employee.id:
+            return Response(
+                {"detail": "You do not have permission to update another employee's photo."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
 
         photo_file = request.FILES.get("profile_photo_file")
         if not photo_file:

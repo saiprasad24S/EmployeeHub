@@ -18,8 +18,16 @@ venv/
 
 # Environment files
 .env
-.env.local
-.env.*.local
+.env.*
+*.env
+*.env.*
+**/.env
+**/.env.*
+*.pem
+*.key
+*service-account*.json
+*firebase-adminsdk*.json
+*credentials*.json
 
 # Databases
 *.sqlite3
@@ -36,3 +44,21 @@ staticfiles/
 *.njsproj
 *.sln
 *.sw?
+
+# Mobile / Expo
+mobile/.expo/
+mobile/android/
+mobile/ios/
+mobile/.env.development
+mobile/.env.production
+*.apk
+*.aab
+*.ipa
+
+# Firebase
+mobile/google-services.json
+mobile/GoogleService-Info.plist
+
+# EAS / Play Store
+mobile/play-store-key.json
+mobile/eas-credentials/

@@ -7,8 +7,9 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.accounts.models import Admin, Employee
-from apps.attendance.models import Notification
+from apps.attendance.models import Notification, DevicePushToken
 from apps.common.permissions import IsAdminRole, IsEmployeeRole
+from apps.common.push import send_push_notification
 from apps.leaves.models import Leave
 from apps.leaves.serializers import (
     LeaveApplySerializer,
@@ -220,12 +221,19 @@ class AdminLeaveApproveView(APIView):
             # Create Notification
             start_str = leave.start_date.strftime("%d %b %Y")
             end_str = leave.end_date.strftime("%d %b %Y")
+            msg = f"Your leave request from {start_str} to {end_str} has been approved."
             Notification.objects.create(
                 employee=leave.employee,
                 title="Leave Approved",
-                message=f"Your leave request from {start_str} to {end_str} has been approved.",
+                message=msg,
                 notification_type=Notification.NotificationType.LEAVE_APPROVED,
                 reference_id=leave.id,
+            )
+            send_push_notification(
+                leave.employee,
+                title="Leave Approved",
+                body=msg,
+                data={"type": "LEAVE_STATUS", "leave_id": leave.id, "status": "APPROVED"},
             )
 
         return Response(
@@ -266,12 +274,19 @@ class AdminLeaveRejectView(APIView):
             start_str = leave.start_date.strftime("%d %b %Y")
             end_str = leave.end_date.strftime("%d %b %Y")
             reason_part = f" Reason: {rejection_reason}" if rejection_reason else ""
+            msg = f"Your leave request from {start_str} to {end_str} was rejected.{reason_part}"
             Notification.objects.create(
                 employee=leave.employee,
                 title="Leave Request Rejected",
-                message=f"Your leave request from {start_str} to {end_str} was rejected.{reason_part}",
+                message=msg,
                 notification_type=Notification.NotificationType.LEAVE_REJECTED,
                 reference_id=leave.id,
+            )
+            send_push_notification(
+                leave.employee,
+                title="Leave Request Rejected",
+                body=msg,
+                data={"type": "LEAVE_STATUS", "leave_id": leave.id, "status": "REJECTED"},
             )
 
         return Response(
@@ -324,3 +339,39 @@ class NotificationMarkAllReadView(APIView):
 
         Notification.objects.filter(employee=employee, is_read=False).update(is_read=True)
         return Response({"detail": "All notifications marked as read."})
+
+
+class DevicePushTokenRegisterView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        employee = _get_authenticated_employee(request)
+        if not employee:
+            return Response({"detail": "Employee not found."}, status=status.HTTP_404_NOT_FOUND)
+
+        token = request.data.get("token", "").strip()
+        device_type = request.data.get("device_type", "android").strip()
+        if not token:
+            return Response({"detail": "Token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        DevicePushToken.objects.update_or_create(
+            token=token,
+            defaults={
+                "employee": employee,
+                "device_type": device_type,
+                "is_active": True,
+            },
+        )
+        return Response({"status": "registered"}, status=status.HTTP_200_OK)
+
+
+class DevicePushTokenUnregisterView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        employee = _get_authenticated_employee(request)
+        token = request.data.get("token", "").strip()
+        if token and employee:
+            DevicePushToken.objects.filter(employee=employee, token=token).update(is_active=False)
+        return Response({"status": "unregistered"}, status=status.HTTP_200_OK)
+

@@ -155,7 +155,14 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
 
-  const messageCacheRef = useRef<Map<number, ChatMessage[]>>(new Map())
+// Global message cache to eliminate loading spinners on conversation reopen
+const globalMessageCache = new Map<number, ChatMessage[]>()
+
+  const tokenProviderRef = useRef(tokenProvider)
+  useEffect(() => {
+    tokenProviderRef.current = tokenProvider
+  }, [tokenProvider])
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isTypingRef = useRef<boolean>(false)
@@ -212,7 +219,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     setFilePreviewUrl(null)
 
     // Instant optimistic render if cached
-    const cached = messageCacheRef.current.get(conversation.id)
+    const cached = globalMessageCache.get(conversation.id)
     if (cached && cached.length > 0) {
       setMessages(cached)
       setIsLoading(false)
@@ -223,9 +230,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
 
     const fetchMessages = async () => {
       try {
-        const msgs = await getConversationMessages(conversation.id, tokenProvider)
+        const msgs = await getConversationMessages(conversation.id, tokenProviderRef.current)
         if (isMounted) {
-          messageCacheRef.current.set(conversation.id, msgs)
+          globalMessageCache.set(conversation.id, msgs)
           setMessages(msgs)
           setIsLoading(false)
           setTimeout(() => scrollToBottom(false), 50)
@@ -239,40 +246,60 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     }
 
     void fetchMessages()
-    void markConversationAsRead(conversation.id, tokenProvider)
+    void markConversationAsRead(conversation.id, tokenProviderRef.current)
 
     return () => {
       isMounted = false
     }
   }, [conversation?.id])
 
-  // 2. Poll messages periodically (every 3.5s) without re-triggering full page loader
+  // 2. Poll messages periodically (every 1.6s) without re-triggering full page loader
   useEffect(() => {
     if (!conversation) return
     let isMounted = true
 
-    const interval = setInterval(async () => {
+    const poll = async () => {
+      if (document.hidden) return
       try {
-        const fresh = await getConversationMessages(conversation.id, tokenProvider)
-        if (isMounted) {
-          messageCacheRef.current.set(conversation.id, fresh)
+        const fresh = await getConversationMessages(conversation.id, tokenProviderRef.current)
+        if (isMounted && fresh) {
+          globalMessageCache.set(conversation.id, fresh)
           setMessages((prev) => {
-            if (fresh.length !== prev.length || JSON.stringify(fresh) !== JSON.stringify(prev)) {
+            if (fresh.length !== prev.length) {
+              setTimeout(() => scrollToBottom(true), 40)
               return fresh
+            }
+            if (fresh.length > 0) {
+              const lastFresh = fresh[fresh.length - 1]
+              const lastPrev = prev[prev.length - 1]
+              if (
+                lastFresh.id !== lastPrev?.id ||
+                lastFresh.status !== lastPrev?.status ||
+                (lastFresh.reactions?.length ?? 0) !== (lastPrev?.reactions?.length ?? 0)
+              ) {
+                return fresh
+              }
+              const hasStatusChange = fresh.some((fm, idx) => {
+                const pm = prev[idx]
+                return pm && (fm.status !== pm.status || (fm.reactions?.length ?? 0) !== (pm.reactions?.length ?? 0))
+              })
+              if (hasStatusChange) return fresh
             }
             return prev
           })
         }
-      } catch (err) {
-        console.warn('Chat poll warning:', err)
+      } catch {
+        // silent fail
       }
-    }, 3500)
+    }
+
+    const interval = setInterval(poll, 1600)
 
     return () => {
       isMounted = false
       clearInterval(interval)
     }
-  }, [conversation?.id, tokenProvider])
+  }, [conversation?.id])
 
   // 3. Partner typing status check (for direct chat)
   useEffect(() => {
@@ -280,8 +307,9 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
     let isMounted = true
 
     const checkTyping = async () => {
+      if (document.hidden) return
       try {
-        const status = await getConversationTyping(conversation.id, tokenProvider)
+        const status = await getConversationTyping(conversation.id, tokenProviderRef.current)
         if (isMounted) {
           if (status.is_typing && status.typing_user_name) {
             setPartnerTyping(status.typing_user_name)
@@ -294,12 +322,12 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       }
     }
 
-    const interval = setInterval(checkTyping, 2200)
+    const interval = setInterval(checkTyping, 2000)
     return () => {
       isMounted = false
       clearInterval(interval)
     }
-  }, [conversation?.id, isGroup, tokenProvider])
+  }, [conversation?.id, isGroup])
 
   // Typing event trigger
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -406,7 +434,7 @@ export const ChatWindow: React.FC<ChatWindowProps> = ({
       )
       setMessages((prev) => {
         const next = prev.map((m) => (m.id === tempId ? realMsg : m))
-        messageCacheRef.current.set(conversation.id, next)
+        globalMessageCache.set(conversation.id, next)
         return next
       })
       onMessageSent?.()

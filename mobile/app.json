@@ -5,32 +5,97 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
+    "scheme": "skandan-portal",
     "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#6B2FA0"
+    },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.skandan.portal",
       "infoPlist": {
-        "NSCameraUsageDescription": "Skandan Portal needs camera access for employee attendance and facial verification.",
-        "NSLocationWhenInUseUsageDescription": "Skandan Portal needs your location to verify your check-in location."
+        "NSCameraUsageDescription": "Camera is required for attendance verification selfies",
+        "NSLocationWhenInUseUsageDescription": "Location is required for attendance geofence verification",
+        "NSLocationAlwaysUsageDescription": "Background location is used during active duty sessions",
+        "NSFaceIDUsageDescription": "Face ID is used for secure authentication"
       }
     },
     "android": {
-      "permissions": [
-        "CAMERA",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
-      ],
+      "package": "com.skandan.portal",
+      "versionCode": 1,
       "adaptiveIcon": {
-        "backgroundColor": "#6B2FA0",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
-    },
-    "web": {
-      "favicon": "./assets/favicon.png"
+      },
+      "permissions": [
+        "CAMERA",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "INTERNET",
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "FOREGROUND_SERVICE",
+        "POST_NOTIFICATIONS"
+      ],
+      "googleServicesFile": "./google-services.json"
     },
     "plugins": [
-      "expo-asset"
-    ]
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Camera is required for attendance verification selfies"
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Location is used for attendance geofence verification and duty tracking",
+          "locationAlwaysPermission": "Background location is used during active duty sessions",
+          "locationWhenInUsePermission": "Location is required for attendance check-in/check-out",
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-monochrome.png",
+          "color": "#6B2FA0",
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Skandan Portal to access your photos for sharing in chat"
+        }
+      ],
+      [
+        "react-native-vision-camera",
+        {
+          "cameraPermissionText": "Camera is required for face verification during attendance",
+          "enableCodeScanner": false
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "extra": {
+      "router": {
+        "origin": false
+      },
+      "eas": {
+        "projectId": ""
+      }
+    }
   }
 }
