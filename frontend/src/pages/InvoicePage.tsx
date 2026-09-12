@@ -148,7 +148,7 @@ export function InvoicePage() {
     if (nextNumQuery.data?.next_invoice_number && invoiceData.invoiceNumber === '1369-0001') {
       setInvoiceData((prev) => ({ ...prev, invoiceNumber: nextNumQuery.data.next_invoice_number }))
     }
-  }, [nextNumQuery.data])
+  }, [nextNumQuery.data, invoiceData.invoiceNumber])
 
   const invoicesQuery = useQuery({
     queryKey: ['invoices-list', searchQuery],
@@ -332,7 +332,7 @@ export function InvoicePage() {
   }
 
   const handleDownloadPDF = async (inv?: Invoice) => {
-    let target = inv || selectedInvoice
+    const target = inv || selectedInvoice
     try {
       const token = (await getToken()) || ''
 

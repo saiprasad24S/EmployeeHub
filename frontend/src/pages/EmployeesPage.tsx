@@ -97,19 +97,21 @@ export function EmployeesPage() {
   })
 
   const { searchQuery } = useSearch()
-  const rawEmployees = employeesQuery.data ?? []
+  const rawEmployees = useMemo(() => Array.isArray(employeesQuery.data) ? employeesQuery.data : [], [employeesQuery.data])
 
   const employees = useMemo(() => {
     if (!searchQuery.trim()) return rawEmployees
     const query = searchQuery.toLowerCase().trim()
     return rawEmployees.filter(
       (emp) =>
-        emp.name.toLowerCase().includes(query) ||
-        emp.employee_id.toLowerCase().includes(query) ||
-        emp.email.toLowerCase().includes(query) ||
-        (emp.phone && emp.phone.toLowerCase().includes(query)) ||
-        (emp.department && emp.department.toLowerCase().includes(query)) ||
-        (emp.default_address && emp.default_address.toLowerCase().includes(query))
+        Boolean(
+          (emp.name && emp.name.toLowerCase().includes(query)) ||
+          (emp.employee_id && emp.employee_id.toLowerCase().includes(query)) ||
+          (emp.email && emp.email.toLowerCase().includes(query)) ||
+          (emp.phone && emp.phone.toLowerCase().includes(query)) ||
+          (emp.department && emp.department.toLowerCase().includes(query)) ||
+          (emp.default_address && emp.default_address.toLowerCase().includes(query))
+        )
     )
   }, [rawEmployees, searchQuery])
 

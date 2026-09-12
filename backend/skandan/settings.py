@@ -76,6 +76,10 @@ def _database_config(url: str) -> dict:
 SECRET_KEY = _env("SECRET_KEY", default="replace-me")
 DEBUG = _env_bool("DEBUG", default=False)
 ALLOWED_HOSTS = [host.strip() for host in _env("ALLOWED_HOSTS", default="*").split(",") if host.strip()]
+if "*" not in ALLOWED_HOSTS:
+    for default_host in [".vercel.app", "localhost", "127.0.0.1"]:
+        if default_host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(default_host)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -201,6 +205,16 @@ else:
     else:
         DATABASES = {"default": {}}
         DB_CONFIG_SOURCE = "none"
+
+import sys
+if "test" in sys.argv:
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": ":memory:",
+        }
+    }
+    DB_CONFIG_SOURCE = "sqlite-test"
 
 logger.info("Database configuration source: %s", DB_CONFIG_SOURCE)
 

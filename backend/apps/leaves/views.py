@@ -173,13 +173,19 @@ class AdminLeaveListView(APIView):
                 | Q(reason__icontains=q_clean)
             )
 
-        # Summary counts for admin
-        all_leaves = Leave.objects.all()
+        # Summary counts for admin via a single database aggregation
+        from django.db.models import Count
+        agg = Leave.objects.aggregate(
+            total=Count("id"),
+            pending=Count("id", filter=Q(status=Leave.Status.PENDING)),
+            approved=Count("id", filter=Q(status=Leave.Status.APPROVED)),
+            rejected=Count("id", filter=Q(status=Leave.Status.REJECTED)),
+        )
         summary = {
-            "total": all_leaves.count(),
-            "pending": all_leaves.filter(status=Leave.Status.PENDING).count(),
-            "approved": all_leaves.filter(status=Leave.Status.APPROVED).count(),
-            "rejected": all_leaves.filter(status=Leave.Status.REJECTED).count(),
+            "total": agg["total"] or 0,
+            "pending": agg["pending"] or 0,
+            "approved": agg["approved"] or 0,
+            "rejected": agg["rejected"] or 0,
         }
 
         serializer = LeaveDetailSerializer(queryset, many=True)

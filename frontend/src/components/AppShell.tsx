@@ -34,7 +34,9 @@ export function AppShell({ children }: PropsWithChildren) {
   }, [isDarkMode])
 
   const breadcrumb = useMemo(() => {
-    const current = navItems.find((item) => location.pathname.startsWith(item.to))
+    const current = navItems.find((item) =>
+      item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)
+    )
     return current?.label ?? 'Dashboard'
   }, [location.pathname])
 

@@ -17,9 +17,11 @@ venv/
 .venv/
 
 # Environment files
-.env
-.env.local
-.env.*.local
+.env*
+*.env
+
+# Expo
+.expo/
 
 # Databases
 *.sqlite3
@@ -36,3 +38,8 @@ staticfiles/
 *.njsproj
 *.sln
 *.sw?
+
+# Mobile credentials & keystores
+google-services.json
+*.keystore
+*.jks

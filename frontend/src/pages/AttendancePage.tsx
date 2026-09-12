@@ -55,7 +55,7 @@ export function AttendancePage() {
   const [isSearchDropdownOpen, setIsSearchDropdownOpen] = useState(false)
 
   const employeesQuery = useQuery({
-    queryKey: ['employees-attendance'],
+    queryKey: ['employees'],
     queryFn: async () => {
       const token = await getToken()
       if (!token) throw new Error('Missing token')
@@ -69,10 +69,10 @@ export function AttendancePage() {
     placeholderData: (previousData) => previousData,
   })
 
-  const employees = employeesQuery.data ?? []
+  const employees = useMemo(() => Array.isArray(employeesQuery.data) ? employeesQuery.data : [], [employeesQuery.data])
 
   const activeEmpId = selectedEmpIds[0]
-  const activeEmp = useMemo(() => employees.find((e) => e.id === activeEmpId), [employees, activeEmpId])
+  const activeEmp = useMemo(() => employees.find((e) => e && e.id === activeEmpId), [employees, activeEmpId])
 
   const candidateMonthlyAttendanceQuery = useQuery({
     queryKey: ['candidate-month-attendance', activeEmp?.id, activeEmp?.employee_id, selectedYear, selectedMonth],
@@ -191,10 +191,10 @@ export function AttendancePage() {
 
   // Filter present and absent employees
   const presentEmployees = employees.filter(
-    (e) => e.is_present || e.presence_status === 'Present' || e.presence_status === 'Checked Out' || e.session_login_time !== null
+    (e) => e && (e.is_present || e.presence_status === 'Present' || e.presence_status === 'Checked Out' || e.session_login_time !== null)
   )
   const absentEmployees = employees.filter(
-    (e) => !e.is_present && e.presence_status !== 'Present' && e.presence_status !== 'Checked Out' && e.session_login_time === null
+    (e) => e && (!e.is_present && e.presence_status !== 'Present' && e.presence_status !== 'Checked Out' && e.session_login_time === null)
   )
 
   const filteredSearchEmployees = useMemo(() => {
@@ -202,9 +202,11 @@ export function AttendancePage() {
     const q = candidateSearchQuery.toLowerCase().trim()
     return employees.filter(
       (e) =>
-        e.name.toLowerCase().includes(q) ||
-        e.employee_id.toLowerCase().includes(q) ||
-        (e.department && e.department.toLowerCase().includes(q))
+        Boolean(
+          (e.name && e.name.toLowerCase().includes(q)) ||
+          (e.employee_id && e.employee_id.toLowerCase().includes(q)) ||
+          (e.department && e.department.toLowerCase().includes(q))
+        )
     )
   }, [employees, candidateSearchQuery])
 
@@ -305,7 +307,7 @@ export function AttendancePage() {
 
       // Invalidate month attendance query and employee attendance table
       queryClient.invalidateQueries({ queryKey: ['candidate-month-attendance'] })
-      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
     } catch (err: any) {
       setEditMsg(err.message || 'Error updating attendance.')
     } finally {
@@ -356,7 +358,7 @@ export function AttendancePage() {
 
       // Invalidate month attendance query and employee attendance table
       queryClient.invalidateQueries({ queryKey: ['candidate-month-attendance'] })
-      queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
+      queryClient.invalidateQueries({ queryKey: ['employees'] })
     } catch (err: any) {
       setEditMsg(err.message || 'Error saving attendance updates.')
     } finally {

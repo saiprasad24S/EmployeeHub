@@ -114,11 +114,11 @@ export const formatDisplayDate = (dateStr: string | null | undefined): string =>
   if (!dateStr || !dateStr.trim()) return '';
   const str = dateStr.trim();
   
-  if (/^\d{2}[\/\-]\d{2}[\/\-]\d{4}$/.test(str)) {
+  if (/^\d{2}[/-]\d{2}[/-]\d{4}$/.test(str)) {
     return str.replace(/-/g, '/');
   }
   
-  const ymdMatch = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  const ymdMatch = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
   if (ymdMatch) {
     const [, yyyy, mm, dd] = ymdMatch;
     return `${dd.padStart(2, '0')}/${mm.padStart(2, '0')}/${yyyy}`;

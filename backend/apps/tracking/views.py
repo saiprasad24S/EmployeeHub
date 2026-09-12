@@ -160,7 +160,7 @@ class AllPresentEmployeesLocationView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        from django.db.models import Subquery, OuterRef
+        from django.db.models import Max
 
         # 1. Get all active sessions in one query with employee data
         active_sessions = (
@@ -180,52 +180,39 @@ class AllPresentEmployeesLocationView(APIView):
 
         employee_ids = list(employee_map.keys())
 
-        # 2. Batch-fetch latest location logs for all active employees
+        # 2. Batch-fetch latest location logs for all active employees using fast indexed Max("id")
         latest_log_ids = (
             LocationLog.objects.filter(employee_id__in=employee_ids)
             .values("employee_id")
-            .annotate(latest_id=Subquery(
-                LocationLog.objects.filter(employee_id=OuterRef("employee_id"))
-                .order_by("-timestamp")
-                .values("id")[:1]
-            ))
-            .values_list("latest_id", flat=True)
+            .annotate(max_id=Max("id"))
+            .values_list("max_id", flat=True)
         )
-        location_logs = LocationLog.objects.filter(id__in=latest_log_ids)
+        location_logs = LocationLog.objects.filter(id__in=list(latest_log_ids))
         log_by_employee = {log.employee_id: log for log in location_logs}
 
-        # 3. For employees without location logs, try latest attendance from their active session
+        # 3. For employees without location logs, batch-fetch latest attendance from their active session
         missing_ids = [eid for eid in employee_ids if eid not in log_by_employee]
         att_by_employee = {}
         if missing_ids:
-            # Map missing employee ids to their active session ids
-            missing_session_ids = {eid: session_map[eid].id for eid in missing_ids}
-            # First try: attendance from the active session
-            for eid in missing_ids:
-                att = (
-                    Attendance.objects.filter(
-                        employee_id=eid,
-                        session_id=missing_session_ids[eid],
-                    )
-                    .order_by("-timestamp")
-                    .first()
-                )
-                if att:
-                    att_by_employee[eid] = att
-            # Second try: any attendance for employees still missing
+            missing_sessions = [session_map[eid].id for eid in missing_ids]
+            active_att_ids = (
+                Attendance.objects.filter(session_id__in=missing_sessions)
+                .values("employee_id")
+                .annotate(max_id=Max("id"))
+                .values_list("max_id", flat=True)
+            )
+            for att in Attendance.objects.filter(id__in=list(active_att_ids)):
+                att_by_employee[att.employee_id] = att
+
             still_missing = [eid for eid in missing_ids if eid not in att_by_employee]
             if still_missing:
-                latest_att_ids = (
+                fallback_att_ids = (
                     Attendance.objects.filter(employee_id__in=still_missing)
                     .values("employee_id")
-                    .annotate(latest_id=Subquery(
-                        Attendance.objects.filter(employee_id=OuterRef("employee_id"))
-                        .order_by("-timestamp")
-                        .values("id")[:1]
-                    ))
-                    .values_list("latest_id", flat=True)
+                    .annotate(max_id=Max("id"))
+                    .values_list("max_id", flat=True)
                 )
-                for att in Attendance.objects.filter(id__in=latest_att_ids):
+                for att in Attendance.objects.filter(id__in=list(fallback_att_ids)):
                     att_by_employee[att.employee_id] = att
 
         # 4. Build results

@@ -13,8 +13,17 @@ import { SmoothScroll } from './components/SmoothScroll'
 import 'leaflet/dist/leaflet.css'
 import './styles/global.css'
 
-const queryClient = new QueryClient()
-const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY ?? ''
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 30_000,
+      gcTime: 10 * 60_000,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    },
+  },
+})
+const clerkKey = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY || 'pk_test_bm9ibGUtdmVydmV0LTYyLmNsZXJrLmFjY291bnRzLmRldiQ'
 
 function AppProviders() {
   return (

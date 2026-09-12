@@ -55,7 +55,34 @@ class InvoiceClientsListView(APIView):
 
     def get(self, request):
         query = request.query_params.get("q", "").strip()
-        invoices = Invoice.objects.exclude(client_name="").exclude(client_name__isnull=True).order_by("-created_at")
+        invoices = (
+            Invoice.objects.exclude(client_name="")
+            .exclude(client_name__isnull=True)
+            .only(
+                "id",
+                "invoice_number",
+                "invoice_date",
+                "invoice_type",
+                "client_name",
+                "client_contact",
+                "client_address",
+                "client_gst",
+                "contact_person",
+                "contact_person_designation",
+                "school_branch",
+                "service_type",
+                "consultant",
+                "gender",
+                "age",
+                "patient_name",
+                "patient_age_gender",
+                "start_date",
+                "service_start_date",
+                "per_day_charges",
+                "created_at",
+            )
+            .order_by("-created_at")
+        )
         if query:
             invoices = invoices.filter(client_name__icontains=query)
 

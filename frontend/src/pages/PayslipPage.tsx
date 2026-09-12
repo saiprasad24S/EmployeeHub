@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
 import { authedFetch } from '../lib/api';
@@ -69,7 +69,7 @@ export function PayslipPage() {
 
   // 1. Fetch employees list from backend to populate dropdown
   const employeesQuery = useQuery({
-    queryKey: ['employees-list-payslip'],
+    queryKey: ['employees'],
     queryFn: async () => {
       const token = await getToken();
       if (!token) return [];
@@ -79,9 +79,10 @@ export function PayslipPage() {
       return Array.isArray(data) ? data : data.results || [];
     },
     staleTime: 5 * 60 * 1000,
+    placeholderData: (previousData) => previousData,
   });
 
-  const employees = employeesQuery.data || [];
+  const employees = useMemo(() => Array.isArray(employeesQuery.data) ? employeesQuery.data : [], [employeesQuery.data]);
 
   // When employees query loads, if no employee selected or matches fallback, auto-fill with first DB employee
   useEffect(() => {
@@ -110,7 +111,7 @@ export function PayslipPage() {
         dateOfJoining: createdDate,
       }));
     }
-  }, [employees]);
+  }, [employees, payslipData.employeeId]);
 
   // 2. Fetch saved payslips from backend Cloudinary database
   const payslipsQuery = useQuery({

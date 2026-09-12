@@ -33,23 +33,37 @@ function MapAutoBounds({ points }: { points: Array<{ latitude: number; longitude
   const map = useMap()
 
   useEffect(() => {
-    if (points.length === 0) return
-    if (points.length === 1) {
-      map.setView([points[0].latitude, points[0].longitude], 14)
+    if (!Array.isArray(points) || points.length === 0) return
+    const valid = points.filter(
+      (p) => p && !isNaN(Number(p.latitude)) && !isNaN(Number(p.longitude)) && isFinite(Number(p.latitude)) && isFinite(Number(p.longitude))
+    )
+    if (valid.length === 0) return
+    if (valid.length === 1) {
+      map.setView([valid[0].latitude, valid[0].longitude], 14)
       return
     }
-    const bounds = latLngBounds(points.map((p) => [p.latitude, p.longitude]))
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
+    try {
+      const bounds = latLngBounds(valid.map((p) => [p.latitude, p.longitude]))
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 })
+    } catch (e) {
+      console.warn('Could not fit bounds on route map:', e)
+    }
   }, [map, points])
 
   return null
 }
 
 export function RouteMap({ points, isLive = false }: RouteMapProps) {
-  const center: LatLngExpression = points.length > 0 ? [points[0].latitude, points[0].longitude] : [12.9716, 77.5946]
+  const safePoints = Array.isArray(points)
+    ? points.filter(
+        (p) => p && !isNaN(Number(p.latitude)) && !isNaN(Number(p.longitude)) && isFinite(Number(p.latitude)) && isFinite(Number(p.longitude))
+      )
+    : []
 
-  const startPoint = points.length > 0 ? points[0] : null
-  const endPoint = points.length > 0 ? points[points.length - 1] : null
+  const center: LatLngExpression = safePoints.length > 0 ? [safePoints[0].latitude, safePoints[0].longitude] : [12.9716, 77.5946]
+
+  const startPoint = safePoints.length > 0 ? safePoints[0] : null
+  const endPoint = safePoints.length > 0 ? safePoints[safePoints.length - 1] : null
 
   const formatTimestamp = (ts?: string) => {
     if (!ts) return ''

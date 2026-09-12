@@ -147,7 +147,13 @@ export function LeavesPage() {
     setSearchParams(tab === 'ALL' ? {} : { status: tab })
   }
 
-  const leaves = leavesQuery.data?.results ?? []
+  const leaves = useMemo(() => {
+    const data = leavesQuery.data
+    if (!data) return []
+    if (Array.isArray(data.results)) return data.results
+    if (Array.isArray(data)) return data
+    return []
+  }, [leavesQuery.data])
 
   // Extract distinct departments from leaves for filter dropdown
   const departments = useMemo(() => {

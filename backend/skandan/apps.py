@@ -20,8 +20,12 @@ class SkandanConfig(AppConfig):
         initialize_cloudinary()
 
     def _validate_database_connection(self) -> None:
-        if os.getenv("SKIP_DB_STARTUP_VALIDATION", "").lower() in {"1", "true", "yes", "on"}:
-            logger.info("Database startup validation skipped by configuration.")
+        if (
+            os.getenv("VERCEL")
+            or os.getenv("AWS_LAMBDA_FUNCTION_NAME")
+            or os.getenv("SKIP_DB_STARTUP_VALIDATION", "").lower() in {"1", "true", "yes", "on"}
+        ):
+            logger.info("Database startup validation skipped for serverless execution.")
             return
 
         engine = settings.DATABASES["default"].get("ENGINE", "")

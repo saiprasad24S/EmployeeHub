@@ -17,17 +17,19 @@ const createProfileIcon = (photo: string | undefined, name: string) => divIcon({
 
 export function LiveLocationsMap({ locations }: LiveLocationsMapProps) {
   const markers = useMemo(() => {
-    const normalized = locations.filter((loc) => {
+    const list = Array.isArray(locations) ? locations : []
+    const normalized = list.filter((loc) => {
+      if (!loc) return false
       const latitude = Number(loc.latitude)
       const longitude = Number(loc.longitude)
-      return !isNaN(latitude) && !isNaN(longitude)
+      return !isNaN(latitude) && !isNaN(longitude) && isFinite(latitude) && isFinite(longitude)
     })
 
     return normalized.map((loc) => ({
       ...loc,
       latitude: Number(loc.latitude),
       longitude: Number(loc.longitude),
-      icon: createProfileIcon(loc.profile_photo, loc.name),
+      icon: createProfileIcon(loc.profile_photo, loc.name || 'Staff'),
     }))
   }, [locations])
 

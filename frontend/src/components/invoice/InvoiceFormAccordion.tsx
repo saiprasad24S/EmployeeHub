@@ -178,7 +178,7 @@ const InputField: React.FC<{
             readOnly={readOnly}
             onFocus={handleFocus as any}
             onBlur={handleBlur as any}
-            onClick={type === 'date' ? (e => { try { (e.currentTarget as any).showPicker?.(); } catch (_) {} }) : undefined}
+            onClick={type === 'date' ? (e => { try { (e.currentTarget as any).showPicker?.(); } catch (_) { /* fallback ignored */ } }) : undefined}
             style={{
               ...baseInputStyle,
               cursor: type === 'date' ? 'pointer' : undefined,
@@ -208,12 +208,12 @@ const DatePickerField: React.FC<{
     if (!value) return null;
     const str = String(value).trim();
     // try YYYY-MM-DD
-    const ymd = str.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+    const ymd = str.match(/^(\d{4})[/-](\d{1,2})[/-](\d{1,2})/);
     if (ymd) {
       return new Date(parseInt(ymd[1]), parseInt(ymd[2]) - 1, parseInt(ymd[3]));
     }
     // try DD/MM/YYYY
-    const dmy = str.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+    const dmy = str.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
     if (dmy) {
       return new Date(parseInt(dmy[3]), parseInt(dmy[2]) - 1, parseInt(dmy[1]));
     }

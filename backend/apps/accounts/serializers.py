@@ -55,7 +55,12 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return obj._cached_presence_summary
 
     def get_is_face_registered(self, obj: Employee) -> bool:
-        return bool(obj.face_embedding or obj.profile_photo)
+        has_emb = getattr(obj, "has_face_embedding", None)
+        if has_emb is not None:
+            return bool(has_emb or obj.profile_photo)
+        if "face_embedding" in obj.__dict__:
+            return bool(obj.face_embedding or obj.profile_photo)
+        return bool(obj.profile_photo)
 
     def get_is_present(self, obj: Employee) -> bool:
         summary = self._get_summary(obj)
@@ -78,8 +83,10 @@ class EmployeeSerializer(serializers.ModelSerializer):
         return summary.get("status") == "Present"
 
     def get_profile_photo(self, obj: Employee) -> str:
-        if obj.profile_photo and obj.profile_photo.startswith("http"):
-            return obj.profile_photo
+        if obj.profile_photo and str(obj.profile_photo).startswith("http"):
+            return str(obj.profile_photo)
+        if hasattr(obj, "_cached_profile_photo"):
+            return obj._cached_profile_photo or ""
         try:
             latest_att = obj.attendance_records.filter(attendance_type="CHECK_IN").exclude(photo_url="").order_by("-timestamp").first()
             if latest_att and latest_att.photo_url:

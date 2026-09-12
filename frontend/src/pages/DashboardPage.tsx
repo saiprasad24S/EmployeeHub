@@ -22,6 +22,7 @@ export function DashboardPage() {
       return response.json() as Promise<Record<string, number>>
     },
     staleTime: 60_000,
+    placeholderData: (previousData) => previousData,
   })
 
   const liveLocationsQuery = useQuery({
@@ -43,21 +44,24 @@ export function DashboardPage() {
         longitude: number
       }>>
     },
-    staleTime: 15_000,
+    staleTime: 30_000,
     refetchInterval: 60000,
     refetchIntervalInBackground: false,
+    placeholderData: (previousData) => previousData,
   })
 
   const filteredLocations = useMemo(() => {
-    const data = liveLocationsQuery.data ?? []
+    const data = Array.isArray(liveLocationsQuery.data) ? liveLocationsQuery.data : []
     if (!searchQuery.trim()) return data
     const query = searchQuery.toLowerCase().trim()
     return data.filter((loc) =>
-      loc.name.toLowerCase().includes(query) ||
-      loc.employee_id.toLowerCase().includes(query) ||
-      (loc.email && loc.email.toLowerCase().includes(query)) ||
-      (loc.default_address && loc.default_address.toLowerCase().includes(query)) ||
-      (loc.department && loc.department.toLowerCase().includes(query))
+      Boolean(
+        (loc.name && loc.name.toLowerCase().includes(query)) ||
+        (loc.employee_id && loc.employee_id.toLowerCase().includes(query)) ||
+        (loc.email && loc.email.toLowerCase().includes(query)) ||
+        (loc.default_address && loc.default_address.toLowerCase().includes(query)) ||
+        (loc.department && loc.department.toLowerCase().includes(query))
+      )
     )
   }, [liveLocationsQuery.data, searchQuery])
 

@@ -1,5 +1,5 @@
 import { lazy, Suspense, useState, useEffect, useCallback } from 'react'
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useParams } from 'react-router-dom'
 import { AuthenticateWithRedirectCallback, SignedIn, SignedOut, SignOutButton, useAuth } from '@clerk/clerk-react'
 import { AppShell } from './components/AppShell'
 import { authedFetch } from './lib/api'
@@ -148,6 +148,34 @@ function MainAppSelector() {
   )
 }
 
+function TestViewHarness() {
+  const { module } = useParams<{ module: string }>()
+  switch (module) {
+    case 'dashboard':
+      return <AppShell><DashboardPage /></AppShell>
+    case 'employees':
+      return <AppShell><EmployeesPage /></AppShell>
+    case 'attendance':
+      return <AppShell><AttendancePage /></AppShell>
+    case 'assignments':
+      return <AppShell><AssignmentsPage /></AppShell>
+    case 'leaves':
+      return <AppShell><LeavesPage /></AppShell>
+    case 'tracking':
+      return <AppShell><TrackingPage /></AppShell>
+    case 'invoice':
+      return <AppShell><InvoicePage /></AppShell>
+    case 'payslip':
+      return <AppShell><PayslipPage /></AppShell>
+    case 'settings':
+      return <AppShell><SettingsPage /></AppShell>
+    case 'portal':
+      return <EmployeePortal />
+    default:
+      return <div>Unknown module: {module}</div>
+  }
+}
+
 export default function App() {
   const { getToken } = useAuth()
   useLocationTracker(getToken)
@@ -155,6 +183,9 @@ export default function App() {
   return (
     <Suspense fallback={<RouteFallback />}>
       <Routes>
+        {import.meta.env.DEV && (
+          <Route path="/test-view/:module" element={<TestViewHarness />} />
+        )}
         <Route
           path="/sign-in/*"
           element={

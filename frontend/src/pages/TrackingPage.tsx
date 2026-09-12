@@ -46,7 +46,7 @@ export function TrackingPage() {
 
   // Query all employees for searching
   const employeesQuery = useQuery({
-    queryKey: ['employees-tracking-list'],
+    queryKey: ['employees'],
     queryFn: async () => {
       const token = await getToken()
       if (!token) throw new Error('Missing token')
@@ -62,7 +62,7 @@ export function TrackingPage() {
 
   // Query present locations for the default map view
   const liveLocationsQuery = useQuery({
-    queryKey: ['live-locations-tracking'],
+    queryKey: ['live-locations'],
     queryFn: async () => {
       const token = await getToken()
       if (!token) throw new Error('Missing token')
@@ -76,14 +76,14 @@ export function TrackingPage() {
     placeholderData: (previousData) => previousData,
   })
 
-  const employees = employeesQuery.data ?? []
-  const liveLocations = liveLocationsQuery.data ?? []
+  const employees = useMemo(() => Array.isArray(employeesQuery.data) ? employeesQuery.data : [], [employeesQuery.data])
+  const liveLocations = useMemo(() => Array.isArray(liveLocationsQuery.data) ? liveLocationsQuery.data : [], [liveLocationsQuery.data])
 
   // Resolve selected employee either from URL or from search
   const selectedEmployee = useMemo(() => {
     if (!urlEmployeeId) return null
     return employees.find(
-      (e) => e.employee_id === urlEmployeeId || String(e.id) === urlEmployeeId
+      (e) => e && (e.employee_id === urlEmployeeId || String(e.id) === urlEmployeeId)
     ) ?? null
   }, [urlEmployeeId, employees])
 
@@ -116,10 +116,12 @@ export function TrackingPage() {
     if (!searchVal.trim()) return liveLocations
     const query = searchVal.toLowerCase().trim()
     return liveLocations.filter((loc) =>
-      loc.name.toLowerCase().includes(query) ||
-      loc.employee_id.toLowerCase().includes(query) ||
-      (loc.email && loc.email.toLowerCase().includes(query)) ||
-      (loc.department && loc.department.toLowerCase().includes(query))
+      Boolean(
+        (loc.name && loc.name.toLowerCase().includes(query)) ||
+        (loc.employee_id && loc.employee_id.toLowerCase().includes(query)) ||
+        (loc.email && loc.email.toLowerCase().includes(query)) ||
+        (loc.department && loc.department.toLowerCase().includes(query))
+      )
     )
   }, [liveLocations, searchVal])
 
@@ -128,9 +130,11 @@ export function TrackingPage() {
     if (!searchVal.trim() || selectedEmployee) return []
     const query = searchVal.toLowerCase().trim()
     return employees.filter((e) =>
-      e.name.toLowerCase().includes(query) ||
-      e.employee_id.toLowerCase().includes(query) ||
-      e.email.toLowerCase().includes(query)
+      Boolean(
+        (e.name && e.name.toLowerCase().includes(query)) ||
+        (e.employee_id && e.employee_id.toLowerCase().includes(query)) ||
+        (e.email && e.email.toLowerCase().includes(query))
+      )
     )
   }, [employees, searchVal, selectedEmployee])
 

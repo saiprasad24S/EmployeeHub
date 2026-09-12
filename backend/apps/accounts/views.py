@@ -87,7 +87,7 @@ class AuthLogoutView(APIView):
 
 
 class EmployeeViewSet(viewsets.ModelViewSet):
-    queryset = Employee.objects.all().order_by("employee_id")
+    queryset = Employee.objects.all().defer("face_embedding").order_by("employee_id")
     serializer_class = EmployeeSerializer
     permission_classes = [IsAuthenticated]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
@@ -101,15 +101,32 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         return [IsAuthenticated()]
 
     def list(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
+        from datetime import time as dt_time, datetime as dt_datetime
+        from django.db.models import Max, Case, When, Value, BooleanField
+        from apps.attendance.models import Attendance
+
+        queryset = (
+            self.filter_queryset(self.get_queryset())
+            .annotate(
+                has_face_embedding=Case(
+                    When(face_embedding__isnull=False, then=Value(True)),
+                    default=Value(False),
+                    output_field=BooleanField(),
+                )
+            )
+            .defer("face_embedding")
+        )
         employees = list(queryset)
         if employees:
             today = timezone.localdate()
+            tz = timezone.get_current_timezone()
+            start_dt = timezone.make_aware(dt_datetime.combine(today, dt_time.min), tz)
+            end_dt = timezone.make_aware(dt_datetime.combine(today, dt_time.max), tz)
             emp_ids = [e.id for e in employees]
 
-            # 1. Bulk-fetch today's sessions in a single query
+            # 1. Bulk-fetch today's sessions in a single index-accelerated query
             sessions = (
-                Session.objects.filter(employee_id__in=emp_ids, login_time__date=today)
+                Session.objects.filter(employee_id__in=emp_ids, login_time__range=(start_dt, end_dt))
                 .order_by("-login_time")
             )
             sessions_by_emp = {}
@@ -164,6 +181,30 @@ class EmployeeViewSet(viewsets.ModelViewSet):
                     assign_by_emp[a.employee_id] = a
             for emp in employees:
                 emp._cached_active_assignment = assign_by_emp.get(emp.id)
+
+            # 3. Bulk-fetch latest check-in photos for employees without direct profile_photo
+            emps_needing_photo = [
+                e.id for e in employees
+                if not (e.profile_photo and str(e.profile_photo).startswith("http"))
+            ]
+            if emps_needing_photo:
+                latest_photo_ids = (
+                    Attendance.objects.filter(
+                        employee_id__in=emps_needing_photo,
+                        attendance_type=Attendance.AttendanceType.CHECK_IN,
+                    )
+                    .exclude(photo_url="")
+                    .values("employee_id")
+                    .annotate(max_id=Max("id"))
+                    .values_list("max_id", flat=True)
+                )
+                photo_records = Attendance.objects.filter(id__in=list(latest_photo_ids)).only("employee_id", "photo_url")
+                photo_map = {att.employee_id: att.photo_url for att in photo_records}
+                for emp in employees:
+                    emp._cached_profile_photo = photo_map.get(emp.id, "")
+            else:
+                for emp in employees:
+                    emp._cached_profile_photo = emp.profile_photo or ""
 
         serializer = self.get_serializer(employees, many=True)
         return Response(serializer.data)
