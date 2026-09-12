@@ -76,7 +76,9 @@ def _database_config(url: str) -> dict:
 SECRET_KEY = _env("SECRET_KEY", default="replace-me")
 DEBUG = _env_bool("DEBUG", default=False)
 ALLOWED_HOSTS = [host.strip() for host in _env("ALLOWED_HOSTS", default="*").split(",") if host.strip()]
-if "*" not in ALLOWED_HOSTS:
+if DEBUG or "*" in ALLOWED_HOSTS:
+    ALLOWED_HOSTS = ["*"]
+elif "*" not in ALLOWED_HOSTS:
     for default_host in [".vercel.app", "localhost", "127.0.0.1"]:
         if default_host not in ALLOWED_HOSTS:
             ALLOWED_HOSTS.append(default_host)

@@ -309,6 +309,7 @@ export function EmployeePortal() {
       window.history.pushState({ portalTab: 'home' }, '')
     }
     setPortalTab(tab)
+    window.scrollTo({ top: 0, behavior: 'instant' })
   }, [])
 
   const stopCamera = useCallback((fromPopState = false) => {
@@ -1507,37 +1508,10 @@ export function EmployeePortal() {
             <strong>{attendanceError}</strong>
           </div>
         )}
-        {/* Desktop / Tablet Top Tabs */}
-        <div className="portal-tabs-top">
-          <button
-            type="button"
-            className={`portal-tab-btn ${portalTab === 'home' ? 'active' : ''}`}
-            onClick={() => setPortalTabWithHistory('home')}
-          >
-            <Home size={16} />
-            <span>Home</span>
-          </button>
-          <button
-            type="button"
-            className={`portal-tab-btn ${portalTab === 'attendance' ? 'active' : ''}`}
-            onClick={() => setPortalTabWithHistory('attendance')}
-          >
-            <Clock size={16} />
-            <span>Attendance</span>
-          </button>
-          <button
-            type="button"
-            className={`portal-tab-btn ${portalTab === 'leaves' ? 'active' : ''}`}
-            onClick={() => setPortalTabWithHistory('leaves')}
-          >
-            <Calendar size={16} />
-            <span>Apply Leave</span>
-          </button>
-        </div>
 
         {/* Tab 1: Home View (Profile details + Live Clock + Schedule + Mark Attendance) */}
         {portalTab === 'home' && (
-          <div className="stack" style={{ gap: '1.5rem' }}>
+          <div className="stack portal-tab-content" style={{ gap: '1.5rem' }}>
             {profile && (
               <div className="glass-card card-soft employee-card">
                 <div className="employee-avatar-wrapper">
@@ -1682,7 +1656,7 @@ export function EmployeePortal() {
 
         {/* Tab 2: Attendance Calendar View */}
         {portalTab === 'attendance' && (
-          <div className="stack" style={{ gap: '1.5rem' }}>
+          <div className="stack portal-tab-content" style={{ gap: '1.5rem' }}>
             <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem' }}>
                 <h4 style={{ margin: 0, color: 'var(--primary)', display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '1.15rem' }}>
@@ -1905,7 +1879,7 @@ export function EmployeePortal() {
 
         {/* Tab 4: Apply Leave View */}
         {portalTab === 'leaves' && (
-          <div className="stack" style={{ gap: '1.5rem' }}>
+          <div className="stack portal-tab-content" style={{ gap: '1.5rem' }}>
             {/* My Leave Requests History */}
             <div className="glass-card card-soft" style={{ padding: '1.75rem' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
@@ -2552,18 +2526,15 @@ export function EmployeePortal() {
         </div>
       )}
 
-      {/* Mobile Fixed Bottom Navigation */}
-      <nav className="portal-bottom-nav" aria-label="Bottom Navigation">
+      {/* Compact Floating Capsule Navigation Dock */}
+      <nav className="portal-bottom-nav" aria-label="Portal Navigation">
         <button
           type="button"
           className={`portal-nav-item ${portalTab === 'home' ? 'active' : ''}`}
           onClick={() => setPortalTabWithHistory('home')}
         >
-          {portalTab === 'home' && <div className="portal-nav-indicator" />}
-          <div className="portal-nav-icon-wrapper">
-            <Home size={20} />
-          </div>
-          <span>Home</span>
+          <Home size={15} strokeWidth={portalTab === 'home' ? 2.5 : 2} />
+          <span className="portal-nav-label">Home</span>
         </button>
 
         <button
@@ -2571,11 +2542,8 @@ export function EmployeePortal() {
           className={`portal-nav-item ${portalTab === 'attendance' ? 'active' : ''}`}
           onClick={() => setPortalTabWithHistory('attendance')}
         >
-          {portalTab === 'attendance' && <div className="portal-nav-indicator" />}
-          <div className="portal-nav-icon-wrapper">
-            <Clock size={20} />
-          </div>
-          <span>Attendance</span>
+          <Clock size={15} strokeWidth={portalTab === 'attendance' ? 2.5 : 2} />
+          <span className="portal-nav-label">Attendance</span>
         </button>
 
         <button
@@ -2583,11 +2551,8 @@ export function EmployeePortal() {
           className={`portal-nav-item ${portalTab === 'leaves' ? 'active' : ''}`}
           onClick={() => setPortalTabWithHistory('leaves')}
         >
-          {portalTab === 'leaves' && <div className="portal-nav-indicator" />}
-          <div className="portal-nav-icon-wrapper">
-            <Calendar size={20} />
-          </div>
-          <span>Apply Leave</span>
+          <Calendar size={15} strokeWidth={portalTab === 'leaves' ? 2.5 : 2} />
+          <span className="portal-nav-label">Apply Leave</span>
         </button>
       </nav>
     </div>
