@@ -64,7 +64,6 @@ if sudo systemctl is-active --quiet employeehub; then
     echo "Backend service check: OK"
 else
     echo "Backend service check: FAILED"
-    sudo systemctl status employeehub --no-pager
     exit 1
 fi
 
@@ -76,7 +75,6 @@ if curl --fail --silent http://127.0.0.1:8001/ > /tmp/employeehub_health.json; t
     rm -f /tmp/employeehub_health.json
 else
     echo "Backend health check: FAILED"
-    sudo journalctl -u employeehub -n 50 --no-pager
     exit 1
 fi
 
