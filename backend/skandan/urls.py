@@ -39,8 +39,8 @@ def root_view(request):
         {
             "status": "online",
             "service": "EmployeeHub API Backend",
-            "frontend_url": "http://localhost:5173",
-            "invoice_app": "http://localhost:5173/invoice",
+            "frontend_url": "https://employee.skandanhomecarrecclinic.com",
+            "invoice_app": "https://employee.skandanhomecarrecclinic.com/invoice",
             "admin": "/admin/",
         }
     )
