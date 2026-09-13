@@ -69,12 +69,28 @@ fi
 
 echo ""
 echo "12. Checking backend health..."
-if curl --fail --silent http://127.0.0.1:8001/ > /tmp/employeehub_health.json; then
+
+HEALTH_OK=false
+
+for attempt in {1..10}; do
+    echo "Health check attempt $attempt/10..."
+
+    if curl --fail --silent --show-error http://127.0.0.1:8001/ > /tmp/employeehub_health.json; then
+        HEALTH_OK=true
+        break
+    fi
+
+    echo "Backend not ready yet. Waiting 2 seconds..."
+    sleep 2
+done
+
+if [ "$HEALTH_OK" = true ]; then
     echo "Backend health check: OK"
     cat /tmp/employeehub_health.json
     rm -f /tmp/employeehub_health.json
 else
-    echo "Backend health check: FAILED"
+    echo "Backend health check: FAILED after 10 attempts"
+    rm -f /tmp/employeehub_health.json
     exit 1
 fi
 
