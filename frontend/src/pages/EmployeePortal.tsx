@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState, useMemo, useCallback } from 'react'
 import { SignOutButton, useAuth } from '@clerk/clerk-react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Bell, Calendar, CheckCircle2, XCircle, AlertCircle, Plus, Clock, MapPin, RotateCcw, User, Home } from 'lucide-react'
+import { Bell, Calendar, CheckCircle2, XCircle, AlertCircle, Plus, Clock, MapPin, RotateCcw, User, Home, Camera, Check } from 'lucide-react'
 import { authedFetch, API_BASE_URL } from '../lib/api'
 import { safeStorage } from '../lib/storage'
 
@@ -2116,18 +2116,21 @@ export function EmployeePortal() {
             <div className="camera-footer">
               {!tempPhoto ? (
                 <button
-                  className="btn-primary"
+                  type="button"
+                  className="btn-camera-capture"
                   onClick={capturePhoto}
                   disabled={!cameraReady}
                   style={{ opacity: cameraReady ? 1 : 0.6 }}
                 >
-                  {cameraReady ? 'Capture Photo' : 'Starting Camera...'}
+                  <Camera size={20} />
+                  <span>{cameraReady ? 'Capture Photo' : 'Starting Camera...'}</span>
                 </button>
               ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-                  <div className="button-group-row">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6rem', width: '100%' }}>
+                  <div className="camera-actions-row">
                     <button
-                      className="btn-secondary"
+                      type="button"
+                      className="btn-camera-retake"
                       onClick={async () => {
                         setTempPhoto(null)
                         setCameraError(null)
@@ -2143,19 +2146,35 @@ export function EmployeePortal() {
                       }}
                       disabled={submitting}
                     >
-                      Retake
+                      <RotateCcw size={17} />
+                      <span>Retake</span>
                     </button>
-                    <button className="btn-primary" onClick={acceptPhoto} disabled={submitting}>
-                      {submitting ? 'Verifying...' : 'Submit'}
+                    <button
+                      type="button"
+                      className="btn-camera-submit"
+                      onClick={acceptPhoto}
+                      disabled={submitting}
+                    >
+                      {submitting ? (
+                        <>
+                          <div className="btn-spinner" />
+                          <span>Verifying...</span>
+                        </>
+                      ) : (
+                        <>
+                          <Check size={20} />
+                          <span>Submit</span>
+                        </>
+                      )}
                     </button>
                   </div>
                   {faceMatchMessage && (
-                    <div style={{ color: 'var(--success)', fontSize: '0.95rem', textAlign: 'center' }}>
+                    <div style={{ color: 'var(--success)', fontSize: '0.88rem', textAlign: 'center', fontWeight: 600 }}>
                       {faceMatchMessage}
                     </div>
                   )}
                   {cameraError && (
-                    <div style={{ color: 'var(--danger)', fontSize: '0.9rem', textAlign: 'center' }}>
+                    <div style={{ color: 'var(--danger)', fontSize: '0.85rem', textAlign: 'center' }}>
                       {cameraError}
                     </div>
                   )}

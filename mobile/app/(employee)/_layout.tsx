@@ -22,8 +22,8 @@ export default function EmployeeLayout() {
       }
     };
 
-    BackHandler.addEventListener('hardwareBackPress', onBackPress);
-    return () => BackHandler.removeEventListener('hardwareBackPress', onBackPress);
+    const backSub = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backSub.remove();
   }, [pathname, router]);
 
   return (

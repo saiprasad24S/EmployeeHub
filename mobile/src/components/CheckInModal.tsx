@@ -12,6 +12,7 @@ import { Text, Button, ActivityIndicator, IconButton } from 'react-native-paper'
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as Location from 'expo-location';
 import { useAuth } from '@clerk/clerk-expo';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { checkIn, checkOut } from '../api/attendanceApi';
 import { useAuthStore } from '../store/authStore';
 import { Assignment } from '../types/employee';
@@ -35,6 +36,7 @@ export default function CheckInModal({
   todayAssignment,
   onSuccess,
 }: CheckInModalProps) {
+  const insets = useSafeAreaInsets();
   const { getToken } = useAuth();
   const setSessionActive = useAuthStore((state) => state.setSessionActive);
 
@@ -144,7 +146,7 @@ export default function CheckInModal({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         {/* Top Header */}
-        <View style={styles.topBar}>
+        <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 16) }]}>
           <Text style={styles.modalTitle}>
             {mode === 'CHECK_IN' ? 'Duty Check-In' : 'Duty Check-Out'}
           </Text>
@@ -170,7 +172,7 @@ export default function CheckInModal({
           /* Preview captured photo */
           <View style={styles.previewContainer}>
             <Image source={{ uri: capturedPhotoUri }} style={styles.previewImage} />
-            <View style={styles.previewOverlay}>
+            <View style={[styles.previewOverlay, { paddingBottom: Math.max(insets.bottom + 20, 32) }]}>
               <Text style={styles.previewHint}>Selfie captured. Confirm to submit.</Text>
               <View style={styles.btnRow}>
                 <Button
@@ -180,7 +182,7 @@ export default function CheckInModal({
                   textColor="#FFFFFF"
                   icon="camera-retake-outline"
                   disabled={isSubmitting}
-                  labelStyle={{ fontWeight: '600' }}
+                  labelStyle={{ fontWeight: '600', fontSize: 15 }}
                 >
                   Retake
                 </Button>
@@ -193,7 +195,7 @@ export default function CheckInModal({
                   textColor="#FFFFFF"
                   icon={mode === 'CHECK_IN' ? 'check-circle-outline' : 'clock-check-outline'}
                   style={styles.submitBtn}
-                  labelStyle={{ fontWeight: '700' }}
+                  labelStyle={{ fontWeight: '700', fontSize: 15 }}
                 >
                   Confirm {mode === 'CHECK_IN' ? 'Check-In' : 'Clock Out'}
                 </Button>
@@ -240,7 +242,7 @@ export default function CheckInModal({
             )}
 
             {/* Capture Shutter Button */}
-            <View style={styles.shutterContainer}>
+            <View style={[styles.shutterContainer, { bottom: Math.max(insets.bottom + 20, 30) }]}>
               <TouchableOpacity
                 style={[styles.shutterButton, { opacity: currentLocation ? 1 : 0.5 }]}
                 onPress={handleCapture}
@@ -301,7 +303,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   ovalGuideContainer: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -411,14 +417,14 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderColor: 'rgba(255,255,255,0.7)',
     borderWidth: 1.5,
-    borderRadius: 12,
-    paddingVertical: 4,
+    borderRadius: 14,
+    paddingVertical: 6,
   },
   submitBtn: {
-    flex: 1.5,
+    flex: 1.6,
     marginLeft: 8,
-    borderRadius: 12,
-    paddingVertical: 4,
-    elevation: 3,
+    borderRadius: 14,
+    paddingVertical: 6,
+    elevation: 4,
   },
 });
