@@ -621,16 +621,26 @@ export function EmployeePortal() {
   })
   const routePoints = routeQuery.data?.route ?? []
 
-  const attendanceHistoryQuery = useQuery({
-    queryKey: ['my-attendance-history', profile?.id],
+  const attendanceMonthQuery = useQuery({
+    queryKey: ['my-attendance-month', profile?.id, calendarYear, calendarMonth],
     enabled: !!profile,
     queryFn: async () => {
       const token = await getToken()
       if (!token) throw new Error('No token')
-      const res = await authedFetch('/api/attendance/', token)
-      if (!res.ok) return []
-      const data = await res.json()
-      return (data.results ?? data ?? []) as Array<{ created_at: string; timestamp?: string; session_login_time?: string; attendance_type: string }>
+      const apiMonth = calendarMonth + 1 // JS 0-indexed → backend 1-indexed
+      const res = await authedFetch(
+        `/api/attendance/employee-month?employee_id=${profile!.id}&year=${calendarYear}&month=${apiMonth}`,
+        token
+      )
+      if (!res.ok) return null
+      return res.json() as Promise<{
+        days: Array<{ date: string; day_number: number; day_name: string; status: string; check_in: string | null; check_out: string | null; total_hours: string | null }>
+        present_count: number
+        unmarked_count: number
+        starting_day_of_week: number
+        total_days: number
+        month_name: string
+      }>
     },
     staleTime: 30_000,
     refetchOnWindowFocus: false,
@@ -807,31 +817,41 @@ export function EmployeePortal() {
     const year = calendarYear
     const month = calendarMonth
 
-    const firstDay = new Date(year, month, 1)
-    const lastDay = new Date(year, month + 1, 0)
-
-    const startingDayOfWeek = firstDay.getDay()
-    const totalDays = lastDay.getDate()
-
-    const records = attendanceHistoryQuery.data ?? []
-    const presentDates = new Set(
-      records.map((r) => {
-        const dtStr = r.session_login_time || r.timestamp || r.created_at
-        return new Date(dtStr).toDateString()
-      })
-    )
-
     const viewDate = new Date(year, month, 1)
     const monthName = viewDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
     const isCurrentMonth = year === now.getFullYear() && month === now.getMonth()
 
-    const days = []
-    for (let i = 0; i < startingDayOfWeek; i++) {
+    const apiData = attendanceMonthQuery.data
+    if (!apiData) {
+      // Fallback: empty calendar while loading
+      const firstDay = new Date(year, month, 1)
+      const lastDay = new Date(year, month + 1, 0)
+      const startingDayOfWeek = firstDay.getDay()
+      const totalDays = lastDay.getDate()
+      const days: Array<null | { dayNumber: number; dateStr: string; isToday: boolean; isPast: boolean; isPresent: boolean }> = []
+      for (let i = 0; i < startingDayOfWeek; i++) days.push(null)
+      for (let day = 1; day <= totalDays; day++) {
+        const d = new Date(year, month, day)
+        days.push({
+          dayNumber: day,
+          dateStr: d.toDateString(),
+          isToday: d.toDateString() === now.toDateString(),
+          isPast: d < new Date(now.getFullYear(), now.getMonth(), now.getDate()),
+          isPresent: false,
+        })
+      }
+      return { monthName, days, year, month, isCurrentMonth }
+    }
+
+    // Build calendar from API response
+    const days: Array<null | { dayNumber: number; dateStr: string; isToday: boolean; isPast: boolean; isPresent: boolean }> = []
+    for (let i = 0; i < apiData.starting_day_of_week; i++) {
       days.push(null)
     }
 
-    for (let day = 1; day <= totalDays; day++) {
-      const d = new Date(year, month, day)
+    for (const dayInfo of apiData.days) {
+      const [y, m, dayNum] = dayInfo.date.split('-').map(Number)
+      const d = new Date(y, m - 1, dayNum) // month is 0-indexed in JS Date
       const dateStr = d.toDateString()
       const isToday = dateStr === now.toDateString()
       const isPast = d < new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -839,10 +859,10 @@ export function EmployeePortal() {
       const isCheckedInToday = isCurrentMonth && isToday && Boolean(
         sessionActive || sessionSummary?.status === 'Present' || sessionSummary?.status === 'Checked Out'
       )
-      const isPresent = presentDates.has(dateStr) || (isToday && (isCheckedInToday || presentDates.has(dateStr)))
+      const isPresent = dayInfo.status === 'PRESENT' || (isToday && isCheckedInToday)
 
       days.push({
-        dayNumber: day,
+        dayNumber: dayInfo.day_number,
         dateStr,
         isToday,
         isPast,
@@ -851,14 +871,22 @@ export function EmployeePortal() {
     }
 
     return { monthName, days, year, month, isCurrentMonth }
-  }, [calendarYear, calendarMonth, attendanceHistoryQuery.data, sessionActive, sessionSummary])
+  }, [calendarYear, calendarMonth, attendanceMonthQuery.data, sessionActive, sessionSummary])
 
   const attendanceMonthStats = useMemo(() => {
+    const apiData = attendanceMonthQuery.data
+    if (apiData) {
+      // Use server-provided counts (more accurate)
+      const pastAndToday = calendarData.days.filter((d) => d && (d.isPast || d.isToday))
+      const present = pastAndToday.filter((d) => d?.isPresent).length
+      const absent = pastAndToday.length - present
+      return { present, absent, total: pastAndToday.length }
+    }
     const pastAndToday = calendarData.days.filter((d) => d && (d.isPast || d.isToday))
     const present = pastAndToday.filter((d) => d?.isPresent).length
     const absent = pastAndToday.filter((d) => !d?.isPresent).length
     return { present, absent, total: pastAndToday.length }
-  }, [calendarData])
+  }, [calendarData, attendanceMonthQuery.data])
 
   // Background tracker: fires coordinate posts every 45s when session is active
   useEffect(() => {
