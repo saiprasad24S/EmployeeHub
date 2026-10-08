@@ -33,20 +33,24 @@ echo "5. Running Django system checks..."
 python manage.py check
 
 echo ""
-echo "6. Collecting static files..."
+echo "6. Running database migrations..."
+python manage.py migrate
+
+echo ""
+echo "7. Collecting static files..."
 python manage.py collectstatic --noinput
 
 echo ""
-echo "7. Installing frontend dependencies..."
+echo "8. Installing frontend dependencies..."
 cd ../frontend
 npm ci
 
 echo ""
-echo "8. Building frontend..."
+echo "9. Building frontend..."
 npm run build
 
 echo ""
-echo "9. Checking frontend build output..."
+echo "10. Checking frontend build output..."
 if [ -f dist/index.html ]; then
     echo "Frontend build check: OK"
 else
@@ -55,11 +59,11 @@ else
 fi
 
 echo ""
-echo "10. Restarting EmployeeHub backend..."
+echo "11. Restarting EmployeeHub backend..."
 sudo systemctl restart employeehub
 
 echo ""
-echo "11. Checking backend service..."
+echo "12. Checking backend service..."
 if sudo systemctl is-active --quiet employeehub; then
     echo "Backend service check: OK"
 else
@@ -68,7 +72,7 @@ else
 fi
 
 echo ""
-echo "12. Checking backend health..."
+echo "13. Checking backend health..."
 
 HEALTH_OK=false
 

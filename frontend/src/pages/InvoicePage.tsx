@@ -51,6 +51,7 @@ export interface Invoice {
   grand_total: number
   amount_in_words: string
   payment_status: string
+  old_dues?: number
   remarks?: string
   services_data: any[]
   pdf_path?: string
@@ -83,6 +84,7 @@ const defaultInvoiceData: InvoicePreviewData = {
   perDayCharges: 0,
   advanceReceived: 0,
   paymentStatus: 'Pending',
+  oldDues: 0,
   remarks: '',
   gstRate: 0,
   gstAmount: 0,
@@ -198,15 +200,24 @@ export function InvoicePage() {
         body: JSON.stringify(payload),
       })
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        let msg = err.detail
-        if (!msg && typeof err === 'object' && Object.keys(err).length > 0) {
-          const fieldErrs = Object.entries(err)
-            .map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`)
-            .join('; ')
-          if (fieldErrs) msg = fieldErrs
+        let msg = ''
+        try {
+          const err = await res.json()
+          if (err.detail) {
+            msg = err.detail
+          } else if (typeof err === 'object' && Object.keys(err).length > 0) {
+            const fieldErrs = Object.entries(err)
+              .map(([k, v]) => `${k.replace('_', ' ')}: ${Array.isArray(v) ? v.join(', ') : v}`)
+              .join('; ')
+            if (fieldErrs) msg = fieldErrs
+          }
+        } catch {
+          try {
+            const text = await res.text()
+            if (text) msg = text.slice(0, 150)
+          } catch {}
         }
-        throw new Error(msg || 'Failed to save invoice.')
+        throw new Error(msg || `Server error (${res.status}: ${res.statusText || 'Failed to save'})`)
       }
       return res.json() as Promise<Invoice>
     },
@@ -316,6 +327,7 @@ export function InvoicePage() {
       balance_due: balanceDue,
       grand_total: grandTotal,
       payment_status: invoiceData.paymentStatus,
+      old_dues: invoiceData.oldDues || 0,
       remarks: invoiceData.remarks,
       services_data: invoiceData.services,
     }
@@ -457,6 +469,7 @@ export function InvoicePage() {
       discountAmount: inv.discount,
       advanceReceived: inv.advance_received,
       paymentStatus: inv.payment_status,
+      oldDues: inv.old_dues || 0,
       remarks: inv.remarks || '',
       services: inv.services_data || defaultInvoiceData.services,
     })

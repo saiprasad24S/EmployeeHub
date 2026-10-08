@@ -1547,7 +1547,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
       <AccordionSection id="invoice" title="Invoice Information" icon={<FileText style={iconSize} />} isOpen={!!openSections.invoice} onToggle={toggleSection} zIndex={80}>
         <InputField label="Invoice Number (Auto-Generated)" icon={<FileText style={iconSize} />} value={data.invoiceNumber} onChange={v => updateField('invoiceNumber', v)} readOnly={true} />
         <DatePickerField label="Invoice Date" value={data.invoiceDate} onChange={v => updateField('invoiceDate', v)} placeholder="DD/MM/YYYY" />
-        <MonthPickerField label="Month" value={data.billingPeriodText} onChange={v => updateField('billingPeriodText', v)} placeholder="Select Month (e.g. July 2026)" />
+        <MonthPickerField label="Invoice Month" value={data.billingPeriodText} onChange={v => updateField('billingPeriodText', v)} placeholder="Select Month (e.g. July 2026)" />
         <DatePickerField label="Start Date" value={data.startDateText} onChange={v => updateField('startDateText', v)} placeholder="DD/MM/YYYY" />
         <InputField
           label="Template Type" icon={<Layers style={iconSize} />} value={data.invoiceType}
@@ -1706,6 +1706,7 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
             { label: 'Partial', value: 'Partial' },
           ]}
         />
+        <InputField label="Old Dues (Rs.)" icon={<DollarSign style={iconSize} />} type="number" value={data.oldDues || 0} onChange={v => updateField('oldDues', Number(v))} placeholder="Enter old dues if any" />
       </AccordionSection>
 
       {/* 5. Service Details Table */}

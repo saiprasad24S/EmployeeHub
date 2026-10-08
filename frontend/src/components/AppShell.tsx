@@ -6,6 +6,7 @@ import { useSearch } from '../context/SearchContext'
 const navItems = [
   { label: 'Dashboard', to: '/' },
   { label: 'Employees', to: '/employees' },
+  { label: 'All Employees', to: '/all-employees' },
   { label: 'Attendance', to: '/attendance' },
   { label: 'Leaves', to: '/leaves' },
   { label: 'Live Tracking', to: '/tracking' },

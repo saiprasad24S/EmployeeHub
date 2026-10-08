@@ -44,7 +44,7 @@ class Invoice(models.Model):
     display_hash = models.CharField(max_length=16, blank=True)
     barcode_value = models.CharField(max_length=100, blank=True)
 
-    invoice_date = models.DateField(default=timezone.now)
+    invoice_date = models.DateField(default=timezone.localdate)
     billing_period_start = models.DateField(null=True, blank=True)
     billing_period_end = models.DateField(null=True, blank=True)
     billing_period_text = models.CharField(max_length=150, blank=True)
@@ -87,6 +87,7 @@ class Invoice(models.Model):
     grand_total = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     amount_in_words = models.CharField(max_length=300, blank=True)
     payment_status = models.CharField(max_length=50, default="Pending", blank=True)
+    old_dues = models.DecimalField(max_digits=12, decimal_places=2, default=0, blank=True)
     remarks = models.TextField(blank=True)
 
     # Service Table JSON Data

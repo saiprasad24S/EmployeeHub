@@ -97,7 +97,10 @@ export function EmployeesPage() {
   })
 
   const { searchQuery } = useSearch()
-  const rawEmployees = useMemo(() => Array.isArray(employeesQuery.data) ? employeesQuery.data : [], [employeesQuery.data])
+  const rawEmployees = useMemo(() => {
+    const list = Array.isArray(employeesQuery.data) ? employeesQuery.data : []
+    return list.filter((emp) => emp.is_active)
+  }, [employeesQuery.data])
 
   const employees = useMemo(() => {
     if (!searchQuery.trim()) return rawEmployees
@@ -173,21 +176,30 @@ export function EmployeesPage() {
   const [deletingEmployee, setDeletingEmployee] = useState<Employee | null>(null)
   const [deleteRemark, setDeleteRemark] = useState('')
 
-  // Delete Mutation
-  const deleteMutation = useMutation({
+  // Remove from active directory (marks as inactive / left organization)
+  const removeActiveMutation = useMutation({
     mutationFn: async (payload: { id: number; remark: string }) => {
       const token = await getToken()
       if (!token) throw new Error('No auth token')
-      const res = await authedFetch(`/api/employees/${payload.id}/?remark=${encodeURIComponent(payload.remark)}`, token, {
-        method: 'DELETE',
+      const formData = new FormData()
+      formData.append('is_active', 'false')
+      const res = await authedFetch(`/api/employees/${payload.id}/`, token, {
+        method: 'PUT',
+        body: formData,
       })
-      if (!res.ok) throw new Error('Failed to delete employee')
+      if (!res.ok) throw new Error('Failed to update employee status')
+      return res.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['employees'] })
+      queryClient.invalidateQueries({ queryKey: ['all-employees'] })
       queryClient.invalidateQueries({ queryKey: ['employees-attendance'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-metrics'] })
       setDeletingEmployee(null)
       setDeleteRemark('')
+    },
+    onError: (err: any) => {
+      setErrorMsg(err.message || 'Failed to remove employee')
     },
   })
 
@@ -224,7 +236,9 @@ export function EmployeesPage() {
     setDefaultAddress(employee.default_address || '')
     setLatitude(employee.default_latitude ? String(employee.default_latitude) : '')
     setLongitude(employee.default_longitude ? String(employee.default_longitude) : '')
-    const initialRadius = employee.default_radius ? (employee.default_radius > 10 ? String(employee.default_radius / 1000) : String(employee.default_radius)) : '1'
+    const initialRadius = employee.default_radius
+      ? (Number(employee.default_radius) >= 50 ? String(Number(employee.default_radius) / 1000) : String(employee.default_radius))
+      : '1'
     setRadius(initialRadius)
     setShiftName(employee.shift_name || 'General Shift')
     setShiftStartTime(employee.shift_start_time ? String(employee.shift_start_time).slice(0, 5) : '09:00')
@@ -265,16 +279,25 @@ export function EmployeesPage() {
         }
       } else if (defaultAddress.trim()) {
         // Forward geocoding: Address -> Coordinates
-        const res = await fetch(
+        let res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(defaultAddress)}&limit=1`
         )
-        if (!res.ok) throw new Error('Geocoding service unavailable.')
-        const data = await res.json()
+        let data = res.ok ? await res.json() : []
+        if (!data || data.length === 0) {
+          // Fallback: simplify address (remove ward numbers, pin code, or take key parts)
+          const simplified = defaultAddress.replace(/Ward\s*\d+|Zone|Mandal|Greater\s*[\w\s]+Corporation|\b\d{6}\b/gi, '').trim()
+          if (simplified && simplified !== defaultAddress.trim()) {
+            const fbRes = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simplified)}&limit=1`
+            )
+            if (fbRes.ok) data = await fbRes.json()
+          }
+        }
         if (data && data.length > 0) {
           setLatitude(parseFloat(data[0].lat).toFixed(7))
           setLongitude(parseFloat(data[0].lon).toFixed(7))
         } else {
-          setErrorMsg('Could not find coordinates for this address. Please enter them manually.')
+          setErrorMsg('Could not auto-detect coordinates for this address. You can enter Latitude & Longitude manually or click Use My Current Location.')
         }
       }
     } catch (err: any) {
@@ -334,25 +357,32 @@ export function EmployeesPage() {
     let finalLat = latitude
     let finalLon = longitude
 
-    // If address is provided and was changed or coordinates are blank, forward-geocode
-    if (finalAddress.trim() && (!finalLat || !finalLon || (editingEmployee && finalAddress.trim() !== (editingEmployee.default_address || '').trim()))) {
+    // If coordinates are blank but address is provided, try client-side geocode
+    if (finalAddress.trim() && (!finalLat || !finalLon)) {
       setIsGeocoding(true)
       try {
         const controller = new AbortController()
         const timeoutId = setTimeout(() => controller.abort(), 2500)
-        const res = await fetch(
+        let res = await fetch(
           `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(finalAddress)}&limit=1`,
           { signal: controller.signal }
         )
         clearTimeout(timeoutId)
-        if (res.ok) {
-          const data = await res.json()
-          if (data && data.length > 0) {
-            finalLat = parseFloat(data[0].lat).toFixed(7)
-            finalLon = parseFloat(data[0].lon).toFixed(7)
-            setLatitude(finalLat)
-            setLongitude(finalLon)
+        let data = res.ok ? await res.json() : []
+        if (!data || data.length === 0) {
+          const simplified = finalAddress.replace(/Ward\s*\d+|Zone|Mandal|Greater\s*[\w\s]+Corporation|\b\d{6}\b/gi, '').trim()
+          if (simplified && simplified !== finalAddress.trim()) {
+            const fbRes = await fetch(
+              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simplified)}&limit=1`
+            )
+            if (fbRes.ok) data = await fbRes.json()
           }
+        }
+        if (data && data.length > 0) {
+          finalLat = parseFloat(data[0].lat).toFixed(7)
+          finalLon = parseFloat(data[0].lon).toFixed(7)
+          setLatitude(finalLat)
+          setLongitude(finalLon)
         }
       } catch {
         // Fall back to backend auto-geocoding
@@ -391,9 +421,9 @@ export function EmployeesPage() {
     formData.append('department', department)
     formData.append('designation', designation)
     formData.append('default_address', finalAddress)
-    if (finalLat) formData.append('default_latitude', finalLat)
-    if (finalLon) formData.append('default_longitude', finalLon)
-    formData.append('default_radius', radius)
+    formData.append('default_latitude', finalLat || '')
+    formData.append('default_longitude', finalLon || '')
+    formData.append('default_radius', radius || '1')
     formData.append('shift_name', shiftName)
     formData.append('shift_start_time', shiftStartTime)
     formData.append('shift_end_time', shiftEndTime)
@@ -410,8 +440,8 @@ export function EmployeesPage() {
   }
 
   const handleDelete = (id: number) => {
-    if (confirm('Are you sure you want to delete this employee profile?')) {
-      deleteMutation.mutate({ id, remark: 'Manual deletion' })
+    if (confirm('Are you sure you want to remove this employee from active directory?')) {
+      removeActiveMutation.mutate({ id, remark: 'Manual deletion' })
     }
   }
 
@@ -1000,12 +1030,12 @@ export function EmployeesPage() {
         </div>
       )}
 
-      {/* Delete Employee Remark Modal */}
+      {/* Remove Employee from Active Directory Modal */}
       {deletingEmployee && (
         <div className="camera-modal-backdrop">
           <div className="camera-modal" style={{ maxWidth: '440px', width: '100%', height: 'auto' }}>
             <div className="camera-header">
-              <h3 style={{ fontSize: '1.15rem', color: '#EF4444' }}>🗑️ Delete Employee Profile</h3>
+              <h3 style={{ fontSize: '1.15rem', color: '#EF4444' }}>🚪 Remove from Active Employees</h3>
               <button
                 onClick={() => {
                   setDeletingEmployee(null)
@@ -1025,11 +1055,14 @@ export function EmployeesPage() {
 
             <div style={{ padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
               <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: 1.5 }}>
-                Are you sure you want to remove <strong>{deletingEmployee.name}</strong> (<code>{deletingEmployee.employee_id}</code>) from the employee directory?
+                Are you sure you want to remove <strong>{deletingEmployee.name}</strong> (<code>{deletingEmployee.employee_id}</code>) from active employees?
               </p>
+              <div style={{ background: 'rgba(239, 68, 68, 0.06)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', padding: '0.75rem', fontSize: '0.82rem', color: 'var(--text)', lineHeight: 1.4 }}>
+                ℹ️ The employee will be marked as inactive and removed from this active list, but their profile will remain safely in <strong>All Employees</strong> for past employment verification.
+              </div>
 
               <div className="stack" style={{ gap: '0.4rem' }}>
-                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Deletion Remark / Reason (Required)</label>
+                <label style={{ fontSize: '0.85rem', fontWeight: 600 }}>Reason / Remark (e.g. Resigned, Contract ended, Left)</label>
                 <textarea
                   value={deleteRemark}
                   onChange={(e) => setDeleteRemark(e.target.value)}
@@ -1054,7 +1087,7 @@ export function EmployeesPage() {
                     setDeletingEmployee(null)
                     setDeleteRemark('')
                   }}
-                  disabled={deleteMutation.isPending}
+                  disabled={removeActiveMutation.isPending}
                 >
                   Cancel
                 </button>
@@ -1063,15 +1096,11 @@ export function EmployeesPage() {
                   className="btn-primary"
                   style={{ background: '#EF4444' }}
                   onClick={() => {
-                    if (!deleteRemark.trim()) {
-                      alert('Please type a deletion remark (e.g. Resigned, Contract ended, etc.)')
-                      return
-                    }
-                    deleteMutation.mutate({ id: deletingEmployee.id, remark: deleteRemark })
+                    removeActiveMutation.mutate({ id: deletingEmployee.id, remark: deleteRemark })
                   }}
-                  disabled={deleteMutation.isPending}
+                  disabled={removeActiveMutation.isPending}
                 >
-                  {deleteMutation.isPending ? 'Deleting...' : 'Confirm Deletion'}
+                  {removeActiveMutation.isPending ? 'Removing...' : 'Remove from Active'}
                 </button>
               </div>
             </div>

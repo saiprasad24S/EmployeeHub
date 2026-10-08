@@ -1,5 +1,5 @@
 from django.db import models
-from django.db.models.signals import pre_save
+from django.db.models.signals import pre_save, pre_delete
 from django.dispatch import receiver
 
 from apps.common.cloudinary_service import delete_image, delete_image_from_url
@@ -80,4 +80,33 @@ def delete_previous_profile_image(sender, instance, **kwargs):
         delete_image(previous.profile_photo_public_id)
     elif previous.profile_photo_public_id and not instance.profile_photo:
         delete_image(previous.profile_photo_public_id)
+
+
+@receiver(pre_delete, sender=Employee)
+def cleanup_employee_dependencies(sender, instance, **kwargs):
+    """
+    Clean up any orphaned records in tables not managed by active models
+    (such as legacy communication tables) to prevent MySQL 1451 foreign key constraint errors.
+    Also clean up Cloudinary profile image.
+    """
+    from django.db import connection
+    if instance.pk:
+        with connection.cursor() as cursor:
+            for tbl, col in [
+                ("communication_messagereaction", "employee_id"),
+                ("communication_message", "sender_id"),
+                ("communication_conversationmember", "employee_id"),
+                ("communication_employeepresence", "employee_id"),
+                ("communication_conversation", "created_by_id"),
+            ]:
+                try:
+                    cursor.execute(f"DELETE FROM `{tbl}` WHERE `{col}` = %s", [instance.pk])
+                except Exception:
+                    pass
+
+    if instance.profile_photo_public_id:
+        try:
+            delete_image(instance.profile_photo_public_id)
+        except Exception:
+            pass
 

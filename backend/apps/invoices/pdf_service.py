@@ -203,10 +203,10 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.setFillColor(colors.HexColor("#1A1A1A"))
             c.drawString(col3_val_x, bar_y + 28, inv_date_str)
 
-            # Row 3: Month
+            # Row 3: Invoice Month
             c.setFont("Times-Bold", 8)
             c.setFillColor(colors.HexColor("#1A1A1A"))
-            c.drawString(col3_label_x, bar_y + 17, "Month")
+            c.drawString(col3_label_x, bar_y + 17, "Invoice Month")
             c.drawString(col3_colon_x, bar_y + 17, ":")
             c.setFont("Times-Roman", 8)
             c.setFillColor(colors.HexColor("#1A1A1A"))
@@ -397,7 +397,7 @@ def generate_invoice_pdf(invoice) -> bytes:
                     card2_y -= 10.5
 
             if srv_type:
-                draw_card_row(x2, card2_y, "Service:", srv_type, val_offset=58)
+                draw_card_row(x2, card2_y, "Service Type:", srv_type, val_offset=58)
                 card2_y -= 10.5
             if consult:
                 draw_card_row(x2, card2_y, "Consultant:", consult, val_offset=58)
@@ -406,7 +406,7 @@ def generate_invoice_pdf(invoice) -> bytes:
                 draw_card_row(x2, card2_y, "Started On:", srv_start, val_offset=58)
                 card2_y -= 10.5
             if rend_days:
-                draw_card_row(x2, card2_y, "Rendered:", rend_days, val_offset=58)
+                draw_card_row(x2, card2_y, "Rendered Days:", rend_days, val_offset=68)
                 card2_y -= 10.5
 
             # Card 3: OTHER INFORMATION
@@ -432,6 +432,11 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.setFont("Times-Roman", 7.5)
             c.setFillColor(colors.HexColor("#0B2C8C"))
             c.drawString(x3 + 64, card3_y, str(getattr(invoice, 'payment_status', 'Pending')))
+
+            old_dues_val = float(getattr(invoice, "old_dues", 0) or 0)
+            if old_dues_val > 0:
+                card3_y -= 10.5
+                draw_card_row(x3, card3_y, "Old Dues:", f"Rs. {old_dues_val:,.2f}", val_offset=64)
 
             # Space before table header (18 pt clear space below cards)
             table_title_y = cards_y - 18

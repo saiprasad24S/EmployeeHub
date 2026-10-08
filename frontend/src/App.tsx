@@ -15,6 +15,7 @@ const EmployeePortal = lazy(() => import('./pages/EmployeePortal').then((m) => (
 const LoginPage = lazy(() => import('./pages/LoginPage').then((m) => ({ default: m.LoginPage })))
 const SignUpPage = lazy(() => import('./pages/SignUpPage').then((m) => ({ default: m.SignUpPage })))
 const EmployeesPage = lazy(() => import('./pages/EmployeesPage').then((m) => ({ default: m.EmployeesPage })))
+const AllEmployeesPage = lazy(() => import('./pages/AllEmployeesPage').then((m) => ({ default: m.AllEmployeesPage })))
 const AttendancePage = lazy(() => import('./pages/AttendancePage').then((m) => ({ default: m.AttendancePage })))
 const AssignmentsPage = lazy(() => import('./pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage })))
 const LeavesPage = lazy(() => import('./pages/LeavesPage').then((m) => ({ default: m.LeavesPage })))
@@ -133,6 +134,7 @@ function MainAppSelector() {
         <Routes>
           <Route index element={<DashboardPage />} />
           <Route path="employees" element={<EmployeesPage />} />
+          <Route path="all-employees" element={<AllEmployeesPage />} />
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="assignments" element={<AssignmentsPage />} />
           <Route path="leaves" element={<LeavesPage />} />
@@ -155,6 +157,8 @@ function TestViewHarness() {
       return <AppShell><DashboardPage /></AppShell>
     case 'employees':
       return <AppShell><EmployeesPage /></AppShell>
+    case 'all-employees':
+      return <AppShell><AllEmployeesPage /></AppShell>
     case 'attendance':
       return <AppShell><AttendancePage /></AppShell>
     case 'assignments':

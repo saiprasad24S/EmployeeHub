@@ -157,8 +157,11 @@ class EmployeeCreateSerializer(serializers.ModelSerializer):
         if value is None:
             return 100
         f_val = float(value)
-        if f_val <= 10 and not f_val.is_integer():
-            return int(round(f_val * 1000))
+        if f_val <= 0:
+            return 100
+        # If <= 25, it is expressed in kilometers from the UI (e.g. 0.1km -> 100m, 1km -> 1000m, 2.5km -> 2500m)
+        if f_val <= 25:
+            return max(50, int(round(f_val * 1000)))
         return int(round(f_val))
 
 

@@ -42,6 +42,7 @@ export interface InvoicePreviewData {
   perDayCharges: number;
   advanceReceived: number;
   paymentStatus: string;
+  oldDues?: number;
   services: ServiceItem[];
   remarks: string;
   gstRate?: number;
@@ -270,7 +271,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
               <span style={{ fontWeight: 400, color: '#1A1A1A', fontSize: '11px' }}>{formatDisplayDate(data.invoiceDate)}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
-              <span style={{ width: '84px', minWidth: '84px', color: '#1A1A1A', fontWeight: 600, fontSize: '11px' }}>Month</span>
+              <span style={{ width: '95px', minWidth: '95px', color: '#1A1A1A', fontWeight: 600, fontSize: '11px' }}>Invoice Month</span>
               <span style={{ width: '10px', minWidth: '10px', color: '#333', fontWeight: 600 }}>:</span>
               <span style={{ fontWeight: 400, color: '#1A1A1A', fontSize: '11px' }}>{data.billingPeriodText || '—'}</span>
             </div>
@@ -288,7 +289,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '20px', fontWeight: '500' }}>
           <span>Invoice No: {data.invoiceNumber}</span>
           <span>Client: {data.clientName}</span>
-          <span>Month: {data.billingPeriodText}</span>
+          <span>Invoice Month: {data.billingPeriodText}</span>
           <span>Page {pageNumber} of {totalPages}</span>
         </div>
       )}
@@ -346,7 +347,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
               {data.serviceType && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Service Type:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.serviceType}</span></div>}
               {data.consultant && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Consultant:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.consultant}</span></div>}
               {data.serviceStarted && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Started On:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{formatDisplayDate(data.serviceStarted)}</span></div>}
-              {data.renderedDays && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Rendered:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.renderedDays}</span></div>}
+              {data.renderedDays && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Rendered Days:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.renderedDays}</span></div>}
             </div>
           </div>
 
@@ -359,6 +360,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
               <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '95px', minWidth: '95px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Per Day Chg:</span> <span style={{ flex: 1, fontWeight: 400, color: '#333' }}>₹ {data.perDayCharges}</span></div>
               <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '95px', minWidth: '95px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Adv. Amount:</span> <span style={{ flex: 1, fontWeight: 400, color: '#333' }}>₹ {data.advanceReceived}</span></div>
               <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '95px', minWidth: '95px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Payment Status:</span> <span style={{ flex: 1, color: '#0B2C8C', fontWeight: 400 }}>{data.paymentStatus}</span></div>
+              {data.oldDues ? <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '95px', minWidth: '95px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Old Dues:</span> <span style={{ flex: 1, fontWeight: 400, color: '#333' }}>₹ {data.oldDues}</span></div> : null}
             </div>
           </div>
         </div>
