@@ -184,6 +184,7 @@ type EmployeeData = {
   default_latitude?: number | string | null
   default_longitude?: number | string | null
   active_session?: boolean
+  is_active?: boolean
 }
 
 type ProfileResponse = {
@@ -391,9 +392,17 @@ export function EmployeePortal() {
       const res = await authedFetch('/api/auth/login', token, { method: 'POST' })
       if (!res.ok) {
         const errData = await res.json().catch(() => ({}))
+        safeStorage.removeItem('skandan_user_role')
+        safeStorage.removeItem('skandan_active_session')
         throw new Error(errData.detail || 'Failed to fetch employee profile')
       }
-      return res.json() as Promise<ProfileResponse>
+      const data = await res.json() as ProfileResponse
+      if (data.employee && data.employee.is_active === false) {
+        safeStorage.removeItem('skandan_user_role')
+        safeStorage.removeItem('skandan_active_session')
+        throw new Error('Account Inactive: Your employee profile has been deactivated. You no longer have access to the employee portal.')
+      }
+      return data
     },
     placeholderData: (previousData) => previousData,
     staleTime: 1000 * 60 * 2,

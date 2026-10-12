@@ -20,9 +20,11 @@ from apps.attendance.services import (
     GeofenceValidationError,
     end_session,
     generate_attendance_export,
+    geocode_address,
     get_active_assignment,
     log_location,
     record_attendance,
+    reverse_geocode_coordinates,
     start_session,
     upload_selfie,
     validate_geofence,
@@ -443,5 +445,43 @@ class EmployeeMonthAttendanceView(APIView):
             "unmarked_count": unmarked_count,
             "days": days_data,
         })
+
+
+class GeocodeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        address = request.query_params.get("address", "").strip()
+        lat_str = request.query_params.get("lat")
+        lon_str = request.query_params.get("lon")
+
+        if lat_str and lon_str and not address:
+            try:
+                lat = float(lat_str)
+                lon = float(lon_str)
+                display_name = reverse_geocode_coordinates(lat, lon)
+                return Response({"display_name": display_name or "", "latitude": lat, "longitude": lon})
+            except Exception as e:
+                return Response({"detail": f"Failed to reverse-geocode: {e}"}, status=status.HTTP_400_BAD_REQUEST)
+
+        if address:
+            coords = geocode_address(address)
+            if not coords:
+                import re
+                simplified = re.sub(r"Ward\s*\d+|Zone|Mandal|Greater\s*[\w\s]+Corporation|\b\d{6}\b", "", address, flags=re.I).strip()
+                if simplified and simplified != address:
+                    coords = geocode_address(simplified)
+            if coords:
+                lat, lon = coords
+                display_name = reverse_geocode_coordinates(lat, lon) or address
+                return Response({
+                    "latitude": lat,
+                    "longitude": lon,
+                    "display_name": display_name,
+                })
+            return Response({"detail": "Could not locate coordinates for this address."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response({"detail": "Provide an address or lat & lon parameters."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 

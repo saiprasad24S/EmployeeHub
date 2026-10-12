@@ -56,17 +56,23 @@ def geocode_address(address: str) -> tuple[float, float] | None:
         return None
 
 
-def ensure_default_coordinates(employee: Employee) -> bool:
-    if employee.default_latitude is not None and employee.default_longitude is not None:
+def ensure_default_coordinates(employee: Employee, force: bool = False) -> bool:
+    if not force and employee.default_latitude is not None and employee.default_longitude is not None:
         return True
     if not employee.default_address:
         return False
     coords = geocode_address(employee.default_address)
     if not coords:
+        import re
+        simplified = re.sub(r"Ward\s*\d+|Zone|Mandal|Greater\s*[\w\s]+Corporation|\b\d{6}\b", "", employee.default_address, flags=re.I).strip()
+        if simplified and simplified != employee.default_address:
+            coords = geocode_address(simplified)
+    if not coords:
         return False
     employee.default_latitude, employee.default_longitude = coords
     employee.save(update_fields=["default_latitude", "default_longitude"])
     return True
+
 
 
 def reverse_geocode_coordinates(latitude: float, longitude: float) -> str | None:

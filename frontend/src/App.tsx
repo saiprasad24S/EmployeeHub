@@ -60,6 +60,7 @@ function MainAppSelector() {
         const errData = await res.json().catch(() => ({}))
         setAuthError(errData.detail || 'Access restricted. Your account is not registered in the system.')
         safeStorage.removeItem('skandan_user_role')
+        setRole(null)
         setLoading(false)
         return
       }
@@ -69,7 +70,11 @@ function MainAppSelector() {
       setRole(normalizedRole)
       setLoading(false)
     } catch (err: any) {
-      if (!hasCached) {
+      if (err.message && (err.message.toLowerCase().includes('inactive') || err.message.toLowerCase().includes('suspended') || err.message.toLowerCase().includes('deactivated'))) {
+        setAuthError(err.message)
+        safeStorage.removeItem('skandan_user_role')
+        setRole(null)
+      } else if (!hasCached) {
         setAuthError(
           err.message === 'Failed to fetch'
             ? 'Unable to connect to the server (Failed to fetch). Please ensure the backend server is running and accessible.'

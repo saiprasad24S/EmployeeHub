@@ -214,7 +214,7 @@ export function EmployeesPage() {
     setDefaultAddress('')
     setLatitude('')
     setLongitude('')
-    setRadius('100')
+    setRadius('1')
     setShiftName('General Shift')
     setShiftStartTime('09:00')
     setShiftEndTime('18:00')
@@ -265,39 +265,76 @@ export function EmployeesPage() {
     setIsGeocoding(true)
     setErrorMsg(null)
     try {
+      const token = await getToken()
       // Reverse geocoding: Coordinates -> Address
       if (latitude && longitude && !defaultAddress.trim()) {
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
-        )
-        if (!res.ok) throw new Error('Reverse geocoding service unavailable.')
-        const data = await res.json()
-        if (data && data.display_name) {
-          setDefaultAddress(data.display_name)
+        let foundAddress = ''
+        if (token) {
+          try {
+            const beRes = await authedFetch(`/api/attendance/geocode?lat=${latitude}&lon=${longitude}`, token)
+            if (beRes.ok) {
+              const beData = await beRes.json()
+              if (beData.display_name) foundAddress = beData.display_name
+            }
+          } catch {}
+        }
+        if (!foundAddress) {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(latitude)}&lon=${encodeURIComponent(longitude)}`
+          )
+          if (res.ok) {
+            const data = await res.json()
+            if (data?.display_name) foundAddress = data.display_name
+          }
+        }
+        if (foundAddress) {
+          setDefaultAddress(foundAddress)
         } else {
           setErrorMsg('Could not find address for these coordinates.')
         }
       } else if (defaultAddress.trim()) {
         // Forward geocoding: Address -> Coordinates
-        let res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(defaultAddress)}&limit=1`
-        )
-        let data = res.ok ? await res.json() : []
-        if (!data || data.length === 0) {
-          // Fallback: simplify address (remove ward numbers, pin code, or take key parts)
-          const simplified = defaultAddress.replace(/Ward\s*\d+|Zone|Mandal|Greater\s*[\w\s]+Corporation|\b\d{6}\b/gi, '').trim()
-          if (simplified && simplified !== defaultAddress.trim()) {
-            const fbRes = await fetch(
-              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simplified)}&limit=1`
-            )
-            if (fbRes.ok) data = await fbRes.json()
+        let foundLat = ''
+        let foundLon = ''
+        if (token) {
+          try {
+            const beRes = await authedFetch(`/api/attendance/geocode?address=${encodeURIComponent(defaultAddress.trim())}`, token)
+            if (beRes.ok) {
+              const beData = await beRes.json()
+              if (beData.latitude && beData.longitude) {
+                foundLat = parseFloat(beData.latitude).toFixed(7)
+                foundLon = parseFloat(beData.longitude).toFixed(7)
+                if (beData.display_name) {
+                  setDefaultAddress(beData.display_name)
+                }
+              }
+            }
+          } catch {}
+        }
+        if (!foundLat || !foundLon) {
+          let res = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(defaultAddress.trim())}&limit=1`
+          )
+          let data = res.ok ? await res.json() : []
+          if (!data || data.length === 0) {
+            const simplified = defaultAddress.replace(/Ward\s*\d+|Zone|Mandal|Greater\s*[\w\s]+Corporation|\b\d{6}\b/gi, '').trim()
+            if (simplified && simplified !== defaultAddress.trim()) {
+              const fbRes = await fetch(
+                `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simplified)}&limit=1`
+              )
+              if (fbRes.ok) data = await fbRes.json()
+            }
+          }
+          if (data && data.length > 0) {
+            foundLat = parseFloat(data[0].lat).toFixed(7)
+            foundLon = parseFloat(data[0].lon).toFixed(7)
           }
         }
-        if (data && data.length > 0) {
-          setLatitude(parseFloat(data[0].lat).toFixed(7))
-          setLongitude(parseFloat(data[0].lon).toFixed(7))
+        if (foundLat && foundLon) {
+          setLatitude(foundLat)
+          setLongitude(foundLon)
         } else {
-          setErrorMsg('Could not auto-detect coordinates for this address. You can enter Latitude & Longitude manually or click Use My Current Location.')
+          setErrorMsg('Could not auto-detect coordinates for this address. Coordinates will be resolved by the server on save, or you can enter Latitude & Longitude manually.')
         }
       }
     } catch (err: any) {
@@ -321,14 +358,30 @@ export function EmployeesPage() {
         setLatitude(lat)
         setLongitude(lon)
         try {
-          const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
-          )
-          if (res.ok) {
-            const data = await res.json()
-            if (data && data.display_name) {
-              setDefaultAddress(data.display_name)
+          const token = await getToken()
+          let foundAddress = ''
+          if (token) {
+            try {
+              const beRes = await authedFetch(`/api/attendance/geocode?lat=${lat}&lon=${lon}`, token)
+              if (beRes.ok) {
+                const beData = await beRes.json()
+                if (beData.display_name) foundAddress = beData.display_name
+              }
+            } catch {}
+          }
+          if (!foundAddress) {
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+            )
+            if (res.ok) {
+              const data = await res.json()
+              if (data && data.display_name) {
+                foundAddress = data.display_name
+              }
             }
+          }
+          if (foundAddress) {
+            setDefaultAddress(foundAddress)
           }
         } catch {
           // Ignore reverse geocode error
@@ -353,57 +406,58 @@ export function EmployeesPage() {
       return
     }
 
-    let finalAddress = defaultAddress
-    let finalLat = latitude
-    let finalLon = longitude
+    let finalAddress = defaultAddress.trim()
+    let finalLat = latitude ? String(latitude).trim() : ''
+    let finalLon = longitude ? String(longitude).trim() : ''
 
-    // If coordinates are blank but address is provided, try client-side geocode
-    if (finalAddress.trim() && (!finalLat || !finalLon)) {
+    // Detect if address was modified in edit mode
+    const addressChanged = editingEmployee && finalAddress !== (editingEmployee.default_address || '').trim()
+
+    // If the address was changed, but coordinates still match the old coordinates:
+    // User modified the address without manually entering new GPS coordinates -> clear coordinates so they re-geocode
+    if (addressChanged && editingEmployee) {
+      const oldLat = editingEmployee.default_latitude ? String(editingEmployee.default_latitude).trim() : ''
+      const oldLon = editingEmployee.default_longitude ? String(editingEmployee.default_longitude).trim() : ''
+      if (finalLat === oldLat && finalLon === oldLon) {
+        finalLat = ''
+        finalLon = ''
+      }
+    }
+
+    // If coordinates are blank but address is provided, resolve via backend geocode
+    if (finalAddress && (!finalLat || !finalLon)) {
       setIsGeocoding(true)
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 2500)
-        let res = await fetch(
-          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(finalAddress)}&limit=1`,
-          { signal: controller.signal }
-        )
-        clearTimeout(timeoutId)
-        let data = res.ok ? await res.json() : []
-        if (!data || data.length === 0) {
-          const simplified = finalAddress.replace(/Ward\s*\d+|Zone|Mandal|Greater\s*[\w\s]+Corporation|\b\d{6}\b/gi, '').trim()
-          if (simplified && simplified !== finalAddress.trim()) {
-            const fbRes = await fetch(
-              `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(simplified)}&limit=1`
-            )
-            if (fbRes.ok) data = await fbRes.json()
+        const token = await getToken()
+        if (token) {
+          const beRes = await authedFetch(`/api/attendance/geocode?address=${encodeURIComponent(finalAddress)}`, token)
+          if (beRes.ok) {
+            const beData = await beRes.json()
+            if (beData.latitude && beData.longitude) {
+              finalLat = parseFloat(beData.latitude).toFixed(7)
+              finalLon = parseFloat(beData.longitude).toFixed(7)
+              setLatitude(finalLat)
+              setLongitude(finalLon)
+            }
           }
         }
-        if (data && data.length > 0) {
-          finalLat = parseFloat(data[0].lat).toFixed(7)
-          finalLon = parseFloat(data[0].lon).toFixed(7)
-          setLatitude(finalLat)
-          setLongitude(finalLon)
-        }
       } catch {
-        // Fall back to backend auto-geocoding
+        // Fall back to server-side auto-geocoding during model save
       } finally {
         setIsGeocoding(false)
       }
-    } else if (finalLat && finalLon && !finalAddress.trim()) {
+    } else if (finalLat && finalLon && !finalAddress) {
       setIsGeocoding(true)
       try {
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 2500)
-        const res = await fetch(
-          `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(finalLat)}&lon=${encodeURIComponent(finalLon)}`,
-          { signal: controller.signal }
-        )
-        clearTimeout(timeoutId)
-        if (res.ok) {
-          const data = await res.json()
-          if (data && data.display_name) {
-            finalAddress = data.display_name
-            setDefaultAddress(finalAddress)
+        const token = await getToken()
+        if (token) {
+          const beRes = await authedFetch(`/api/attendance/geocode?lat=${finalLat}&lon=${finalLon}`, token)
+          if (beRes.ok) {
+            const beData = await beRes.json()
+            if (beData.display_name) {
+              finalAddress = beData.display_name
+              setDefaultAddress(finalAddress)
+            }
           }
         }
       } catch {

@@ -203,7 +203,7 @@ class ClerkJWTAuthentication(BaseAuthentication):
         employee = Employee.objects.filter(email__iexact=email).first()
         if employee:
             if not employee.is_active:
-                raise AuthenticationFailed("Account Suspended: Your employee profile is inactive.")
+                raise AuthenticationFailed("Account Inactive: Your employee profile has been deactivated. You no longer have access to the employee portal.")
             return AuthenticatedPrincipal(
                 email=email,
                 role="EMPLOYEE",

@@ -40,6 +40,11 @@ class AuthLoginView(APIView):
             employee = Employee.objects.filter(pk=principal.employee_id).first()
             if not employee:
                 return Response({"detail": "Employee profile not found."}, status=status.HTTP_404_NOT_FOUND)
+            if not employee.is_active:
+                return Response(
+                    {"detail": "Account Inactive: Your employee profile has been deactivated. You no longer have access to the employee portal."},
+                    status=status.HTTP_403_FORBIDDEN
+                )
             
             from django.utils import timezone
             today = timezone.localdate()
@@ -252,12 +257,40 @@ class EmployeeViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", True)
         instance = self.get_object()
+
+        old_address = (instance.default_address or "").strip()
+        new_address = (request.data.get("default_address") or "").strip()
+        address_changed = bool(new_address and new_address != old_address)
+
+        req_lat = request.data.get("default_latitude")
+        req_lon = request.data.get("default_longitude")
+        old_lat = str(instance.default_latitude or "")
+        old_lon = str(instance.default_longitude or "")
+        coords_manually_changed = bool(
+            (req_lat not in (None, "") and str(req_lat) != old_lat) or
+            (req_lon not in (None, "") and str(req_lon) != old_lon)
+        )
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
-        if employee.default_address and (employee.default_latitude is None or employee.default_longitude is None):
+
+        # If employee was marked inactive, end any active sessions immediately
+        if not employee.is_active:
+            try:
+                from apps.attendance.services import end_session
+                end_session(employee)
+            except Exception:
+                pass
+            Session.objects.filter(employee=employee, is_active=True).update(is_active=False)
+
+        # Automatically re-geocode if address changed and user didn't manually type new coordinates
+        if address_changed and not coords_manually_changed:
             from apps.attendance.services import ensure_default_coordinates
-            ensure_default_coordinates(employee)
+            ensure_default_coordinates(employee, force=True)
+        elif employee.default_address and (employee.default_latitude is None or employee.default_longitude is None):
+            from apps.attendance.services import ensure_default_coordinates
+            ensure_default_coordinates(employee, force=False)
         elif employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
             from apps.attendance.services import ensure_default_address
             ensure_default_address(employee)

@@ -261,12 +261,12 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
           </div>
           <div style={{ flex: 1.25, paddingLeft: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
-              <span style={{ width: '84px', minWidth: '84px', color: '#1A1A1A', fontWeight: 600, fontSize: '11px' }}>Invoice No.</span>
+              <span style={{ width: '95px', minWidth: '95px', color: '#1A1A1A', fontWeight: 600, fontSize: '11px' }}>Invoice No.</span>
               <span style={{ width: '10px', minWidth: '10px', color: '#333', fontWeight: 600 }}>:</span>
               <span style={{ fontWeight: 400, color: '#0B2C8C', fontSize: '11px' }}>{data.invoiceNumber}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
-              <span style={{ width: '84px', minWidth: '84px', color: '#1A1A1A', fontWeight: 600, fontSize: '11px' }}>Invoice Date</span>
+              <span style={{ width: '95px', minWidth: '95px', color: '#1A1A1A', fontWeight: 600, fontSize: '11px' }}>Invoice Date</span>
               <span style={{ width: '10px', minWidth: '10px', color: '#333', fontWeight: 600 }}>:</span>
               <span style={{ fontWeight: 400, color: '#1A1A1A', fontSize: '11px' }}>{formatDisplayDate(data.invoiceDate)}</span>
             </div>
@@ -276,7 +276,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
               <span style={{ fontWeight: 400, color: '#1A1A1A', fontSize: '11px' }}>{data.billingPeriodText || '—'}</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
-              <span style={{ width: '84px', minWidth: '84px', color: '#1A1A1A', fontWeight: 600, fontSize: '11px' }}>Start Date</span>
+              <span style={{ width: '95px', minWidth: '95px', color: '#1A1A1A', fontWeight: 600, fontSize: '11px' }}>Start Date</span>
               <span style={{ width: '10px', minWidth: '10px', color: '#333', fontWeight: 600 }}>:</span>
               <span style={{ fontWeight: 400, color: '#1A1A1A', fontSize: '11px' }}>{formatDisplayDate(data.startDateText) || '—'}</span>
             </div>
