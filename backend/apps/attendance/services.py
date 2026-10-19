@@ -37,23 +37,63 @@ def get_active_assignment(employee: Employee) -> Assignment | None:
     )
 
 
-def geocode_address(address: str) -> tuple[float, float] | None:
-    if not address:
-        return None
+def _fetch_nominatim(query: str) -> tuple[float, float] | None:
     try:
         response = requests.get(
             "https://nominatim.openstreetmap.org/search",
-            params={"q": address, "format": "jsonv2", "limit": 1},
+            params={"q": query, "format": "jsonv2", "limit": 1},
             headers={"User-Agent": "EmployeeHub/1.0"},
-            timeout=10,
+            timeout=5,
         )
-        response.raise_for_status()
-        data = response.json()
-        if not data:
-            return None
-        return float(data[0]["lat"]), float(data[0]["lon"])
+        if response.status_code == 200:
+            data = response.json()
+            if data and len(data) > 0:
+                return float(data[0]["lat"]), float(data[0]["lon"])
     except Exception:
+        pass
+    return None
+
+
+def geocode_address(address: str) -> tuple[float, float] | None:
+    if not address or not address.strip():
         return None
+    raw = address.strip()
+
+    # 1. Try exact address
+    res = _fetch_nominatim(raw)
+    if res:
+        return res
+
+    # 2. Strip administrative tokens and noise (Flat, Plot, D.No, H.No, Door No, Near, Opposite, Ward, Zone, Mandal, Pincode)
+    import re
+    clean = re.sub(
+        r"(?i)\b(flat|plot|d\.?no\.?|h\.?no\.?|house\s*no\.?|door\s*no\.?)\s*[\w\d\-/]+|(?i)\b(near|opposite|opp\.?)\s+[^,]+|(?i)\b(ward\s*\d+|zone\s*\d+|mandal|greater\s*[\w\s]+corporation)\b|\b\d{6}\b",
+        "",
+        raw,
+    ).strip()
+    clean = re.sub(r"\s+", " ", clean).strip(" ,")
+    if clean and clean != raw:
+        res = _fetch_nominatim(clean)
+        if res:
+            return res
+
+    # 3. Progressive substring trimming (from left to right) across comma-separated tokens
+    parts = [p.strip() for p in raw.split(",") if p.strip()]
+    if len(parts) > 1:
+        for i in range(1, len(parts)):
+            sub = ", ".join(parts[i:]).strip()
+            if len(sub) > 2:
+                res = _fetch_nominatim(sub)
+                if res:
+                    return res
+
+    # 4. Fallback with Hyderabad, Telangana if not already in query
+    if not re.search(r"(?i)(hyderabad|telangana|secunderabad)", raw):
+        res = _fetch_nominatim(f"{clean or raw}, Hyderabad, Telangana, India")
+        if res:
+            return res
+
+    return None
 
 
 def ensure_default_coordinates(employee: Employee, force: bool = False) -> bool:
@@ -62,11 +102,6 @@ def ensure_default_coordinates(employee: Employee, force: bool = False) -> bool:
     if not employee.default_address:
         return False
     coords = geocode_address(employee.default_address)
-    if not coords:
-        import re
-        simplified = re.sub(r"Ward\s*\d+|Zone|Mandal|Greater\s*[\w\s]+Corporation|\b\d{6}\b", "", employee.default_address, flags=re.I).strip()
-        if simplified and simplified != employee.default_address:
-            coords = geocode_address(simplified)
     if not coords:
         return False
     employee.default_latitude, employee.default_longitude = coords

@@ -110,3 +110,47 @@ def cleanup_employee_dependencies(sender, instance, **kwargs):
         except Exception:
             pass
 
+
+class SalaryCheckItem(models.Model):
+    employee = models.ForeignKey(Employee, on_delete=models.CASCADE, null=True, blank=True, related_name="salary_check_items")
+    is_custom = models.BooleanField(default=False, help_text="True if vendor/contractor not in main directory")
+    custom_emp_id = models.CharField(max_length=60, blank=True, default="")
+    custom_name = models.CharField(max_length=150, blank=True, default="")
+    custom_phone = models.CharField(max_length=40, blank=True, default="")
+    custom_pic = models.TextField(blank=True, default="")
+    salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
+    is_paid = models.BooleanField(default=False)
+    paid_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    @property
+    def display_name(self) -> str:
+        if self.employee:
+            return self.employee.name
+        return self.custom_name
+
+    @property
+    def display_emp_id(self) -> str:
+        if self.employee:
+            return self.employee.employee_id
+        return self.custom_emp_id
+
+    @property
+    def display_phone(self) -> str:
+        if self.employee:
+            return self.employee.phone
+        return self.custom_phone
+
+    @property
+    def display_photo(self) -> str:
+        if self.employee:
+            return self.employee.profile_photo or ""
+        return self.custom_pic or ""
+
+    def __str__(self) -> str:
+        return f"{self.display_emp_id} - {self.display_name}: ₹{self.salary} (Paid: {self.is_paid})"
+

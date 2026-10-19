@@ -20,6 +20,7 @@ const AttendancePage = lazy(() => import('./pages/AttendancePage').then((m) => (
 const AssignmentsPage = lazy(() => import('./pages/AssignmentsPage').then((m) => ({ default: m.AssignmentsPage })))
 const LeavesPage = lazy(() => import('./pages/LeavesPage').then((m) => ({ default: m.LeavesPage })))
 const TrackingPage = lazy(() => import('./pages/TrackingPage').then((m) => ({ default: m.TrackingPage })))
+const SalaryCheckPage = lazy(() => import('./pages/SalaryCheckPage').then((m) => ({ default: m.SalaryCheckPage })))
 const InvoicePage = lazy(() => import('./pages/InvoicePage').then((m) => ({ default: m.InvoicePage })))
 const PayslipPage = lazy(() => import('./pages/PayslipPage').then((m) => ({ default: m.PayslipPage })))
 const SettingsPage = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
@@ -143,6 +144,7 @@ function MainAppSelector() {
           <Route path="attendance" element={<AttendancePage />} />
           <Route path="assignments" element={<AssignmentsPage />} />
           <Route path="leaves" element={<LeavesPage />} />
+          <Route path="salary-check" element={<SalaryCheckPage />} />
           <Route path="tracking" element={<TrackingPage />} />
           <Route path="tracking/:employeeId" element={<TrackingPage />} />
           <Route path="invoice" element={<InvoicePage />} />
@@ -170,6 +172,8 @@ function TestViewHarness() {
       return <AppShell><AssignmentsPage /></AppShell>
     case 'leaves':
       return <AppShell><LeavesPage /></AppShell>
+    case 'salary-check':
+      return <AppShell><SalaryCheckPage /></AppShell>
     case 'tracking':
       return <AppShell><TrackingPage /></AppShell>
     case 'invoice':

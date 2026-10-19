@@ -9,7 +9,7 @@ const navItems = [
   { label: 'All Employees', to: '/all-employees' },
   { label: 'Attendance', to: '/attendance' },
   { label: 'Leaves', to: '/leaves' },
-  { label: 'Live Tracking', to: '/tracking' },
+  { label: 'Salary Check', to: '/salary-check' },
   { label: 'Invoice', to: '/invoice' },
   { label: 'Payslip', to: '/payslip' },
 ]

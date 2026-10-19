@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from apps.accounts.models import Admin, Employee
+from apps.accounts.models import Admin, Employee, SalaryCheckItem
 from apps.attendance.models import Session
 from apps.attendance.services import get_employee_presence_summary
 
@@ -170,3 +170,32 @@ class AdminSerializer(serializers.ModelSerializer):
     class Meta:
         model = Admin
         fields = ["id", "name", "email", "role", "created_at"]
+
+
+class SalaryCheckItemSerializer(serializers.ModelSerializer):
+    emp_id = serializers.CharField(source="display_emp_id", read_only=True)
+    name = serializers.CharField(source="display_name", read_only=True)
+    contact_no = serializers.CharField(source="display_phone", read_only=True)
+    pic = serializers.CharField(source="display_photo", read_only=True)
+
+    class Meta:
+        model = SalaryCheckItem
+        fields = [
+            "id",
+            "employee",
+            "is_custom",
+            "custom_emp_id",
+            "custom_name",
+            "custom_phone",
+            "custom_pic",
+            "emp_id",
+            "name",
+            "contact_no",
+            "pic",
+            "salary",
+            "is_paid",
+            "paid_at",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]

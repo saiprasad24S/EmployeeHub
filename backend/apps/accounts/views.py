@@ -7,11 +7,12 @@ from rest_framework.views import APIView
 
 
 
+from django.db.models import Q
 from django.utils import timezone
 
 from apps.accounts.authentication import ClerkJWTAuthentication
-from apps.accounts.models import Employee
-from apps.accounts.serializers import EmployeeCreateSerializer, EmployeeSerializer
+from apps.accounts.models import Employee, SalaryCheckItem
+from apps.accounts.serializers import EmployeeCreateSerializer, EmployeeSerializer, SalaryCheckItemSerializer
 from apps.assignments.models import Assignment
 from apps.attendance.models import Session
 from apps.attendance.services import get_employee_presence_summary, end_session, upload_profile_photo
@@ -271,6 +272,9 @@ class EmployeeViewSet(viewsets.ModelViewSet):
             (req_lon not in (None, "") and str(req_lon) != old_lon)
         )
 
+        prev_lat = instance.default_latitude
+        prev_lon = instance.default_longitude
+
         serializer = self.get_serializer(instance, data=request.data, partial=partial)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
@@ -287,7 +291,11 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # Automatically re-geocode if address changed and user didn't manually type new coordinates
         if address_changed and not coords_manually_changed:
             from apps.attendance.services import ensure_default_coordinates
-            ensure_default_coordinates(employee, force=True)
+            geocoded = ensure_default_coordinates(employee, force=True)
+            if not geocoded and prev_lat is not None and prev_lon is not None:
+                employee.default_latitude = prev_lat
+                employee.default_longitude = prev_lon
+                employee.save(update_fields=["default_latitude", "default_longitude"])
         elif employee.default_address and (employee.default_latitude is None or employee.default_longitude is None):
             from apps.attendance.services import ensure_default_coordinates
             ensure_default_coordinates(employee, force=False)
@@ -371,3 +379,100 @@ class UploadProfilePhotoView(APIView):
         employee.profile_photo_public_id = upload_result["public_id"]
         employee.save(update_fields=["profile_photo", "profile_photo_public_id"])
         return Response({"detail": "Profile photo updated.", "profile_photo": employee.profile_photo})
+
+
+class SalaryCheckViewSet(viewsets.ModelViewSet):
+    queryset = SalaryCheckItem.objects.all()
+    serializer_class = SalaryCheckItemSerializer
+    permission_classes = [IsAuthenticated]
+
+    def list(self, request, *args, **kwargs):
+        # 1. Sync active employees into SalaryCheckItem:
+        # Every Employee with is_active=True gets a SalaryCheckItem if not already present
+        active_employees = Employee.objects.filter(is_active=True)
+        existing_emp_ids = set(
+            SalaryCheckItem.objects.filter(employee__isnull=False).values_list("employee_id", flat=True)
+        )
+        new_items = []
+        for emp in active_employees:
+            if emp.id not in existing_emp_ids:
+                new_items.append(
+                    SalaryCheckItem(
+                        employee=emp,
+                        is_custom=False,
+                        salary=0.00,
+                        is_paid=False,
+                    )
+                )
+        if new_items:
+            SalaryCheckItem.objects.bulk_create(new_items)
+
+        # 2. Return all items where either is_custom=True OR employee.is_active=True
+        # Former/inactive employees are excluded from Salary Check
+        items = SalaryCheckItem.objects.filter(
+            Q(is_custom=True) | Q(employee__is_active=True)
+        ).select_related("employee").order_by("-is_custom", "employee__employee_id", "id")
+
+        serializer = self.get_serializer(items, many=True)
+        return Response(serializer.data)
+
+    def create(self, request, *args, **kwargs):
+        name = (request.data.get("name") or request.data.get("custom_name") or "").strip()
+        if not name:
+            return Response({"detail": "Name is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        emp_id = (request.data.get("emp_id") or request.data.get("custom_emp_id") or "").strip()
+        if not emp_id:
+            count = SalaryCheckItem.objects.filter(is_custom=True).count() + 1
+            emp_id = f"VEND-{count:03d}"
+
+        phone = (request.data.get("contact_no") or request.data.get("custom_phone") or request.data.get("phone") or "").strip()
+        pic = (request.data.get("pic") or request.data.get("custom_pic") or "").strip()
+        salary = request.data.get("salary") or 0.00
+
+        item = SalaryCheckItem.objects.create(
+            is_custom=True,
+            custom_name=name,
+            custom_emp_id=emp_id,
+            custom_phone=phone,
+            custom_pic=pic,
+            salary=salary,
+            is_paid=False,
+        )
+        return Response(self.get_serializer(item).data, status=status.HTTP_201_CREATED)
+
+    def partial_update(self, request, *args, **kwargs):
+        item = self.get_object()
+        if "salary" in request.data:
+            try:
+                item.salary = float(request.data["salary"])
+            except (ValueError, TypeError):
+                pass
+        if "is_paid" in request.data:
+            val = request.data["is_paid"]
+            if isinstance(val, str):
+                val = val.lower() in ("true", "1", "yes")
+            item.is_paid = bool(val)
+            item.paid_at = timezone.now() if item.is_paid else None
+
+        if item.is_custom:
+            if "name" in request.data:
+                item.custom_name = request.data["name"]
+            if "emp_id" in request.data:
+                item.custom_emp_id = request.data["emp_id"]
+            if "contact_no" in request.data:
+                item.custom_phone = request.data["contact_no"]
+            if "pic" in request.data:
+                item.custom_pic = request.data["pic"]
+
+        item.save()
+        return Response(self.get_serializer(item).data)
+
+    def update(self, request, *args, **kwargs):
+        return self.partial_update(request, *args, **kwargs)
+
+    @action(detail=False, methods=["post"], url_path="reset")
+    def reset(self, request):
+        SalaryCheckItem.objects.all().update(is_paid=False, paid_at=None)
+        return Response({"detail": "All salary payment statuses have been reset to default (Unpaid).", "status": "ok"})
+

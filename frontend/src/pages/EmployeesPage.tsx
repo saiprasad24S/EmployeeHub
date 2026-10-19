@@ -304,9 +304,6 @@ export function EmployeesPage() {
               if (beData.latitude && beData.longitude) {
                 foundLat = parseFloat(beData.latitude).toFixed(7)
                 foundLon = parseFloat(beData.longitude).toFixed(7)
-                if (beData.display_name) {
-                  setDefaultAddress(beData.display_name)
-                }
               }
             }
           } catch {}
@@ -333,8 +330,9 @@ export function EmployeesPage() {
         if (foundLat && foundLon) {
           setLatitude(foundLat)
           setLongitude(foundLon)
+          setErrorMsg(null)
         } else {
-          setErrorMsg('Could not auto-detect coordinates for this address. Coordinates will be resolved by the server on save, or you can enter Latitude & Longitude manually.')
+          setErrorMsg('Address recorded. Note: GPS coordinates could not be auto-detected, existing coordinates will be retained.')
         }
       }
     } catch (err: any) {
@@ -413,19 +411,29 @@ export function EmployeesPage() {
     // Detect if address was modified in edit mode
     const addressChanged = editingEmployee && finalAddress !== (editingEmployee.default_address || '').trim()
 
-    // If the address was changed, but coordinates still match the old coordinates:
-    // User modified the address without manually entering new GPS coordinates -> clear coordinates so they re-geocode
-    if (addressChanged && editingEmployee) {
-      const oldLat = editingEmployee.default_latitude ? String(editingEmployee.default_latitude).trim() : ''
-      const oldLon = editingEmployee.default_longitude ? String(editingEmployee.default_longitude).trim() : ''
-      if (finalLat === oldLat && finalLon === oldLon) {
-        finalLat = ''
-        finalLon = ''
+    // If address changed, attempt to resolve new coordinates
+    if (addressChanged && finalAddress) {
+      setIsGeocoding(true)
+      try {
+        const token = await getToken()
+        if (token) {
+          const beRes = await authedFetch(`/api/attendance/geocode?address=${encodeURIComponent(finalAddress)}`, token)
+          if (beRes.ok) {
+            const beData = await beRes.json()
+            if (beData.latitude && beData.longitude) {
+              finalLat = parseFloat(beData.latitude).toFixed(7)
+              finalLon = parseFloat(beData.longitude).toFixed(7)
+              setLatitude(finalLat)
+              setLongitude(finalLon)
+            }
+          }
+        }
+      } catch {
+        // Fall back to server-side auto-geocoding during model save
+      } finally {
+        setIsGeocoding(false)
       }
-    }
-
-    // If coordinates are blank but address is provided, resolve via backend geocode
-    if (finalAddress && (!finalLat || !finalLon)) {
+    } else if (finalAddress && (!finalLat || !finalLon)) {
       setIsGeocoding(true)
       try {
         const token = await getToken()
