@@ -67,9 +67,10 @@ def geocode_address(address: str) -> tuple[float, float] | None:
     # 2. Strip administrative tokens and noise (Flat, Plot, D.No, H.No, Door No, Near, Opposite, Ward, Zone, Mandal, Pincode)
     import re
     clean = re.sub(
-        r"(?i)\b(flat|plot|d\.?no\.?|h\.?no\.?|house\s*no\.?|door\s*no\.?)\s*[\w\d\-/]+|(?i)\b(near|opposite|opp\.?)\s+[^,]+|(?i)\b(ward\s*\d+|zone\s*\d+|mandal|greater\s*[\w\s]+corporation)\b|\b\d{6}\b",
+        r"\b(flat|plot|d\.?no\.?|h\.?no\.?|house\s*no\.?|door\s*no\.?)\s*[\w\d\-/]+|\b(near|opposite|opp\.?)\s+[^,]+|\b(ward\s*\d+|zone\s*\d+|mandal|greater\s*[\w\s]+corporation)\b|\b\d{6}\b",
         "",
         raw,
+        flags=re.IGNORECASE,
     ).strip()
     clean = re.sub(r"\s+", " ", clean).strip(" ,")
     if clean and clean != raw:
@@ -88,7 +89,7 @@ def geocode_address(address: str) -> tuple[float, float] | None:
                     return res
 
     # 4. Fallback with Hyderabad, Telangana if not already in query
-    if not re.search(r"(?i)(hyderabad|telangana|secunderabad)", raw):
+    if not re.search(r"hyderabad|telangana|secunderabad", raw, flags=re.IGNORECASE):
         res = _fetch_nominatim(f"{clean or raw}, Hyderabad, Telangana, India")
         if res:
             return res

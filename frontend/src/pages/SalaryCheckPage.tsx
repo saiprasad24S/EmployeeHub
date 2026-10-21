@@ -13,6 +13,7 @@ import {
   Phone,
   Check,
   X,
+  Trash2,
   Building2,
   UserCheck,
   Clock,
@@ -34,6 +35,7 @@ export interface SalaryCheckItem {
   salary: number | string
   is_paid: boolean
   paid_at: string | null
+  is_hidden?: boolean
   created_at: string
   updated_at: string
 }
@@ -46,6 +48,7 @@ export function SalaryCheckPage() {
   const [filterTab, setFilterTab] = useState<'ALL' | 'PAID' | 'UNPAID' | 'VENDORS'>('ALL')
   const [isResetModalOpen, setIsResetModalOpen] = useState(false)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [itemToRemove, setItemToRemove] = useState<SalaryCheckItem | null>(null)
 
   // Create Custom Vendor / Staff Form State
   const [newEmpName, setNewEmpName] = useState('')
@@ -177,6 +180,34 @@ export function SalaryCheckPage() {
     },
   })
 
+  // Mutation to remove employee/vendor from Salary Check
+  const removeItemMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const token = await getToken()
+      if (!token) throw new Error('Authentication required')
+      const res = await authedFetch(`/api/salary-check/${id}/`, token, {
+        method: 'DELETE',
+      })
+      if (!res.ok) {
+        // Fallback to PATCH { is_hidden: true }
+        const patchRes = await authedFetch(`/api/salary-check/${id}/`, token, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_hidden: true }),
+        })
+        if (!patchRes.ok) throw new Error('Failed to remove from Salary Check')
+      }
+      return true
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['salary-check'] })
+      setItemToRemove(null)
+    },
+    onError: (err: any) => {
+      alert(err.message || 'Failed to remove from Salary Check')
+    },
+  })
+
   // Save salary on blur or enter key
   const handleSalaryBlurOrSubmit = (item: SalaryCheckItem) => {
     const rawVal = editingSalaries[item.id]
@@ -254,9 +285,6 @@ export function SalaryCheckPage() {
             <h3 style={{ fontSize: '1.6rem', fontWeight: 700, margin: '0.2rem 0', color: 'var(--text)' }}>
               Salary Check
             </h3>
-            <p style={{ color: 'var(--muted)', fontSize: '0.9rem', margin: 0 }}>
-              Verify staff salary disbursements, adjust compensation, and track paid status for active employees and vendors.
-            </p>
           </div>
 
           {/* Top Right Action Buttons */}
@@ -480,34 +508,68 @@ export function SalaryCheckPage() {
                       >
                         {/* PIC */}
                         <td style={{ padding: '0.75rem 0.5rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                          {item.pic ? (
-                            <img
-                              src={item.pic}
-                              alt={item.name}
-                              onError={(e) => {
-                                // fallback to initials if photo fails to load
-                                (e.target as HTMLElement).style.display = 'none'
-                              }}
-                              style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', display: 'inline-block', border: '1px solid var(--border)' }}
-                            />
-                          ) : (
+                          <div
+                            onClick={() => setItemToRemove(item)}
+                            title={`Click on photo to remove ${item.name} from Salary Check`}
+                            style={{
+                              position: 'relative',
+                              display: 'inline-block',
+                              cursor: 'pointer',
+                              borderRadius: '50%',
+                              transition: 'transform 0.15s ease',
+                            }}
+                            onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.transform = 'scale(1.08)')}
+                            onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.transform = 'scale(1)')}
+                          >
+                            {item.pic ? (
+                              <img
+                                src={item.pic}
+                                alt={item.name}
+                                onError={(e) => {
+                                  // fallback to initials if photo fails to load
+                                  (e.target as HTMLElement).style.display = 'none'
+                                }}
+                                style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', display: 'inline-block', border: '1px solid var(--border)' }}
+                              />
+                            ) : (
+                              <div
+                                style={{
+                                  width: '38px',
+                                  height: '38px',
+                                  borderRadius: '50%',
+                                  background: item.is_custom ? 'rgba(59, 130, 246, 0.15)' : 'rgba(107, 47, 160, 0.12)',
+                                  color: item.is_custom ? '#2563EB' : 'var(--primary)',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  fontWeight: 700,
+                                  fontSize: '0.85rem',
+                                }}
+                              >
+                                {(item.name || 'E').slice(0, 2).toUpperCase()}
+                              </div>
+                            )}
                             <div
                               style={{
-                                width: '38px',
-                                height: '38px',
+                                position: 'absolute',
+                                bottom: -2,
+                                right: -2,
+                                width: '15px',
+                                height: '15px',
                                 borderRadius: '50%',
-                                background: item.is_custom ? 'rgba(59, 130, 246, 0.15)' : 'rgba(107, 47, 160, 0.12)',
-                                color: item.is_custom ? '#2563EB' : 'var(--primary)',
-                                display: 'inline-flex',
+                                background: '#EF4444',
+                                color: '#FFF',
+                                display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'center',
-                                fontWeight: 700,
-                                fontSize: '0.85rem',
+                                fontSize: '9px',
+                                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                                opacity: 0.9,
                               }}
                             >
-                              {(item.name || 'E').slice(0, 2).toUpperCase()}
+                              <X style={{ width: '9px', height: '9px', strokeWidth: 3 }} />
                             </div>
-                          )}
+                          </div>
                         </td>
 
                         {/* EMP ID */}
@@ -676,29 +738,62 @@ export function SalaryCheckPage() {
                     }}
                   >
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                      {item.pic ? (
-                        <img
-                          src={item.pic}
-                          alt={item.name}
-                          style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }}
-                        />
-                      ) : (
+                      <div
+                        onClick={() => setItemToRemove(item)}
+                        title={`Click on photo to remove ${item.name} from Salary Check`}
+                        style={{
+                          position: 'relative',
+                          display: 'inline-block',
+                          cursor: 'pointer',
+                          borderRadius: '50%',
+                          flexShrink: 0,
+                          transition: 'transform 0.15s ease',
+                        }}
+                      >
+                        {item.pic ? (
+                          <img
+                            src={item.pic}
+                            alt={item.name}
+                            style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }}
+                          />
+                        ) : (
+                          <div
+                            style={{
+                              width: '42px',
+                              height: '42px',
+                              borderRadius: '50%',
+                              background: item.is_custom ? 'rgba(59, 130, 246, 0.15)' : 'rgba(107, 47, 160, 0.12)',
+                              color: item.is_custom ? '#2563EB' : 'var(--primary)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {(item.name || 'E').slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
                         <div
                           style={{
-                            width: '42px',
-                            height: '42px',
+                            position: 'absolute',
+                            bottom: -2,
+                            right: -2,
+                            width: '16px',
+                            height: '16px',
                             borderRadius: '50%',
-                            background: item.is_custom ? 'rgba(59, 130, 246, 0.15)' : 'rgba(107, 47, 160, 0.12)',
-                            color: item.is_custom ? '#2563EB' : 'var(--primary)',
+                            background: '#EF4444',
+                            color: '#FFF',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            fontWeight: 700,
+                            fontSize: '10px',
+                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                            opacity: 0.9,
                           }}
                         >
-                          {(item.name || 'E').slice(0, 2).toUpperCase()}
+                          <X style={{ width: '10px', height: '10px', strokeWidth: 3 }} />
                         </div>
-                      )}
+                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>{item.name}</div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
@@ -989,6 +1084,168 @@ export function SalaryCheckPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Confirmation Modal: Remove from Salary Check */}
+      {itemToRemove && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0, 0, 0, 0.55)',
+            backdropFilter: 'blur(4px)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 9999,
+            padding: '1rem',
+          }}
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !removeItemMutation.isPending) {
+              setItemToRemove(null)
+            }
+          }}
+        >
+          <div
+            className="glass-card"
+            style={{
+              maxWidth: '460px',
+              width: '100%',
+              padding: '1.75rem',
+              borderRadius: '16px',
+              background: 'var(--panel)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 20px 40px rgba(0,0,0,0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1.25rem',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+              <div
+                style={{
+                  width: '42px',
+                  height: '42px',
+                  borderRadius: '10px',
+                  background: 'rgba(239, 68, 68, 0.12)',
+                  color: '#EF4444',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  flexShrink: 0,
+                }}
+              >
+                <Trash2 style={{ width: '22px', height: '22px' }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h4 style={{ margin: 0, fontSize: '1.15rem', fontWeight: 700, color: 'var(--text)' }}>
+                  Remove from Salary Check
+                </h4>
+                <p style={{ margin: '0.2rem 0 0 0', fontSize: '0.82rem', color: 'var(--muted)' }}>
+                  {itemToRemove.is_custom ? 'Custom vendor / staff' : 'Organization employee'}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setItemToRemove(null)}
+                disabled={removeItemMutation.isPending}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--muted)',
+                  cursor: 'pointer',
+                  padding: '0.25rem',
+                }}
+              >
+                <X style={{ width: '20px', height: '20px' }} />
+              </button>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.75rem',
+                padding: '0.85rem 1rem',
+                background: 'rgba(0, 0, 0, 0.04)',
+                borderRadius: '10px',
+                border: '1px solid var(--border)',
+              }}
+            >
+              {itemToRemove.pic ? (
+                <img
+                  src={itemToRemove.pic}
+                  alt={itemToRemove.name}
+                  style={{ width: '42px', height: '42px', borderRadius: '50%', objectFit: 'cover' }}
+                />
+              ) : (
+                <div
+                  style={{
+                    width: '42px',
+                    height: '42px',
+                    borderRadius: '50%',
+                    background: itemToRemove.is_custom ? 'rgba(59, 130, 246, 0.15)' : 'rgba(107, 47, 160, 0.12)',
+                    color: itemToRemove.is_custom ? '#2563EB' : 'var(--primary)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                  }}
+                >
+                  {(itemToRemove.name || 'E').slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>
+                  {itemToRemove.name}
+                </div>
+                <div style={{ fontSize: '0.8rem', color: 'var(--muted)' }}>
+                  ID: {itemToRemove.emp_id} {itemToRemove.contact_no ? `· ${itemToRemove.contact_no}` : ''}
+                </div>
+              </div>
+            </div>
+
+            <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text)', lineHeight: 1.5 }}>
+              Are you sure you want to remove <strong>{itemToRemove.name}</strong> from the Salary Check table?
+            </p>
+            {!itemToRemove.is_custom && (
+              <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--muted)', lineHeight: 1.4 }}>
+                <em>Note: This employee's master profile in the Employees / All Employees section will remain active and intact.</em>
+              </p>
+            )}
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '0.5rem' }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setItemToRemove(null)}
+                disabled={removeItemMutation.isPending}
+                style={{ padding: '0.55rem 1rem', borderRadius: '8px' }}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => removeItemMutation.mutate(itemToRemove.id)}
+                disabled={removeItemMutation.isPending}
+                style={{
+                  padding: '0.55rem 1.25rem',
+                  borderRadius: '8px',
+                  background: '#EF4444',
+                  color: '#ffffff',
+                  border: 'none',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                }}
+              >
+                <Trash2 style={{ width: '15px', height: '15px' }} />
+                {removeItemMutation.isPending ? 'Removing...' : 'Remove'}
+              </button>
+            </div>
           </div>
         </div>
       )}

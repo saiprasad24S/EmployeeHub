@@ -410,9 +410,13 @@ export function EmployeesPage() {
 
     // Detect if address was modified in edit mode
     const addressChanged = editingEmployee && finalAddress !== (editingEmployee.default_address || '').trim()
+    const coordsManuallyChanged = editingEmployee && (
+      (finalLat && finalLat !== String(editingEmployee.default_latitude || '')) ||
+      (finalLon && finalLon !== String(editingEmployee.default_longitude || ''))
+    )
 
-    // If address changed, attempt to resolve new coordinates
-    if (addressChanged && finalAddress) {
+    // If address changed and coordinates were not manually changed, attempt to resolve new coordinates
+    if (addressChanged && !coordsManuallyChanged && finalAddress) {
       setIsGeocoding(true)
       try {
         const token = await getToken()

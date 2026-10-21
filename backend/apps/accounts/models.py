@@ -121,6 +121,7 @@ class SalaryCheckItem(models.Model):
     salary = models.DecimalField(max_digits=12, decimal_places=2, default=0.00)
     is_paid = models.BooleanField(default=False)
     paid_at = models.DateTimeField(null=True, blank=True)
+    is_hidden = models.BooleanField(default=False, help_text="Hidden / removed from salary check")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -153,4 +154,3 @@ class SalaryCheckItem(models.Model):
 
     def __str__(self) -> str:
         return f"{self.display_emp_id} - {self.display_name}: ₹{self.salary} (Paid: {self.is_paid})"
-

@@ -195,6 +195,7 @@ class SalaryCheckItemSerializer(serializers.ModelSerializer):
             "salary",
             "is_paid",
             "paid_at",
+            "is_hidden",
             "created_at",
             "updated_at",
         ]

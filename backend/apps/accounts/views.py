@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -231,6 +233,13 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         employee = serializer.save()
+        try:
+            SalaryCheckItem.objects.get_or_create(
+                employee=employee,
+                defaults={"is_custom": False, "salary": 0.00, "is_paid": False, "is_hidden": False}
+            )
+        except Exception as e:
+            logger.warning(f"Failed to auto-create SalaryCheckItem for employee {employee.id}: {e}")
         if employee.default_address and (employee.default_latitude is None or employee.default_longitude is None):
             from apps.attendance.services import ensure_default_coordinates
             ensure_default_coordinates(employee)
@@ -291,17 +300,26 @@ class EmployeeViewSet(viewsets.ModelViewSet):
         # Automatically re-geocode if address changed and user didn't manually type new coordinates
         if address_changed and not coords_manually_changed:
             from apps.attendance.services import ensure_default_coordinates
-            geocoded = ensure_default_coordinates(employee, force=True)
-            if not geocoded and prev_lat is not None and prev_lon is not None:
-                employee.default_latitude = prev_lat
-                employee.default_longitude = prev_lon
-                employee.save(update_fields=["default_latitude", "default_longitude"])
+            try:
+                geocoded = ensure_default_coordinates(employee, force=True)
+                if not geocoded and prev_lat is not None and prev_lon is not None:
+                    employee.default_latitude = prev_lat
+                    employee.default_longitude = prev_lon
+                    employee.save(update_fields=["default_latitude", "default_longitude"])
+            except Exception as e:
+                logger.warning(f"Failed to auto-geocode on employee update: {e}")
         elif employee.default_address and (employee.default_latitude is None or employee.default_longitude is None):
             from apps.attendance.services import ensure_default_coordinates
-            ensure_default_coordinates(employee, force=False)
+            try:
+                ensure_default_coordinates(employee, force=False)
+            except Exception as e:
+                logger.warning(f"Failed to ensure coordinates: {e}")
         elif employee.default_latitude is not None and employee.default_longitude is not None and not employee.default_address:
             from apps.attendance.services import ensure_default_address
-            ensure_default_address(employee)
+            try:
+                ensure_default_address(employee)
+            except Exception as e:
+                logger.warning(f"Failed to ensure address: {e}")
         
         photo_file = request.FILES.get("profile_photo_file") or request.data.get("profile_photo_file")
         if photo_file and hasattr(photo_file, "read"):
@@ -402,19 +420,29 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
                         is_custom=False,
                         salary=0.00,
                         is_paid=False,
+                        is_hidden=False,
                     )
                 )
         if new_items:
             SalaryCheckItem.objects.bulk_create(new_items)
 
-        # 2. Return all items where either is_custom=True OR employee.is_active=True
-        # Former/inactive employees are excluded from Salary Check
+        # 2. Return all items where either is_custom=True OR employee.is_active=True, excluding hidden
+        # Former/inactive employees and manually removed employees are excluded from Salary Check
         items = SalaryCheckItem.objects.filter(
-            Q(is_custom=True) | Q(employee__is_active=True)
+            (Q(is_custom=True) | Q(employee__is_active=True)) & Q(is_hidden=False)
         ).select_related("employee").order_by("-is_custom", "employee__employee_id", "id")
 
         serializer = self.get_serializer(items, many=True)
         return Response(serializer.data)
+
+    def destroy(self, request, *args, **kwargs):
+        item = self.get_object()
+        if item.is_custom:
+            item.delete()
+        else:
+            item.is_hidden = True
+            item.save(update_fields=["is_hidden"])
+        return Response({"detail": "Removed from Salary Check."}, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
         name = (request.data.get("name") or request.data.get("custom_name") or "").strip()
@@ -454,6 +482,12 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
                 val = val.lower() in ("true", "1", "yes")
             item.is_paid = bool(val)
             item.paid_at = timezone.now() if item.is_paid else None
+
+        if "is_hidden" in request.data:
+            val = request.data["is_hidden"]
+            if isinstance(val, str):
+                val = val.lower() in ("true", "1", "yes")
+            item.is_hidden = bool(val)
 
         if item.is_custom:
             if "name" in request.data:
