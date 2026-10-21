@@ -512,7 +512,6 @@ export function SalaryCheckPage() {
                             onClick={() => setItemToRemove(item)}
                             title={`Click on photo to remove ${item.name} from Salary Check`}
                             style={{
-                              position: 'relative',
                               display: 'inline-block',
                               cursor: 'pointer',
                               borderRadius: '50%',
@@ -549,26 +548,6 @@ export function SalaryCheckPage() {
                                 {(item.name || 'E').slice(0, 2).toUpperCase()}
                               </div>
                             )}
-                            <div
-                              style={{
-                                position: 'absolute',
-                                bottom: -2,
-                                right: -2,
-                                width: '15px',
-                                height: '15px',
-                                borderRadius: '50%',
-                                background: '#EF4444',
-                                color: '#FFF',
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'center',
-                                fontSize: '9px',
-                                boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                                opacity: 0.9,
-                              }}
-                            >
-                              <X style={{ width: '9px', height: '9px', strokeWidth: 3 }} />
-                            </div>
                           </div>
                         </td>
 
@@ -742,7 +721,6 @@ export function SalaryCheckPage() {
                         onClick={() => setItemToRemove(item)}
                         title={`Click on photo to remove ${item.name} from Salary Check`}
                         style={{
-                          position: 'relative',
                           display: 'inline-block',
                           cursor: 'pointer',
                           borderRadius: '50%',
@@ -773,26 +751,6 @@ export function SalaryCheckPage() {
                             {(item.name || 'E').slice(0, 2).toUpperCase()}
                           </div>
                         )}
-                        <div
-                          style={{
-                            position: 'absolute',
-                            bottom: -2,
-                            right: -2,
-                            width: '16px',
-                            height: '16px',
-                            borderRadius: '50%',
-                            background: '#EF4444',
-                            color: '#FFF',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '10px',
-                            boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
-                            opacity: 0.9,
-                          }}
-                        >
-                          <X style={{ width: '10px', height: '10px', strokeWidth: 3 }} />
-                        </div>
                       </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontWeight: 700, fontSize: '0.95rem', color: 'var(--text)' }}>{item.name}</div>
