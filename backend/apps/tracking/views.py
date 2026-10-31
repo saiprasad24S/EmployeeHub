@@ -162,9 +162,9 @@ class AllPresentEmployeesLocationView(APIView):
     def get(self, request):
         from django.db.models import Max
 
-        # 1. Get all active sessions in one query with employee data
+        # 1. Get all active sessions in one query with employee data (Active employees only)
         active_sessions = (
-            Session.objects.filter(is_active=True)
+            Session.objects.filter(is_active=True, employee__is_active=True)
             .select_related("employee")
         )
 
@@ -175,8 +175,9 @@ class AllPresentEmployeesLocationView(APIView):
         session_map = {}
         for session in active_sessions:
             emp = session.employee
-            employee_map[emp.id] = emp
-            session_map[emp.id] = session
+            if emp and emp.is_active:
+                employee_map[emp.id] = emp
+                session_map[emp.id] = session
 
         employee_ids = list(employee_map.keys())
 
@@ -237,6 +238,7 @@ class AllPresentEmployeesLocationView(APIView):
                 "id": emp.id,
                 "employee_id": emp.employee_id,
                 "name": emp.name,
+                "is_active": emp.is_active,
                 "email": emp.email,
                 "phone": emp.phone,
                 "department": emp.department,

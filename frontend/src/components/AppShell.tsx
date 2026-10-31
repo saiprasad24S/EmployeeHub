@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState, type PropsWithChildren } from 'react'
+import { useEffect, useMemo, useState, useRef, type PropsWithChildren } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { SignOutButton, UserButton } from '@clerk/clerk-react'
+import { ChevronDown } from 'lucide-react'
 import { useSearch } from '../context/SearchContext'
 
 const navItems = [
   { label: 'Dashboard', to: '/' },
   { label: 'Employees', to: '/employees' },
-  { label: 'All Employees', to: '/all-employees' },
   { label: 'Attendance', to: '/attendance' },
   { label: 'Leaves', to: '/leaves' },
   { label: 'Salary Check', to: '/salary-check' },
@@ -27,6 +27,33 @@ export function AppShell({ children }: PropsWithChildren) {
     return typeof window !== 'undefined' && window.matchMedia ? window.matchMedia('(prefers-color-scheme: dark)').matches : false
   })
 
+  // Employees dropdown state (supports both click and hover)
+  const [isEmpDropdownOpen, setIsEmpDropdownOpen] = useState(false)
+  const [isMobileEmpMenuOpen, setIsMobileEmpMenuOpen] = useState(false)
+  const dropdownCloseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const isEmpRoute = location.pathname === '/employees' || location.pathname === '/all-employees'
+
+  const handleMouseEnter = () => {
+    if (dropdownCloseTimeoutRef.current) {
+      clearTimeout(dropdownCloseTimeoutRef.current)
+      dropdownCloseTimeoutRef.current = null
+    }
+    setIsEmpDropdownOpen(true)
+  }
+
+  const handleMouseLeave = () => {
+    dropdownCloseTimeoutRef.current = setTimeout(() => {
+      setIsEmpDropdownOpen(false)
+    }, 250)
+  }
+
+  useEffect(() => {
+    // Auto-close dropdowns on navigation change
+    setIsEmpDropdownOpen(false)
+    setIsMobileEmpMenuOpen(false)
+  }, [location.pathname])
+
   useEffect(() => {
     const theme = isDarkMode ? 'dark' : 'light'
     document.documentElement.dataset.theme = theme
@@ -35,6 +62,8 @@ export function AppShell({ children }: PropsWithChildren) {
   }, [isDarkMode])
 
   const breadcrumb = useMemo(() => {
+    if (location.pathname === '/all-employees') return 'All Employees'
+    if (location.pathname === '/employees') return 'Employees'
     const current = navItems.find((item) =>
       item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to)
     )
@@ -62,11 +91,126 @@ export function AppShell({ children }: PropsWithChildren) {
         </div>
         <div className="sidebar-chip">Healthcare field workforce platform</div>
         <nav>
-          {navItems.map((item) => (
-            <NavLink key={item.to} to={item.to} end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
-              {item.label}
-            </NavLink>
-          ))}
+          <NavLink to="/" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Dashboard
+          </NavLink>
+
+          {/* Employees with Dropdown */}
+          <div
+            className="nav-item-dropdown"
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            style={{ position: 'relative' }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%', position: 'relative' }}>
+              <NavLink
+                to="/employees"
+                end
+                className={() => `nav-link ${isEmpRoute ? 'active' : ''}`}
+                style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingRight: '2.5rem' }}
+              >
+                <span>Employees</span>
+              </NavLink>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation()
+                  setIsEmpDropdownOpen((prev) => !prev)
+                }}
+                aria-label="Toggle Employees Menu"
+                style={{
+                  position: 'absolute',
+                  right: '0.75rem',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '0.3rem',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: isEmpRoute ? 'var(--primary)' : 'var(--muted)',
+                  transition: 'transform 0.2s ease',
+                }}
+              >
+                <ChevronDown
+                  size={16}
+                  style={{
+                    transform: isEmpDropdownOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.2s ease',
+                  }}
+                />
+              </button>
+            </div>
+
+            {/* Dropdown Menu */}
+            {isEmpDropdownOpen && (
+              <div
+                className="nav-dropdown-menu"
+                style={{
+                  marginTop: '0.35rem',
+                  marginLeft: '0.75rem',
+                  padding: '0.35rem',
+                  background: 'var(--panel)',
+                  border: '1px solid var(--border)',
+                  borderRadius: '12px',
+                  boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.2rem',
+                }}
+              >
+                <NavLink
+                  to="/employees"
+                  end
+                  className={({ isActive }) =>
+                    `nav-link ${isActive ? 'active' : ''}`
+                  }
+                  style={{
+                    padding: '0.55rem 0.85rem',
+                    fontSize: '0.88rem',
+                    borderRadius: '8px',
+                  }}
+                  onClick={() => setIsEmpDropdownOpen(false)}
+                >
+                  Employees (Active)
+                </NavLink>
+                <NavLink
+                  to="/all-employees"
+                  end
+                  className={({ isActive }) =>
+                    `nav-link ${isActive ? 'active' : ''}`
+                  }
+                  style={{
+                    padding: '0.55rem 0.85rem',
+                    fontSize: '0.88rem',
+                    borderRadius: '8px',
+                  }}
+                  onClick={() => setIsEmpDropdownOpen(false)}
+                >
+                  All Employees
+                </NavLink>
+              </div>
+            )}
+          </div>
+
+          <NavLink to="/attendance" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Attendance
+          </NavLink>
+          <NavLink to="/leaves" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Leaves
+          </NavLink>
+          <NavLink to="/salary-check" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Salary Check
+          </NavLink>
+          <NavLink to="/invoice" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Invoice
+          </NavLink>
+          <NavLink to="/payslip" end className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}>
+            Payslip
+          </NavLink>
         </nav>
         <div className="sidebar-footer">
           <button className="ghost-button" onClick={() => { safeStorage.removeItem('skandan_user_role'); navigate('/sign-in') }}>
@@ -157,11 +301,79 @@ export function AppShell({ children }: PropsWithChildren) {
 
       {/* Fixed Mobile Bottom Navigation Bar */}
       <nav className="mobile-bottom-nav">
-        {navItems.map((item) => (
-          <NavLink key={item.to} to={item.to} end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
-            <span className="mobile-nav-label">{item.label}</span>
-          </NavLink>
-        ))}
+        <NavLink to="/" end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
+          <span className="mobile-nav-label">Dashboard</span>
+        </NavLink>
+
+        {/* Mobile Employees with Menu */}
+        <div style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          <button
+            type="button"
+            onClick={() => setIsMobileEmpMenuOpen((prev) => !prev)}
+            className={`mobile-nav-link ${isEmpRoute ? 'active' : ''}`}
+            style={{ background: 'transparent', border: 'none', cursor: 'pointer', width: '100%', padding: '0.25rem' }}
+          >
+            <span className="mobile-nav-label" style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+              Employees <ChevronDown size={11} style={{ transform: isMobileEmpMenuOpen ? 'rotate(180deg)' : 'none' }} />
+            </span>
+          </button>
+          {isMobileEmpMenuOpen && (
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                marginBottom: '8px',
+                background: 'var(--panel)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '4px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '4px',
+                boxShadow: '0 8px 20px rgba(0,0,0,0.2)',
+                zIndex: 1000,
+                minWidth: '135px',
+              }}
+            >
+              <NavLink
+                to="/employees"
+                end
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                style={{ padding: '6px 10px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                onClick={() => setIsMobileEmpMenuOpen(false)}
+              >
+                Employees (Active)
+              </NavLink>
+              <NavLink
+                to="/all-employees"
+                end
+                className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
+                style={{ padding: '6px 10px', fontSize: '0.8rem', whiteSpace: 'nowrap' }}
+                onClick={() => setIsMobileEmpMenuOpen(false)}
+              >
+                All Employees
+              </NavLink>
+            </div>
+          )}
+        </div>
+
+        <NavLink to="/attendance" end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
+          <span className="mobile-nav-label">Attendance</span>
+        </NavLink>
+        <NavLink to="/leaves" end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
+          <span className="mobile-nav-label">Leaves</span>
+        </NavLink>
+        <NavLink to="/salary-check" end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
+          <span className="mobile-nav-label">Salary Check</span>
+        </NavLink>
+        <NavLink to="/invoice" end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
+          <span className="mobile-nav-label">Invoice</span>
+        </NavLink>
+        <NavLink to="/payslip" end className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}>
+          <span className="mobile-nav-label">Payslip</span>
+        </NavLink>
       </nav>
     </div>
   )

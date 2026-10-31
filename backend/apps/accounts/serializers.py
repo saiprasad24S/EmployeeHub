@@ -177,6 +177,10 @@ class SalaryCheckItemSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="display_name", read_only=True)
     contact_no = serializers.CharField(source="display_phone", read_only=True)
     pic = serializers.CharField(source="display_photo", read_only=True)
+    present_days = serializers.SerializerMethodField()
+    total_days = serializers.SerializerMethodField()
+    salary = serializers.SerializerMethodField()
+    is_paid = serializers.SerializerMethodField()
 
     class Meta:
         model = SalaryCheckItem
@@ -192,11 +196,46 @@ class SalaryCheckItemSerializer(serializers.ModelSerializer):
             "name",
             "contact_no",
             "pic",
+            "present_days",
+            "total_days",
+            "fixed_salary",
             "salary",
             "is_paid",
             "paid_at",
+            "paid_months",
             "is_hidden",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+    def get_present_days(self, obj):
+        if obj.is_custom or not obj.employee_id:
+            return 0
+        attendance_map = self.context.get("attendance_map", {})
+        return attendance_map.get(obj.employee_id, 0)
+
+    def get_total_days(self, obj):
+        return self.context.get("total_days", 31)
+
+    def get_salary(self, obj):
+        if obj.is_custom:
+            return float(obj.fixed_salary if obj.fixed_salary > 0 else obj.salary)
+
+        base = float(obj.fixed_salary if obj.fixed_salary > 0 else obj.salary)
+        if base <= 0:
+            return 0.0
+
+        total_days = self.get_total_days(obj)
+        present_days = self.get_present_days(obj)
+
+        if total_days <= 0 or present_days <= 0:
+            return 0.0
+
+        return round((base / total_days) * present_days, 2)
+
+    def get_is_paid(self, obj):
+        month_key = self.context.get("month_key")
+        if month_key and obj.paid_months and month_key in obj.paid_months:
+            return bool(obj.paid_months[month_key])
+        return bool(obj.is_paid)

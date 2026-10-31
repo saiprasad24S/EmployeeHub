@@ -17,6 +17,9 @@ import {
   Building2,
   UserCheck,
   Clock,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
 } from 'lucide-react'
 import { authedFetch } from '../lib/api'
 
@@ -32,17 +35,51 @@ export interface SalaryCheckItem {
   name: string
   contact_no: string
   pic: string
+  present_days?: number
+  total_days?: number
+  fixed_salary: number | string
   salary: number | string
   is_paid: boolean
   paid_at: string | null
+  paid_months?: Record<string, boolean>
   is_hidden?: boolean
   created_at: string
   updated_at: string
 }
 
 export function SalaryCheckPage() {
-  const { getToken } = useAuth()
+  const { getToken, isLoaded, isSignedIn } = useAuth()
   const queryClient = useQueryClient()
+
+  // Selected Month and Year State (defaults to current month)
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date()
+    return { year: now.getFullYear(), month: now.getMonth() + 1 }
+  })
+
+  const selectedMonthName = useMemo(() => {
+    return new Intl.DateTimeFormat('en-IN', { month: 'long', year: 'numeric' }).format(
+      new Date(selectedDate.year, selectedDate.month - 1, 1)
+    )
+  }, [selectedDate])
+
+  const handlePrevMonth = () => {
+    setSelectedDate((prev) => {
+      if (prev.month === 1) {
+        return { year: prev.year - 1, month: 12 }
+      }
+      return { year: prev.year, month: prev.month - 1 }
+    })
+  }
+
+  const handleNextMonth = () => {
+    setSelectedDate((prev) => {
+      if (prev.month === 12) {
+        return { year: prev.year + 1, month: 1 }
+      }
+      return { year: prev.year, month: prev.month + 1 }
+    })
+  }
 
   const [searchQuery, setSearchQuery] = useState('')
   const [filterTab, setFilterTab] = useState<'ALL' | 'PAID' | 'UNPAID' | 'VENDORS'>('ALL')
@@ -54,44 +91,52 @@ export function SalaryCheckPage() {
   const [newEmpName, setNewEmpName] = useState('')
   const [newEmpId, setNewEmpId] = useState('')
   const [newEmpPhone, setNewEmpPhone] = useState('')
-  const [newEmpSalary, setNewEmpSalary] = useState('')
+  const [newEmpFixedSalary, setNewEmpFixedSalary] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
 
-  // Local editing states for salaries: { [id]: string }
-  const [editingSalaries, setEditingSalaries] = useState<Record<number, string>>({})
+  // Local editing states for fixed salaries: { [id]: string }
+  const [editingFixedSalaries, setEditingFixedSalaries] = useState<Record<number, string>>({})
   const [savingSalaryId, setSavingSalaryId] = useState<number | null>(null)
   const [savedSuccessId, setSavedSuccessId] = useState<number | null>(null)
 
-  // Query salary items
-  const { data: salaryItems = [], isLoading, error } = useQuery<SalaryCheckItem[]>({
-    queryKey: ['salary-check'],
+  // Query salary items for selected month & year
+  const { data: salaryItems = [], isLoading, error, refetch } = useQuery<SalaryCheckItem[]>({
+    queryKey: ['salary-check', selectedDate.year, selectedDate.month],
     queryFn: async () => {
       const token = await getToken()
       if (!token) throw new Error('Authentication required')
-      const res = await authedFetch('/api/salary-check/', token)
+      const res = await authedFetch(`/api/salary-check/?year=${selectedDate.year}&month=${selectedDate.month}`, token)
       if (!res.ok) throw new Error('Failed to load salary check records')
-      return res.json()
+      const data = await res.json()
+      return (Array.isArray(data) ? data : data?.results ?? []) as SalaryCheckItem[]
     },
+    enabled: !!isLoaded && !!isSignedIn,
+    retry: 2,
+    placeholderData: (previousData) => previousData,
   })
 
-  // Mutation to toggle is_paid
+  // Mutation to toggle is_paid for current month
   const togglePaidMutation = useMutation({
     mutationFn: async ({ id, is_paid }: { id: number; is_paid: boolean }) => {
       const token = await getToken()
       if (!token) throw new Error('Authentication required')
       const res = await authedFetch(`/api/salary-check/${id}/`, token, {
         method: 'PATCH',
-        body: JSON.stringify({ is_paid }),
+        body: JSON.stringify({
+          is_paid,
+          year: selectedDate.year,
+          month: selectedDate.month,
+        }),
       })
       if (!res.ok) throw new Error('Failed to update payment status')
       return res.json()
     },
     onMutate: async ({ id, is_paid }) => {
-      await queryClient.cancelQueries({ queryKey: ['salary-check'] })
-      const previous = queryClient.getQueryData<SalaryCheckItem[]>(['salary-check'])
+      await queryClient.cancelQueries({ queryKey: ['salary-check', selectedDate.year, selectedDate.month] })
+      const previous = queryClient.getQueryData<SalaryCheckItem[]>(['salary-check', selectedDate.year, selectedDate.month])
       if (previous) {
         queryClient.setQueryData<SalaryCheckItem[]>(
-          ['salary-check'],
+          ['salary-check', selectedDate.year, selectedDate.month],
           previous.map((item) =>
             item.id === id ? { ...item, is_paid, paid_at: is_paid ? new Date().toISOString() : null } : item
           )
@@ -101,59 +146,64 @@ export function SalaryCheckPage() {
     },
     onError: (_err, _vars, context) => {
       if (context?.previous) {
-        queryClient.setQueryData(['salary-check'], context.previous)
+        queryClient.setQueryData(['salary-check', selectedDate.year, selectedDate.month], context.previous)
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['salary-check'] })
+      queryClient.invalidateQueries({ queryKey: ['salary-check', selectedDate.year, selectedDate.month] })
     },
   })
 
-  // Mutation to update salary amount
-  const updateSalaryMutation = useMutation({
-    mutationFn: async ({ id, salary }: { id: number; salary: number }) => {
+  // Mutation to update fixed salary amount
+  const updateFixedSalaryMutation = useMutation({
+    mutationFn: async ({ id, fixed_salary }: { id: number; fixed_salary: number }) => {
       const token = await getToken()
       if (!token) throw new Error('Authentication required')
       const res = await authedFetch(`/api/salary-check/${id}/`, token, {
         method: 'PATCH',
-        body: JSON.stringify({ salary }),
+        body: JSON.stringify({
+          fixed_salary,
+          salary: fixed_salary,
+        }),
       })
-      if (!res.ok) throw new Error('Failed to update salary')
+      if (!res.ok) throw new Error('Failed to update fixed salary')
       return res.json()
     },
     onSuccess: (updatedItem) => {
       setSavingSalaryId(null)
       setSavedSuccessId(updatedItem.id)
       setTimeout(() => setSavedSuccessId(null), 2000)
-      queryClient.setQueryData<SalaryCheckItem[]>(['salary-check'], (old = []) =>
-        old.map((item) => (item.id === updatedItem.id ? { ...item, salary: updatedItem.salary } : item))
-      )
+      queryClient.invalidateQueries({ queryKey: ['salary-check', selectedDate.year, selectedDate.month] })
     },
     onError: () => {
       setSavingSalaryId(null)
     },
   })
 
-  // Mutation to reset all statuses
+  // Mutation to reset all statuses for selected month
   const resetMutation = useMutation({
     mutationFn: async () => {
       const token = await getToken()
       if (!token) throw new Error('Authentication required')
       const res = await authedFetch('/api/salary-check/reset/', token, {
         method: 'POST',
+        body: JSON.stringify({
+          year: selectedDate.year,
+          month: selectedDate.month,
+        }),
       })
       if (!res.ok) throw new Error('Failed to reset salary statuses')
       return res.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['salary-check'] })
+      queryClient.invalidateQueries({ queryKey: ['salary-check', selectedDate.year, selectedDate.month] })
       setIsResetModalOpen(false)
     },
   })
 
   // Mutation to create new custom employee / vendor
   const createVendorMutation = useMutation({
-    mutationFn: async (payload: { name: string; emp_id: string; contact_no: string; salary: number }) => {
+    mutationFn: async (payload: { name: string; emp_id: string; contact_no: string; fixed_salary: number }) => {
       const token = await getToken()
       if (!token) throw new Error('Authentication required')
       const res = await authedFetch('/api/salary-check/', token, {
@@ -167,12 +217,12 @@ export function SalaryCheckPage() {
       return res.json()
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['salary-check'] })
+      queryClient.invalidateQueries({ queryKey: ['salary-check', selectedDate.year, selectedDate.month] })
       setIsCreateModalOpen(false)
       setNewEmpName('')
       setNewEmpId('')
       setNewEmpPhone('')
-      setNewEmpSalary('')
+      setNewEmpFixedSalary('')
       setCreateError(null)
     },
     onError: (err: any) => {
@@ -189,7 +239,6 @@ export function SalaryCheckPage() {
         method: 'DELETE',
       })
       if (!res.ok) {
-        // Fallback to PATCH { is_hidden: true }
         const patchRes = await authedFetch(`/api/salary-check/${id}/`, token, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
@@ -200,7 +249,7 @@ export function SalaryCheckPage() {
       return true
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['salary-check'] })
+      queryClient.invalidateQueries({ queryKey: ['salary-check', selectedDate.year, selectedDate.month] })
       setItemToRemove(null)
     },
     onError: (err: any) => {
@@ -208,28 +257,29 @@ export function SalaryCheckPage() {
     },
   })
 
-  // Save salary on blur or enter key
-  const handleSalaryBlurOrSubmit = (item: SalaryCheckItem) => {
-    const rawVal = editingSalaries[item.id]
+  // Save fixed salary on blur or enter key
+  const handleFixedSalaryBlurOrSubmit = (item: SalaryCheckItem) => {
+    const rawVal = editingFixedSalaries[item.id]
     if (rawVal === undefined) return
     const num = parseFloat(rawVal)
     if (isNaN(num) || num < 0) {
-      setEditingSalaries((prev) => ({ ...prev, [item.id]: String(item.salary || 0) }))
+      setEditingFixedSalaries((prev) => ({ ...prev, [item.id]: String(item.fixed_salary || 0) }))
       return
     }
-    if (num !== Number(item.salary)) {
+    if (num !== Number(item.fixed_salary)) {
       setSavingSalaryId(item.id)
-      updateSalaryMutation.mutate({ id: item.id, salary: num })
+      updateFixedSalaryMutation.mutate({ id: item.id, fixed_salary: num })
     }
   }
 
   // Summary Metrics
   const metrics = useMemo(() => {
-    const totalCount = salaryItems.length
-    const paidItems = salaryItems.filter((i) => i.is_paid)
-    const unpaidItems = salaryItems.filter((i) => !i.is_paid)
+    const list = Array.isArray(salaryItems) ? salaryItems : []
+    const totalCount = list.length
+    const paidItems = list.filter((i) => i.is_paid)
+    const unpaidItems = list.filter((i) => !i.is_paid)
 
-    const totalSalaryBudget = salaryItems.reduce((acc, curr) => acc + (Number(curr.salary) || 0), 0)
+    const totalSalaryBudget = list.reduce((acc, curr) => acc + (Number(curr.salary) || 0), 0)
     const totalPaidAmount = paidItems.reduce((acc, curr) => acc + (Number(curr.salary) || 0), 0)
     const totalPendingAmount = unpaidItems.reduce((acc, curr) => acc + (Number(curr.salary) || 0), 0)
 
@@ -248,7 +298,8 @@ export function SalaryCheckPage() {
 
   // Filtered Items
   const filteredItems = useMemo(() => {
-    return salaryItems.filter((item) => {
+    const list = Array.isArray(salaryItems) ? salaryItems : []
+    return list.filter((item) => {
       const q = searchQuery.toLowerCase().trim()
       const matchesSearch =
         !q ||
@@ -289,6 +340,82 @@ export function SalaryCheckPage() {
 
           {/* Top Right Action Buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            {/* Month with Side Arrows Button */}
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                background: 'var(--panel)',
+                border: '1px solid var(--border)',
+                borderRadius: '10px',
+                padding: '0.2rem 0.35rem',
+                gap: '0.25rem',
+                boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
+              }}
+            >
+              <button
+                type="button"
+                onClick={handlePrevMonth}
+                title="Previous month"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text)',
+                  cursor: 'pointer',
+                  padding: '0.35rem 0.5rem',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.06)')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+              >
+                <ChevronLeft size={18} />
+              </button>
+
+              <span
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '0.4rem',
+                  padding: '0.35rem 0.65rem',
+                  fontWeight: 700,
+                  fontSize: '0.88rem',
+                  color: 'var(--text)',
+                  minWidth: '140px',
+                  justifyContent: 'center',
+                  userSelect: 'none',
+                }}
+              >
+                <Calendar size={14} style={{ color: 'var(--primary)' }} />
+                <span>{selectedMonthName}</span>
+              </span>
+
+              <button
+                type="button"
+                onClick={handleNextMonth}
+                title="Next month"
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--text)',
+                  cursor: 'pointer',
+                  padding: '0.35rem 0.5rem',
+                  borderRadius: '6px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  transition: 'background 0.15s ease',
+                }}
+                onMouseEnter={(e) => ((e.currentTarget as HTMLElement).style.background = 'rgba(0,0,0,0.06)')}
+                onMouseLeave={(e) => ((e.currentTarget as HTMLElement).style.background = 'transparent')}
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+
             {/* Reset Button */}
             <button
               onClick={() => setIsResetModalOpen(true)}
@@ -306,7 +433,7 @@ export function SalaryCheckPage() {
                 cursor: 'pointer',
                 transition: 'all 0.2s',
               }}
-              title="Reset all salary payment statuses to default Unpaid"
+              title="Reset salary payment statuses for this month to default Unpaid"
             >
               <RotateCcw size={15} />
               <span>Reset</span>
@@ -348,80 +475,93 @@ export function SalaryCheckPage() {
               <Users size={22} />
             </div>
             <div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Total Workforce</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text)', marginTop: '0.15rem' }}>{metrics.totalCount} Members</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.03em', fontWeight: 600 }}>Total Staff</div>
+              <div style={{ fontSize: '1.5rem', fontWeight: 700, color: 'var(--text)', marginTop: '0.15rem' }}>{metrics.totalCount}</div>
             </div>
           </div>
 
-          {/* Total Budget */}
-          <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.12)', color: '#3B82F6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <DollarSign size={22} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Total Salary Budget</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text)', marginTop: '0.15rem' }}>{formatCurrency(metrics.totalSalaryBudget)}</div>
-            </div>
-          </div>
-
-          {/* Paid Total */}
+          {/* Disbursed (Paid) */}
           <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <CheckCircle2 size={22} />
             </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Salary Paid</span>
-                <span style={{ fontSize: '0.78rem', color: '#10B981', fontWeight: 700 }}>{metrics.paidCount}/{metrics.totalCount} ({metrics.paidPercentage}%)</span>
-              </div>
+            <div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.03em', fontWeight: 600 }}>Disbursed (Paid)</div>
               <div style={{ fontSize: '1.35rem', fontWeight: 700, color: '#10B981', marginTop: '0.15rem' }}>{formatCurrency(metrics.totalPaidAmount)}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{metrics.paidCount} staff paid ({metrics.paidPercentage}%)</div>
             </div>
           </div>
 
-          {/* Pending Total */}
+          {/* Pending (Unpaid) */}
           <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
             <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.12)', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <Clock size={22} />
+              <XCircle size={22} />
             </div>
             <div>
-              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Pending Payout</div>
-              <div style={{ fontSize: '1.35rem', fontWeight: 700, color: '#EF4444', marginTop: '0.15rem' }}>{formatCurrency(metrics.totalPendingAmount)} ({metrics.unpaidCount} Pending)</div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.03em', fontWeight: 600 }}>Pending (Unpaid)</div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 700, color: '#EF4444', marginTop: '0.15rem' }}>{formatCurrency(metrics.totalPendingAmount)}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>{metrics.unpaidCount} staff pending</div>
+            </div>
+          </div>
+
+          {/* Calculated Budget for Month */}
+          <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(59, 130, 246, 0.12)', color: '#2563EB', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <DollarSign size={22} />
+            </div>
+            <div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.03em', fontWeight: 600 }}>
+                {selectedMonthName.split(' ')[0]} Payout
+              </div>
+              <div style={{ fontSize: '1.35rem', fontWeight: 700, color: 'var(--text)', marginTop: '0.15rem' }}>{formatCurrency(metrics.totalSalaryBudget)}</div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>Based on attendance</div>
             </div>
           </div>
         </div>
-
-        {/* Progress Bar */}
-        {metrics.totalSalaryBudget > 0 && (
-          <div style={{ marginTop: '1.25rem', background: 'var(--border)', height: '6px', borderRadius: '999px', overflow: 'hidden' }}>
-            <div
-              style={{
-                width: `${metrics.paidPercentage}%`,
-                background: 'linear-gradient(90deg, #10B981, #059669)',
-                height: '100%',
-                borderRadius: '999px',
-                transition: 'width 0.4s ease',
-              }}
-            />
-          </div>
-        )}
       </div>
 
-      {/* Main Content Card: Filter & Table */}
-      <div className="glass-card card-soft" style={{ padding: '1.75rem' }}>
-        {/* Search & Filter Bar */}
+      {/* Main Table Card */}
+      <div className="glass-card card-soft" style={{ padding: '1.5rem' }}>
+        {/* Filter Controls and Search */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem', marginBottom: '1.25rem' }}>
+          {/* Filter Pills */}
+          <div style={{ display: 'flex', gap: '0.5rem', background: 'var(--panel)', padding: '0.25rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+            {(['ALL', 'PAID', 'UNPAID', 'VENDORS'] as const).map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setFilterTab(tab)}
+                style={{
+                  padding: '0.45rem 0.95rem',
+                  borderRadius: '8px',
+                  border: 'none',
+                  fontSize: '0.82rem',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  background: filterTab === tab ? 'var(--primary)' : 'transparent',
+                  color: filterTab === tab ? '#ffffff' : 'var(--muted)',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                {tab === 'ALL' && `All (${metrics.totalCount})`}
+                {tab === 'PAID' && `Paid (${metrics.paidCount})`}
+                {tab === 'UNPAID' && `Unpaid (${metrics.unpaidCount})`}
+                {tab === 'VENDORS' && 'Vendors/Staff'}
+              </button>
+            ))}
+          </div>
+
           {/* Search Box */}
-          <div style={{ position: 'relative', width: '320px', maxWidth: '100%' }}>
-            <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
+          <div style={{ position: 'relative', width: '280px', maxWidth: '100%' }}>
+            <Search size={16} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)' }} />
             <input
               type="text"
-              placeholder="Search by name, emp id, or phone..."
+              placeholder="Search by name, ID, contact..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{
                 width: '100%',
-                padding: '0.55rem 0.85rem 0.55rem 2.25rem',
-                borderRadius: '10px',
+                padding: '0.5rem 0.75rem 0.5rem 2.2rem',
+                borderRadius: '8px',
                 border: '1px solid var(--border)',
                 background: 'var(--panel)',
                 color: 'var(--text)',
@@ -429,47 +569,26 @@ export function SalaryCheckPage() {
               }}
             />
           </div>
-
-          {/* Filter Pills */}
-          <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            {(
-              [
-                { key: 'ALL', label: `All (${metrics.totalCount})` },
-                { key: 'PAID', label: `Paid (${metrics.paidCount})` },
-                { key: 'UNPAID', label: `Unpaid (${metrics.unpaidCount})` },
-                { key: 'VENDORS', label: `Vendors / Staff` },
-              ] as const
-            ).map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setFilterTab(tab.key)}
-                style={{
-                  padding: '0.45rem 0.85rem',
-                  borderRadius: '8px',
-                  fontSize: '0.8rem',
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  border: filterTab === tab.key ? '1px solid var(--primary)' : '1px solid var(--border)',
-                  background: filterTab === tab.key ? 'var(--primary)' : 'var(--panel)',
-                  color: filterTab === tab.key ? '#ffffff' : 'var(--text)',
-                  transition: 'all 0.15s ease',
-                }}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
         </div>
 
         {/* Loading / Error States */}
         {isLoading ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted)' }}>
-            Loading salary records...
+            Loading salary disbursement records for {selectedMonthName}...
           </div>
         ) : error ? (
-          <div style={{ padding: '2rem', background: 'rgba(239, 68, 68, 0.08)', color: '#EF4444', borderRadius: '10px', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <AlertCircle size={18} />
-            <span>{(error as any).message || 'Failed to load salary check records'}</span>
+          <div style={{ padding: '2rem', background: 'rgba(239, 68, 68, 0.08)', color: '#EF4444', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <AlertCircle size={18} />
+              <span>{(error as any).message || 'Failed to load salary check records'}</span>
+            </div>
+            <button
+              onClick={() => refetch()}
+              className="btn-secondary"
+              style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem', cursor: 'pointer' }}
+            >
+              Retry
+            </button>
           </div>
         ) : filteredItems.length === 0 ? (
           <div style={{ padding: '3rem', textAlign: 'center', color: 'var(--muted)' }}>
@@ -486,16 +605,18 @@ export function SalaryCheckPage() {
                     <th style={{ padding: '0.75rem 0.75rem' }}>Emp ID</th>
                     <th style={{ padding: '0.75rem 0.75rem' }}>Name</th>
                     <th style={{ padding: '0.75rem 0.75rem' }}>Contact No</th>
-                    <th style={{ padding: '0.75rem 0.75rem', width: '180px' }}>Salary (₹)</th>
-                    <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center', width: '160px' }}>Salary Paid</th>
+                    <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center' }}>Present Days</th>
+                    <th style={{ padding: '0.75rem 0.75rem', minWidth: '150px' }}>Fixed Salary (₹)</th>
+                    <th style={{ padding: '0.75rem 0.75rem', minWidth: '140px' }}>Salary (₹)</th>
+                    <th style={{ padding: '0.75rem 0.75rem', textAlign: 'center', width: '150px' }}>Salary Paid</th>
                   </tr>
                 </thead>
                 <tbody>
                   {filteredItems.map((item) => {
-                    const currentSalaryVal =
-                      editingSalaries[item.id] !== undefined
-                        ? editingSalaries[item.id]
-                        : String(Number(item.salary) || '')
+                    const currentFixedSalaryVal =
+                      editingFixedSalaries[item.id] !== undefined
+                        ? editingFixedSalaries[item.id]
+                        : String(Number(item.fixed_salary) || '')
 
                     return (
                       <tr
@@ -525,8 +646,7 @@ export function SalaryCheckPage() {
                                 src={item.pic}
                                 alt={item.name}
                                 onError={(e) => {
-                                  // fallback to initials if photo fails to load
-                                  (e.target as HTMLElement).style.display = 'none'
+                                  ;(e.target as HTMLElement).style.display = 'none'
                                 }}
                                 style={{ width: '38px', height: '38px', borderRadius: '50%', objectFit: 'cover', display: 'inline-block', border: '1px solid var(--border)' }}
                               />
@@ -587,7 +707,32 @@ export function SalaryCheckPage() {
                           )}
                         </td>
 
-                        {/* SALARY (EDITABLE) */}
+                        {/* PRESENT DAYS (From Attendance Module) */}
+                        <td style={{ padding: '0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
+                          {item.is_custom ? (
+                            <span style={{ fontSize: '0.78rem', color: 'var(--muted)', fontStyle: 'italic' }}>Vendor</span>
+                          ) : (
+                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+                              <span
+                                style={{
+                                  fontWeight: 700,
+                                  fontSize: '0.88rem',
+                                  color: (item.present_days || 0) > 0 ? '#10B981' : 'var(--muted)',
+                                  background: (item.present_days || 0) > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0, 0, 0, 0.04)',
+                                  padding: '0.2rem 0.6rem',
+                                  borderRadius: '6px',
+                                }}
+                              >
+                                {item.present_days ?? 0} {item.present_days === 1 ? 'day' : 'days'}
+                              </span>
+                              <span style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '2px' }}>
+                                of {item.total_days ?? 31} days
+                              </span>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* FIXED SALARY (EDITABLE) */}
                         <td style={{ padding: '0.75rem', verticalAlign: 'middle' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.35rem' }}>
                             <div style={{ position: 'relative', width: '130px' }}>
@@ -599,15 +744,15 @@ export function SalaryCheckPage() {
                                 min="0"
                                 step="100"
                                 placeholder="0"
-                                value={currentSalaryVal}
+                                value={currentFixedSalaryVal}
                                 onChange={(e) => {
                                   const val = e.target.value
-                                  setEditingSalaries((prev) => ({ ...prev, [item.id]: val }))
+                                  setEditingFixedSalaries((prev) => ({ ...prev, [item.id]: val }))
                                 }}
-                                onBlur={() => handleSalaryBlurOrSubmit(item)}
+                                onBlur={() => handleFixedSalaryBlurOrSubmit(item)}
                                 onKeyDown={(e) => {
                                   if (e.key === 'Enter') {
-                                    handleSalaryBlurOrSubmit(item)
+                                    handleFixedSalaryBlurOrSubmit(item)
                                     ;(e.target as HTMLInputElement).blur()
                                   }
                                 }}
@@ -621,6 +766,7 @@ export function SalaryCheckPage() {
                                   fontSize: '0.88rem',
                                   fontWeight: 600,
                                 }}
+                                title="Edit employee base/fixed actual salary"
                               />
                             </div>
                             {savingSalaryId === item.id && (
@@ -628,6 +774,20 @@ export function SalaryCheckPage() {
                             )}
                             {savedSuccessId === item.id && (
                               <Check size={16} style={{ color: '#10B981' }} />
+                            )}
+                          </div>
+                        </td>
+
+                        {/* SALARY (Calculated from Attendance & Fixed Salary) */}
+                        <td style={{ padding: '0.75rem', verticalAlign: 'middle' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column' }}>
+                            <span style={{ fontWeight: 700, fontSize: '0.98rem', color: 'var(--text)' }}>
+                              {formatCurrency(Number(item.salary) || 0)}
+                            </span>
+                            {!item.is_custom && (item.present_days || 0) > 0 && Number(item.fixed_salary || 0) > 0 && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--muted)', marginTop: '2px' }}>
+                                ₹{((Number(item.fixed_salary) / (item.total_days || 31))).toFixed(0)}/day × {item.present_days}
+                              </span>
                             )}
                           </div>
                         </td>
@@ -698,10 +858,10 @@ export function SalaryCheckPage() {
             {/* Mobile Responsive Cards View */}
             <div className="mobile-cards-container" style={{ display: 'none', flexDirection: 'column', gap: '0.9rem', marginTop: '1rem' }}>
               {filteredItems.map((item) => {
-                const currentSalaryVal =
-                  editingSalaries[item.id] !== undefined
-                    ? editingSalaries[item.id]
-                    : String(Number(item.salary) || '')
+                const currentFixedSalaryVal =
+                  editingFixedSalaries[item.id] !== undefined
+                    ? editingFixedSalaries[item.id]
+                    : String(Number(item.fixed_salary) || '')
 
                 return (
                   <div
@@ -769,16 +929,38 @@ export function SalaryCheckPage() {
                       </div>
                     )}
 
+                    {/* Present Days & Monthly Salary Details */}
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', background: 'rgba(0,0,0,0.03)', padding: '0.6rem', borderRadius: '8px' }}>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Present</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10B981', marginTop: '2px' }}>
+                          {item.is_custom ? '—' : `${item.present_days ?? 0} d`}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Fixed Base</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text)', marginTop: '2px' }}>
+                          {formatCurrency(Number(item.fixed_salary) || 0)}
+                        </div>
+                      </div>
+                      <div>
+                        <div style={{ fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Payable</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--primary)', marginTop: '2px' }}>
+                          {formatCurrency(Number(item.salary) || 0)}
+                        </div>
+                      </div>
+                    </div>
+
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', paddingTop: '0.5rem', borderTop: '1px solid var(--border)' }}>
                       <div>
-                        <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Salary (₹)</div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--muted)', textTransform: 'uppercase', fontWeight: 600 }}>Edit Fixed (₹)</div>
                         <div style={{ position: 'relative', width: '120px', marginTop: '0.2rem' }}>
                           <span style={{ position: 'absolute', left: '8px', top: '50%', transform: 'translateY(-50%)', color: 'var(--muted)', fontSize: '0.85rem' }}>₹</span>
                           <input
                             type="number"
-                            value={currentSalaryVal}
-                            onChange={(e) => setEditingSalaries((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                            onBlur={() => handleSalaryBlurOrSubmit(item)}
+                            value={currentFixedSalaryVal}
+                            onChange={(e) => setEditingFixedSalaries((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                            onBlur={() => handleFixedSalaryBlurOrSubmit(item)}
                             style={{
                               width: '100%',
                               padding: '0.35rem 0.4rem 0.35rem 1.4rem',
@@ -865,7 +1047,7 @@ export function SalaryCheckPage() {
               <h4 style={{ margin: 0, fontSize: '1.2rem', fontWeight: 700 }}>Reset Salary Paid Status?</h4>
             </div>
             <p style={{ color: 'var(--muted)', fontSize: '0.9rem', lineHeight: '1.5', margin: '0 0 1.5rem 0' }}>
-              This will reset the <strong>Salary Paid</strong> toggle for all active employees and vendors back to the default <strong>No (Unpaid)</strong> status for the current cycle.
+              This will reset the <strong>Salary Paid</strong> toggle for all active employees and vendors back to the default <strong>No (Unpaid)</strong> status for <strong>{selectedMonthName}</strong>.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
               <button
@@ -948,26 +1130,27 @@ export function SalaryCheckPage() {
               onSubmit={(e) => {
                 e.preventDefault()
                 if (!newEmpName.trim()) {
-                  setCreateError('Name is required')
+                  setCreateError('Name is required.')
                   return
                 }
+                const fixedSalaryNum = parseFloat(newEmpFixedSalary) || 0
                 createVendorMutation.mutate({
                   name: newEmpName.trim(),
                   emp_id: newEmpId.trim(),
                   contact_no: newEmpPhone.trim(),
-                  salary: parseFloat(newEmpSalary) || 0,
+                  fixed_salary: fixedSalaryNum,
                 })
               }}
               style={{ display: 'flex', flexDirection: 'column', gap: '0.9rem' }}
             >
               <div>
-                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-                  Full Name / Vendor Name *
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text)' }}>
+                  Full Name <span style={{ color: '#EF4444' }}>*</span>
                 </label>
                 <input
                   type="text"
                   required
-                  placeholder="e.g. Care Hygiene Services or John Doe"
+                  placeholder="e.g. Ramesh Kumar"
                   value={newEmpName}
                   onChange={(e) => setNewEmpName(e.target.value)}
                   style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
@@ -975,12 +1158,12 @@ export function SalaryCheckPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-                  Emp / Vendor ID (Optional)
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text)' }}>
+                  Identifier / Emp ID (optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="e.g. VEND-001 (leave blank to auto-generate)"
+                  placeholder="Leave empty for auto-generated VEND-XXX"
                   value={newEmpId}
                   onChange={(e) => setNewEmpId(e.target.value)}
                   style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
@@ -988,12 +1171,12 @@ export function SalaryCheckPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-                  Contact Number
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text)' }}>
+                  Contact Phone No
                 </label>
                 <input
-                  type="tel"
-                  placeholder="e.g. +91 9876543210"
+                  type="text"
+                  placeholder="e.g. 9876543210"
                   value={newEmpPhone}
                   onChange={(e) => setNewEmpPhone(e.target.value)}
                   style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
@@ -1001,16 +1184,16 @@ export function SalaryCheckPage() {
               </div>
 
               <div>
-                <label style={{ fontSize: '0.82rem', fontWeight: 600, display: 'block', marginBottom: '0.35rem' }}>
-                  Salary / Payout Amount (₹)
+                <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: 600, marginBottom: '0.35rem', color: 'var(--text)' }}>
+                  Fixed Monthly Salary (₹)
                 </label>
                 <input
                   type="number"
                   min="0"
                   step="100"
                   placeholder="e.g. 15000"
-                  value={newEmpSalary}
-                  onChange={(e) => setNewEmpSalary(e.target.value)}
+                  value={newEmpFixedSalary}
+                  onChange={(e) => setNewEmpFixedSalary(e.target.value)}
                   style={{ width: '100%', padding: '0.55rem', borderRadius: '8px', border: '1px solid var(--border)', background: 'var(--panel)', color: 'var(--text)' }}
                 />
               </div>
@@ -1045,6 +1228,7 @@ export function SalaryCheckPage() {
           </div>
         </div>
       )}
+
       {/* Confirmation Modal: Remove from Salary Check */}
       {itemToRemove && (
         <div

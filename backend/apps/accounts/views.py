@@ -1,4 +1,7 @@
 import logging
+import calendar
+from datetime import datetime, date, time
+from collections import defaultdict
 logger = logging.getLogger(__name__)
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
@@ -11,6 +14,9 @@ from rest_framework.views import APIView
 
 from django.db.models import Q
 from django.utils import timezone
+import calendar
+from datetime import datetime, date, time
+from collections import defaultdict
 
 from apps.accounts.authentication import ClerkJWTAuthentication
 from apps.accounts.models import Employee, SalaryCheckItem
@@ -403,10 +409,10 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
     queryset = SalaryCheckItem.objects.all()
     serializer_class = SalaryCheckItemSerializer
     permission_classes = [IsAuthenticated]
+    pagination_class = None
 
     def list(self, request, *args, **kwargs):
         # 1. Sync active employees into SalaryCheckItem:
-        # Every Employee with is_active=True gets a SalaryCheckItem if not already present
         active_employees = Employee.objects.filter(is_active=True)
         existing_emp_ids = set(
             SalaryCheckItem.objects.filter(employee__isnull=False).values_list("employee_id", flat=True)
@@ -418,6 +424,7 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
                     SalaryCheckItem(
                         employee=emp,
                         is_custom=False,
+                        fixed_salary=0.00,
                         salary=0.00,
                         is_paid=False,
                         is_hidden=False,
@@ -426,13 +433,61 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
         if new_items:
             SalaryCheckItem.objects.bulk_create(new_items)
 
-        # 2. Return all items where either is_custom=True OR employee.is_active=True, excluding hidden
-        # Former/inactive employees and manually removed employees are excluded from Salary Check
+        # 2. Extract year and month from query_params
+        now = datetime.now()
+        year_str = request.query_params.get("year")
+        month_str = request.query_params.get("month")
+        year = int(year_str) if year_str and year_str.isdigit() else now.year
+        month = int(month_str) if month_str and month_str.isdigit() else now.month
+        month_key = f"{year}-{month:02d}"
+
+        num_days = calendar.monthrange(year, month)[1]
+        start_date = date(year, month, 1)
+        end_date = date(year, month, num_days)
+
+        tz = timezone.get_current_timezone()
+        local_start = timezone.make_aware(datetime.combine(start_date, time.min), tz)
+        local_end = timezone.make_aware(datetime.combine(end_date, time.max), tz)
+
+        # Query Attendance and Session records for active employees in this month
+        from apps.attendance.models import Session, Attendance
+        sessions = Session.objects.filter(
+            employee__is_active=True,
+            login_time__range=(local_start, local_end)
+        ).values_list("employee_id", "login_time")
+
+        attendances = Attendance.objects.filter(
+            employee__is_active=True,
+            timestamp__range=(local_start, local_end)
+        ).values_list("employee_id", "timestamp")
+
+        emp_dates = defaultdict(set)
+        for emp_id, login_time in sessions:
+            if login_time:
+                emp_dates[emp_id].add(timezone.localtime(login_time).date())
+        for emp_id, timestamp in attendances:
+            if timestamp:
+                emp_dates[emp_id].add(timezone.localtime(timestamp).date())
+
+        attendance_map = {emp_id: len(dates) for emp_id, dates in emp_dates.items()}
+
+        # 3. Return all items where either is_custom=True OR employee.is_active=True, excluding hidden
         items = SalaryCheckItem.objects.filter(
             (Q(is_custom=True) | Q(employee__is_active=True)) & Q(is_hidden=False)
         ).select_related("employee").order_by("-is_custom", "employee__employee_id", "id")
 
-        serializer = self.get_serializer(items, many=True)
+        serializer = self.get_serializer(
+            items,
+            many=True,
+            context={
+                "request": request,
+                "attendance_map": attendance_map,
+                "total_days": num_days,
+                "year": year,
+                "month": month,
+                "month_key": month_key,
+            }
+        )
         return Response(serializer.data)
 
     def destroy(self, request, *args, **kwargs):
@@ -456,7 +511,7 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
 
         phone = (request.data.get("contact_no") or request.data.get("custom_phone") or request.data.get("phone") or "").strip()
         pic = (request.data.get("pic") or request.data.get("custom_pic") or "").strip()
-        salary = request.data.get("salary") or 0.00
+        fixed_salary = request.data.get("fixed_salary") or request.data.get("salary") or 0.00
 
         item = SalaryCheckItem.objects.create(
             is_custom=True,
@@ -464,13 +519,19 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
             custom_emp_id=emp_id,
             custom_phone=phone,
             custom_pic=pic,
-            salary=salary,
+            fixed_salary=fixed_salary,
+            salary=fixed_salary,
             is_paid=False,
         )
         return Response(self.get_serializer(item).data, status=status.HTTP_201_CREATED)
 
     def partial_update(self, request, *args, **kwargs):
         item = self.get_object()
+        if "fixed_salary" in request.data:
+            try:
+                item.fixed_salary = float(request.data["fixed_salary"])
+            except (ValueError, TypeError):
+                pass
         if "salary" in request.data:
             try:
                 item.salary = float(request.data["salary"])
@@ -480,8 +541,17 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
             val = request.data["is_paid"]
             if isinstance(val, str):
                 val = val.lower() in ("true", "1", "yes")
-            item.is_paid = bool(val)
-            item.paid_at = timezone.now() if item.is_paid else None
+            is_paid_val = bool(val)
+            item.is_paid = is_paid_val
+            item.paid_at = timezone.now() if is_paid_val else None
+
+            year = request.data.get("year") or request.query_params.get("year")
+            month = request.data.get("month") or request.query_params.get("month")
+            if year and month:
+                m_key = f"{int(year)}-{int(month):02d}"
+                if not isinstance(item.paid_months, dict):
+                    item.paid_months = {}
+                item.paid_months[m_key] = is_paid_val
 
         if "is_hidden" in request.data:
             val = request.data["is_hidden"]
@@ -507,6 +577,19 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], url_path="reset")
     def reset(self, request):
-        SalaryCheckItem.objects.all().update(is_paid=False, paid_at=None)
-        return Response({"detail": "All salary payment statuses have been reset to default (Unpaid).", "status": "ok"})
+        year = request.data.get("year") or request.query_params.get("year")
+        month = request.data.get("month") or request.query_params.get("month")
+        if year and month:
+            m_key = f"{int(year)}-{int(month):02d}"
+            items = SalaryCheckItem.objects.all()
+            for it in items:
+                if not isinstance(it.paid_months, dict):
+                    it.paid_months = {}
+                it.paid_months[m_key] = False
+                it.is_paid = False
+                it.save(update_fields=["paid_months", "is_paid"])
+            return Response({"detail": f"All salary payment statuses for {m_key} have been reset to default (Unpaid).", "status": "ok"})
+        else:
+            SalaryCheckItem.objects.all().update(is_paid=False, paid_at=None, paid_months={})
+            return Response({"detail": "All salary payment statuses have been reset to default (Unpaid).", "status": "ok"})
 

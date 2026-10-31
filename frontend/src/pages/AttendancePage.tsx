@@ -69,7 +69,10 @@ export function AttendancePage() {
     placeholderData: (previousData) => previousData,
   })
 
-  const employees = useMemo(() => Array.isArray(employeesQuery.data) ? employeesQuery.data : [], [employeesQuery.data])
+  const employees = useMemo(() => {
+    const list = Array.isArray(employeesQuery.data) ? employeesQuery.data : []
+    return list.filter((emp) => emp && emp.is_active)
+  }, [employeesQuery.data])
 
   const activeEmpId = selectedEmpIds[0]
   const activeEmp = useMemo(() => employees.find((e) => e && e.id === activeEmpId), [employees, activeEmpId])

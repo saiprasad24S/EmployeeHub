@@ -380,7 +380,7 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
     start_dt = timezone.make_aware(datetime.combine(start_date, time.min), tz)
     end_dt = timezone.make_aware(datetime.combine(end_date, time.max), tz)
 
-    all_sessions = Session.objects.filter(login_time__gte=start_dt, login_time__lte=end_dt).order_by('login_time')
+    all_sessions = Session.objects.filter(employee__is_active=True, login_time__gte=start_dt, login_time__lte=end_dt).order_by('login_time')
     sessions_by_emp_date: dict[tuple[int, date], Session] = {}
     for s in all_sessions:
         if s.login_time:
@@ -389,7 +389,7 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
             if key not in sessions_by_emp_date or (s.is_active or s.logout_time):
                 sessions_by_emp_date[key] = s
 
-    all_attendances = Attendance.objects.filter(timestamp__gte=start_dt, timestamp__lte=end_dt).order_by('timestamp')
+    all_attendances = Attendance.objects.filter(employee__is_active=True, timestamp__gte=start_dt, timestamp__lte=end_dt).order_by('timestamp')
     attendances_by_emp_date: dict[tuple[int, date], Attendance] = {}
     for a in all_attendances:
         if a.timestamp:
@@ -399,7 +399,7 @@ def generate_attendance_export(start_date: date, end_date: date) -> bytes:
                 attendances_by_emp_date[key] = a
 
     # Populate Data Rows
-    employees = Employee.objects.all().order_by("employee_id")
+    employees = Employee.objects.filter(is_active=True).order_by("employee_id")
     row_idx = 8
     now = timezone.now()
 

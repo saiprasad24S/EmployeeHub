@@ -42,6 +42,7 @@ export function DashboardPage() {
         profile_photo?: string
         latitude: number
         longitude: number
+        is_active?: boolean
       }>>
     },
     staleTime: 30_000,
@@ -51,7 +52,8 @@ export function DashboardPage() {
   })
 
   const filteredLocations = useMemo(() => {
-    const data = Array.isArray(liveLocationsQuery.data) ? liveLocationsQuery.data : []
+    const rawData = Array.isArray(liveLocationsQuery.data) ? liveLocationsQuery.data : []
+    const data = rawData.filter((loc) => loc && (loc as any).is_active !== false)
     if (!searchQuery.trim()) return data
     const query = searchQuery.toLowerCase().trim()
     return data.filter((loc) =>

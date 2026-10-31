@@ -34,9 +34,9 @@ class DashboardMetricsView(APIView):
             .count()
         )
 
-        # Efficient: single COUNT query
+        # Efficient: single COUNT query (active employees only)
         employees_in_field = (
-            Session.objects.filter(is_active=True)
+            Session.objects.filter(is_active=True, employee__is_active=True)
             .values("employee_id")
             .distinct()
             .count()

@@ -76,8 +76,8 @@ export function TrackingPage() {
     placeholderData: (previousData) => previousData,
   })
 
-  const employees = useMemo(() => Array.isArray(employeesQuery.data) ? employeesQuery.data : [], [employeesQuery.data])
-  const liveLocations = useMemo(() => Array.isArray(liveLocationsQuery.data) ? liveLocationsQuery.data : [], [liveLocationsQuery.data])
+  const employees = useMemo(() => Array.isArray(employeesQuery.data) ? employeesQuery.data.filter((e) => e && e.is_active !== false) : [], [employeesQuery.data])
+  const liveLocations = useMemo(() => Array.isArray(liveLocationsQuery.data) ? liveLocationsQuery.data.filter((l) => l && (l as any).is_active !== false) : [], [liveLocationsQuery.data])
 
   // Resolve selected employee either from URL or from search
   const selectedEmployee = useMemo(() => {

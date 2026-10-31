@@ -78,7 +78,17 @@ class GeofenceTests(TestCase):
         workbook = load_workbook(BytesIO(workbook_bytes))
         sheet = workbook.active
         self.assertGreater(sheet.max_row, 7)
-        self.assertIn(sheet.cell(row=8, column=1).value, {'EMP001', 'EMP002'})
+        Employee.objects.create(
+            employee_id='EMP999',
+            name='Inactive Employee',
+            email='inactive@example.com',
+            phone='9999999999',
+            is_active=False,
+        )
+        emp_ids = [sheet.cell(row=r, column=1).value for r in range(8, sheet.max_row + 1)]
+        self.assertIn('EMP001', emp_ids)
+        self.assertIn('EMP002', emp_ids)
+        self.assertNotIn('EMP999', emp_ids)
 
     def test_get_employee_presence_summary_keeps_active_session_present_across_days(self):
         employee = Employee.objects.create(
