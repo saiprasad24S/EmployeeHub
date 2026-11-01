@@ -236,6 +236,8 @@ class SalaryCheckItemSerializer(serializers.ModelSerializer):
 
     def get_is_paid(self, obj):
         month_key = self.context.get("month_key")
-        if month_key and obj.paid_months and month_key in obj.paid_months:
-            return bool(obj.paid_months[month_key])
+        if month_key:
+            if obj.paid_months and isinstance(obj.paid_months, dict):
+                return bool(obj.paid_months.get(month_key, False))
+            return False
         return bool(obj.is_paid)

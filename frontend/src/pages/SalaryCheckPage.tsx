@@ -272,18 +272,28 @@ export function SalaryCheckPage() {
     }
   }
 
+  const isItemPaid = (item: SalaryCheckItem): boolean => {
+    return Boolean(item.is_paid)
+  }
+
+  const getItemPayableAmount = (item: SalaryCheckItem): number => {
+    const sal = Number(item.salary) || 0
+    if (sal > 0) return sal
+    return Number(item.fixed_salary) || 0
+  }
+
   // Summary Metrics
   const metrics = useMemo(() => {
     const list = Array.isArray(salaryItems) ? salaryItems : []
     const totalCount = list.length
-    const paidItems = list.filter((i) => i.is_paid)
-    const unpaidItems = list.filter((i) => !i.is_paid)
+    const paidItems = list.filter((i) => isItemPaid(i))
+    const unpaidItems = list.filter((i) => !isItemPaid(i))
 
-    const totalSalaryBudget = list.reduce((acc, curr) => acc + (Number(curr.salary) || 0), 0)
-    const totalPaidAmount = paidItems.reduce((acc, curr) => acc + (Number(curr.salary) || 0), 0)
-    const totalPendingAmount = unpaidItems.reduce((acc, curr) => acc + (Number(curr.salary) || 0), 0)
+    const totalSalaryBudget = list.reduce((acc, curr) => acc + getItemPayableAmount(curr), 0)
+    const totalPaidAmount = paidItems.reduce((acc, curr) => acc + getItemPayableAmount(curr), 0)
+    const totalPendingAmount = unpaidItems.reduce((acc, curr) => acc + getItemPayableAmount(curr), 0)
 
-    const paidPercentage = totalSalaryBudget > 0 ? Math.round((totalPaidAmount / totalSalaryBudget) * 100) : 0
+    const paidPercentage = totalCount > 0 ? Math.round((paidItems.length / totalCount) * 100) : 0
 
     return {
       totalCount,
@@ -309,8 +319,8 @@ export function SalaryCheckPage() {
 
       if (!matchesSearch) return false
 
-      if (filterTab === 'PAID') return item.is_paid
-      if (filterTab === 'UNPAID') return !item.is_paid
+      if (filterTab === 'PAID') return isItemPaid(item)
+      if (filterTab === 'UNPAID') return !isItemPaid(item)
       if (filterTab === 'VENDORS') return item.is_custom
       return true
     })
@@ -470,7 +480,22 @@ export function SalaryCheckPage() {
         {/* Interactive KPI Metrics Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem', marginTop: '1.25rem' }}>
           {/* Total Staff */}
-          <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div
+            onClick={() => setFilterTab('ALL')}
+            title="Click to view all staff"
+            style={{
+              background: 'var(--panel)',
+              border: filterTab === 'ALL' ? '2px solid var(--primary)' : '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '1.1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              cursor: 'pointer',
+              boxShadow: filterTab === 'ALL' ? '0 4px 14px rgba(107, 47, 160, 0.15)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
             <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(107, 47, 160, 0.12)', color: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Users size={22} />
             </div>
@@ -481,7 +506,22 @@ export function SalaryCheckPage() {
           </div>
 
           {/* Disbursed (Paid) */}
-          <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div
+            onClick={() => setFilterTab('PAID')}
+            title="Click to filter disbursed (paid) staff"
+            style={{
+              background: 'var(--panel)',
+              border: filterTab === 'PAID' ? '2px solid #10B981' : '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '1.1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              cursor: 'pointer',
+              boxShadow: filterTab === 'PAID' ? '0 4px 14px rgba(16, 185, 129, 0.2)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
             <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(16, 185, 129, 0.12)', color: '#10B981', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <CheckCircle2 size={22} />
             </div>
@@ -493,7 +533,22 @@ export function SalaryCheckPage() {
           </div>
 
           {/* Pending (Unpaid) */}
-          <div style={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: '12px', padding: '1.1rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <div
+            onClick={() => setFilterTab('UNPAID')}
+            title="Click to filter pending (unpaid) staff"
+            style={{
+              background: 'var(--panel)',
+              border: filterTab === 'UNPAID' ? '2px solid #EF4444' : '1px solid var(--border)',
+              borderRadius: '12px',
+              padding: '1.1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '1rem',
+              cursor: 'pointer',
+              boxShadow: filterTab === 'UNPAID' ? '0 4px 14px rgba(239, 68, 68, 0.2)' : 'none',
+              transition: 'all 0.15s ease',
+            }}
+          >
             <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'rgba(239, 68, 68, 0.12)', color: '#EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <XCircle size={22} />
             </div>
@@ -799,7 +854,7 @@ export function SalaryCheckPage() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (!item.is_paid) {
+                                if (!isItemPaid(item)) {
                                   togglePaidMutation.mutate({ id: item.id, is_paid: true })
                                 }
                               }}
@@ -812,8 +867,8 @@ export function SalaryCheckPage() {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '0.25rem',
-                                background: item.is_paid ? '#10B981' : 'transparent',
-                                color: item.is_paid ? '#ffffff' : 'var(--muted)',
+                                background: isItemPaid(item) ? '#10B981' : 'transparent',
+                                color: isItemPaid(item) ? '#ffffff' : 'var(--muted)',
                                 transition: 'all 0.15s ease',
                               }}
                             >
@@ -825,7 +880,7 @@ export function SalaryCheckPage() {
                             <button
                               type="button"
                               onClick={() => {
-                                if (item.is_paid) {
+                                if (isItemPaid(item)) {
                                   togglePaidMutation.mutate({ id: item.id, is_paid: false })
                                 }
                               }}
@@ -838,8 +893,8 @@ export function SalaryCheckPage() {
                                 display: 'inline-flex',
                                 alignItems: 'center',
                                 gap: '0.25rem',
-                                background: !item.is_paid ? '#EF4444' : 'transparent',
-                                color: !item.is_paid ? '#ffffff' : 'var(--muted)',
+                                background: !isItemPaid(item) ? '#EF4444' : 'transparent',
+                                color: !isItemPaid(item) ? '#ffffff' : 'var(--muted)',
                                 transition: 'all 0.15s ease',
                               }}
                             >
@@ -980,28 +1035,38 @@ export function SalaryCheckPage() {
                         <div style={{ display: 'inline-flex', borderRadius: '8px', overflow: 'hidden', border: '1px solid var(--border)' }}>
                           <button
                             type="button"
-                            onClick={() => togglePaidMutation.mutate({ id: item.id, is_paid: true })}
+                            onClick={() => {
+                              if (!isItemPaid(item)) {
+                                togglePaidMutation.mutate({ id: item.id, is_paid: true })
+                              }
+                            }}
                             style={{
                               padding: '0.4rem 0.75rem',
                               border: 'none',
+                              cursor: 'pointer',
                               fontSize: '0.8rem',
                               fontWeight: 700,
-                              background: item.is_paid ? '#10B981' : 'var(--panel)',
-                              color: item.is_paid ? '#ffffff' : 'var(--muted)',
+                              background: isItemPaid(item) ? '#10B981' : 'var(--panel)',
+                              color: isItemPaid(item) ? '#ffffff' : 'var(--muted)',
                             }}
                           >
                             Yes
                           </button>
                           <button
                             type="button"
-                            onClick={() => togglePaidMutation.mutate({ id: item.id, is_paid: false })}
+                            onClick={() => {
+                              if (isItemPaid(item)) {
+                                togglePaidMutation.mutate({ id: item.id, is_paid: false })
+                              }
+                            }}
                             style={{
                               padding: '0.4rem 0.75rem',
                               border: 'none',
+                              cursor: 'pointer',
                               fontSize: '0.8rem',
                               fontWeight: 700,
-                              background: !item.is_paid ? '#EF4444' : 'var(--panel)',
-                              color: !item.is_paid ? '#ffffff' : 'var(--muted)',
+                              background: !isItemPaid(item) ? '#EF4444' : 'var(--panel)',
+                              color: !isItemPaid(item) ? '#ffffff' : 'var(--muted)',
                             }}
                           >
                             No

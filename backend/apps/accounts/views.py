@@ -411,6 +411,28 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
     pagination_class = None
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        now = datetime.now()
+        year_str = self.request.query_params.get("year")
+        if not year_str and hasattr(self.request, "data") and isinstance(self.request.data, dict):
+            year_str = self.request.data.get("year")
+
+        month_str = self.request.query_params.get("month")
+        if not month_str and hasattr(self.request, "data") and isinstance(self.request.data, dict):
+            month_str = self.request.data.get("month")
+
+        year = int(year_str) if year_str and str(year_str).isdigit() else now.year
+        month = int(month_str) if month_str and str(month_str).isdigit() else now.month
+        month_key = f"{year}-{month:02d}"
+        num_days = calendar.monthrange(year, month)[1]
+
+        context["year"] = year
+        context["month"] = month
+        context["month_key"] = month_key
+        context["total_days"] = num_days
+        return context
+
     def list(self, request, *args, **kwargs):
         # 1. Sync active employees into SalaryCheckItem:
         active_employees = Employee.objects.filter(is_active=True)
@@ -542,16 +564,22 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
             if isinstance(val, str):
                 val = val.lower() in ("true", "1", "yes")
             is_paid_val = bool(val)
-            item.is_paid = is_paid_val
-            item.paid_at = timezone.now() if is_paid_val else None
 
-            year = request.data.get("year") or request.query_params.get("year")
-            month = request.data.get("month") or request.query_params.get("month")
-            if year and month:
-                m_key = f"{int(year)}-{int(month):02d}"
-                if not isinstance(item.paid_months, dict):
-                    item.paid_months = {}
-                item.paid_months[m_key] = is_paid_val
+            now = datetime.now()
+            year_val = request.data.get("year") or request.query_params.get("year") or now.year
+            month_val = request.data.get("month") or request.query_params.get("month") or now.month
+            year = int(year_val) if str(year_val).isdigit() else now.year
+            month = int(month_val) if str(month_val).isdigit() else now.month
+            m_key = f"{year}-{month:02d}"
+
+            if not isinstance(item.paid_months, dict):
+                item.paid_months = {}
+            item.paid_months[m_key] = is_paid_val
+
+            cur_key = f"{now.year}-{now.month:02d}"
+            if m_key == cur_key:
+                item.is_paid = is_paid_val
+                item.paid_at = timezone.now() if is_paid_val else None
 
         if "is_hidden" in request.data:
             val = request.data["is_hidden"]
@@ -570,26 +598,57 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
                 item.custom_pic = request.data["pic"]
 
         item.save()
-        return Response(self.get_serializer(item).data)
+
+        context = self.get_serializer_context()
+        if item.employee_id:
+            from apps.attendance.models import Session, Attendance
+            year = context["year"]
+            month = context["month"]
+            num_days = context["total_days"]
+            start_date = date(year, month, 1)
+            end_date = date(year, month, num_days)
+            tz = timezone.get_current_timezone()
+            local_start = timezone.make_aware(datetime.combine(start_date, time.min), tz)
+            local_end = timezone.make_aware(datetime.combine(end_date, time.max), tz)
+
+            sess_dates = set(
+                timezone.localtime(ts).date()
+                for ts in Session.objects.filter(employee_id=item.employee_id, login_time__range=(local_start, local_end)).values_list("login_time", flat=True)
+                if ts
+            )
+            att_dates = set(
+                timezone.localtime(ts).date()
+                for ts in Attendance.objects.filter(employee_id=item.employee_id, timestamp__range=(local_start, local_end)).values_list("timestamp", flat=True)
+                if ts
+            )
+            context["attendance_map"] = {item.employee_id: len(sess_dates | att_dates)}
+
+        return Response(self.get_serializer(item, context=context).data)
 
     def update(self, request, *args, **kwargs):
         return self.partial_update(request, *args, **kwargs)
 
     @action(detail=False, methods=["post"], url_path="reset")
     def reset(self, request):
-        year = request.data.get("year") or request.query_params.get("year")
-        month = request.data.get("month") or request.query_params.get("month")
-        if year and month:
-            m_key = f"{int(year)}-{int(month):02d}"
-            items = SalaryCheckItem.objects.all()
-            for it in items:
-                if not isinstance(it.paid_months, dict):
-                    it.paid_months = {}
-                it.paid_months[m_key] = False
+        now = datetime.now()
+        year_val = request.data.get("year") or request.query_params.get("year") or now.year
+        month_val = request.data.get("month") or request.query_params.get("month") or now.month
+        year = int(year_val) if str(year_val).isdigit() else now.year
+        month = int(month_val) if str(month_val).isdigit() else now.month
+        m_key = f"{year}-{month:02d}"
+
+        items = SalaryCheckItem.objects.all()
+        for it in items:
+            if not isinstance(it.paid_months, dict):
+                it.paid_months = {}
+            it.paid_months[m_key] = False
+            cur_key = f"{now.year}-{now.month:02d}"
+            if m_key == cur_key:
                 it.is_paid = False
-                it.save(update_fields=["paid_months", "is_paid"])
-            return Response({"detail": f"All salary payment statuses for {m_key} have been reset to default (Unpaid).", "status": "ok"})
-        else:
-            SalaryCheckItem.objects.all().update(is_paid=False, paid_at=None, paid_months={})
-            return Response({"detail": "All salary payment statuses have been reset to default (Unpaid).", "status": "ok"})
+                it.paid_at = None
+                it.save(update_fields=["paid_months", "is_paid", "paid_at"])
+            else:
+                it.save(update_fields=["paid_months"])
+
+        return Response({"detail": f"All salary payment statuses for {m_key} have been reset to default (Unpaid).", "status": "ok"})
 
