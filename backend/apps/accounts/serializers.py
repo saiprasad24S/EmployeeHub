@@ -203,6 +203,7 @@ class SalaryCheckItemSerializer(serializers.ModelSerializer):
             "is_paid",
             "paid_at",
             "paid_months",
+            "custom_present_days",
             "is_hidden",
             "created_at",
             "updated_at",
@@ -210,6 +211,13 @@ class SalaryCheckItemSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_at", "updated_at"]
 
     def get_present_days(self, obj):
+        month_key = self.context.get("month_key")
+        if month_key and obj.custom_present_days and isinstance(obj.custom_present_days, dict) and month_key in obj.custom_present_days:
+            try:
+                return int(obj.custom_present_days[month_key])
+            except (ValueError, TypeError):
+                pass
+
         if obj.is_custom or not obj.employee_id:
             return 0
         attendance_map = self.context.get("attendance_map", {})

@@ -42,6 +42,7 @@ export interface SalaryCheckItem {
   is_paid: boolean
   paid_at: string | null
   paid_months?: Record<string, boolean>
+  custom_present_days?: Record<string, number>
   is_hidden?: boolean
   created_at: string
   updated_at: string
@@ -98,6 +99,11 @@ export function SalaryCheckPage() {
   const [editingFixedSalaries, setEditingFixedSalaries] = useState<Record<number, string>>({})
   const [savingSalaryId, setSavingSalaryId] = useState<number | null>(null)
   const [savedSuccessId, setSavedSuccessId] = useState<number | null>(null)
+
+  // Local editing states for present days: { [id]: string }
+  const [editingPresentDays, setEditingPresentDays] = useState<Record<number, string>>({})
+  const [savingPresentDaysId, setSavingPresentDaysId] = useState<number | null>(null)
+  const [savedPresentDaysSuccessId, setSavedPresentDaysSuccessId] = useState<number | null>(null)
 
   // Query salary items for selected month & year
   const { data: salaryItems = [], isLoading, error, refetch } = useQuery<SalaryCheckItem[]>({
@@ -164,6 +170,8 @@ export function SalaryCheckPage() {
         body: JSON.stringify({
           fixed_salary,
           salary: fixed_salary,
+          year: selectedDate.year,
+          month: selectedDate.month,
         }),
       })
       if (!res.ok) throw new Error('Failed to update fixed salary')
@@ -179,6 +187,50 @@ export function SalaryCheckPage() {
       setSavingSalaryId(null)
     },
   })
+
+  // Mutation to update present days
+  const updatePresentDaysMutation = useMutation({
+    mutationFn: async ({ id, present_days }: { id: number; present_days: number }) => {
+      const token = await getToken()
+      if (!token) throw new Error('Authentication required')
+      const res = await authedFetch(`/api/salary-check/${id}/`, token, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          present_days,
+          year: selectedDate.year,
+          month: selectedDate.month,
+        }),
+      })
+      if (!res.ok) throw new Error('Failed to update present days')
+      return res.json()
+    },
+    onSuccess: (updatedItem) => {
+      setSavingPresentDaysId(null)
+      setSavedPresentDaysSuccessId(updatedItem.id)
+      setTimeout(() => setSavedPresentDaysSuccessId(null), 2000)
+      queryClient.invalidateQueries({ queryKey: ['salary-check', selectedDate.year, selectedDate.month] })
+    },
+    onError: () => {
+      setSavingPresentDaysId(null)
+    },
+  })
+
+  // Save present days on blur or enter key
+  const handlePresentDaysBlurOrSubmit = (item: SalaryCheckItem) => {
+    const rawVal = editingPresentDays[item.id]
+    if (rawVal === undefined) return
+    const num = parseInt(rawVal, 10)
+    if (isNaN(num) || num < 0) {
+      setEditingPresentDays((prev) => ({ ...prev, [item.id]: String(item.present_days ?? 0) }))
+      return
+    }
+    const maxDays = item.total_days || 31
+    const clamped = Math.min(num, maxDays)
+    if (clamped !== Number(item.present_days ?? 0)) {
+      setSavingPresentDaysId(item.id)
+      updatePresentDaysMutation.mutate({ id: item.id, present_days: clamped })
+    }
+  }
 
   // Mutation to reset all statuses for selected month
   const resetMutation = useMutation({
@@ -762,29 +814,50 @@ export function SalaryCheckPage() {
                           )}
                         </td>
 
-                        {/* PRESENT DAYS (From Attendance Module) */}
+                        {/* PRESENT DAYS (Synced with Attendance & Editable) */}
                         <td style={{ padding: '0.75rem', textAlign: 'center', verticalAlign: 'middle' }}>
-                          {item.is_custom ? (
-                            <span style={{ fontSize: '0.78rem', color: 'var(--muted)', fontStyle: 'italic' }}>Vendor</span>
-                          ) : (
-                            <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                              <span
-                                style={{
-                                  fontWeight: 700,
-                                  fontSize: '0.88rem',
-                                  color: (item.present_days || 0) > 0 ? '#10B981' : 'var(--muted)',
-                                  background: (item.present_days || 0) > 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(0, 0, 0, 0.04)',
-                                  padding: '0.2rem 0.6rem',
-                                  borderRadius: '6px',
+                          <div style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'center', gap: '0.2rem' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3rem' }}>
+                              <input
+                                type="number"
+                                min={0}
+                                max={item.total_days || 31}
+                                value={editingPresentDays[item.id] !== undefined ? editingPresentDays[item.id] : (item.present_days ?? 0)}
+                                onChange={(e) => {
+                                  const val = e.target.value
+                                  setEditingPresentDays((prev) => ({ ...prev, [item.id]: val }))
                                 }}
-                              >
-                                {item.present_days ?? 0} {item.present_days === 1 ? 'day' : 'days'}
-                              </span>
-                              <span style={{ fontSize: '0.7rem', color: 'var(--muted)', marginTop: '2px' }}>
-                                of {item.total_days ?? 31} days
-                              </span>
+                                onBlur={() => handlePresentDaysBlurOrSubmit(item)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    handlePresentDaysBlurOrSubmit(item)
+                                    ;(e.target as HTMLInputElement).blur()
+                                  }
+                                }}
+                                style={{
+                                  width: '64px',
+                                  padding: '0.35rem 0.4rem',
+                                  textAlign: 'center',
+                                  borderRadius: '8px',
+                                  border: savedPresentDaysSuccessId === item.id ? '1px solid #10B981' : '1px solid var(--border)',
+                                  background: (item.present_days || 0) > 0 ? 'rgba(16, 185, 129, 0.08)' : 'var(--panel)',
+                                  color: (item.present_days || 0) > 0 ? '#10B981' : 'var(--text)',
+                                  fontSize: '0.88rem',
+                                  fontWeight: 700,
+                                }}
+                                title="Edit employee present days (calculates salary dynamically)"
+                              />
+                              {savingPresentDaysId === item.id && (
+                                <span style={{ fontSize: '0.75rem', color: 'var(--muted)' }}>...</span>
+                              )}
+                              {savedPresentDaysSuccessId === item.id && (
+                                <Check size={14} style={{ color: '#10B981' }} />
+                              )}
                             </div>
-                          )}
+                            <span style={{ fontSize: '0.68rem', color: 'var(--muted)' }}>
+                              of {item.total_days ?? 31} days
+                            </span>
+                          </div>
                         </td>
 
                         {/* FIXED SALARY (EDITABLE) */}
@@ -988,9 +1061,26 @@ export function SalaryCheckPage() {
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0.5rem', background: 'rgba(0,0,0,0.03)', padding: '0.6rem', borderRadius: '8px' }}>
                       <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Present</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#10B981', marginTop: '2px' }}>
-                          {item.is_custom ? '—' : `${item.present_days ?? 0} d`}
-                        </div>
+                        <input
+                          type="number"
+                          min={0}
+                          max={item.total_days || 31}
+                          value={editingPresentDays[item.id] !== undefined ? editingPresentDays[item.id] : (item.present_days ?? 0)}
+                          onChange={(e) => setEditingPresentDays((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                          onBlur={() => handlePresentDaysBlurOrSubmit(item)}
+                          style={{
+                            width: '56px',
+                            padding: '0.2rem 0.3rem',
+                            textAlign: 'center',
+                            borderRadius: '6px',
+                            border: savedPresentDaysSuccessId === item.id ? '1px solid #10B981' : '1px solid var(--border)',
+                            background: 'var(--panel)',
+                            color: '#10B981',
+                            fontSize: '0.85rem',
+                            fontWeight: 700,
+                            marginTop: '2px',
+                          }}
+                        />
                       </div>
                       <div>
                         <div style={{ fontSize: '0.7rem', color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase' }}>Fixed Base</div>

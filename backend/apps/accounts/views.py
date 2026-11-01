@@ -559,6 +559,30 @@ class SalaryCheckViewSet(viewsets.ModelViewSet):
                 item.salary = float(request.data["salary"])
             except (ValueError, TypeError):
                 pass
+        if "present_days" in request.data:
+            p_val = request.data["present_days"]
+            now = datetime.now()
+            year_val = request.data.get("year") or request.query_params.get("year") or now.year
+            month_val = request.data.get("month") or request.query_params.get("month") or now.month
+            year = int(year_val) if str(year_val).isdigit() else now.year
+            month = int(month_val) if str(month_val).isdigit() else now.month
+            m_key = f"{year}-{month:02d}"
+
+            if not isinstance(item.custom_present_days, dict):
+                item.custom_present_days = {}
+
+            if p_val is None or p_val == "":
+                item.custom_present_days.pop(m_key, None)
+            else:
+                try:
+                    num = int(p_val)
+                    if num >= 0:
+                        item.custom_present_days[m_key] = num
+                    else:
+                        item.custom_present_days.pop(m_key, None)
+                except (ValueError, TypeError):
+                    pass
+
         if "is_paid" in request.data:
             val = request.data["is_paid"]
             if isinstance(val, str):
