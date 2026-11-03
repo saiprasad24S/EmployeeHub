@@ -1,9 +1,12 @@
 import os
 import json
 import hashlib
+from datetime import datetime
 from django.conf import settings
 from django.http import HttpResponse
-from django.db.models import Q
+from django.db.models import Q, Count
+from django.db.models.functions import TruncMonth
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -12,6 +15,12 @@ from rest_framework.permissions import IsAuthenticated, AllowAny
 from apps.invoices.models import Invoice, InvoiceCounter
 from apps.invoices.serializers import InvoiceSerializer
 from apps.invoices.pdf_service import generate_invoice_pdf, amount_in_rupees_words
+from apps.invoices.export_service import (
+    generate_invoices_excel,
+    generate_invoices_zip,
+    get_invoice_month_3,
+    sanitize_filename_part,
+)
 from apps.common.cloudinary_service import upload_invoice_pdf
 
 
@@ -280,7 +289,10 @@ class InvoiceDownloadPDFView(APIView):
         try:
             pdf_bytes = generate_invoice_pdf(invoice)
             response = HttpResponse(pdf_bytes, content_type="application/pdf")
-            filename = f"Invoice_{str(invoice.invoice_number).replace(' ', '_')}.pdf"
+            month_3 = get_invoice_month_3(invoice)
+            safe_inv = sanitize_filename_part(invoice.invoice_number, default="1369-0001")
+            safe_client = sanitize_filename_part(invoice.client_name, default="Client")
+            filename = f"{month_3}_{safe_inv}_{safe_client}.pdf"
             response["Content-Disposition"] = f'attachment; filename="{filename}"'
             response["Access-Control-Expose-Headers"] = "Content-Disposition"
             return response
@@ -304,7 +316,10 @@ class InvoiceDownloadPDFView(APIView):
         try:
             pdf_bytes = generate_invoice_pdf(inv)
             response = HttpResponse(pdf_bytes, content_type="application/pdf")
-            filename = f"Invoice_{str(inv.invoice_number).replace(' ', '_')}.pdf"
+            month_3 = get_invoice_month_3(inv)
+            safe_inv = sanitize_filename_part(getattr(inv, "invoice_number", "1369-0001"), default="1369-0001")
+            safe_client = sanitize_filename_part(getattr(inv, "client_name", "Client"), default="Client")
+            filename = f"{month_3}_{safe_inv}_{safe_client}.pdf"
             response["Content-Disposition"] = f'attachment; filename="{filename}"'
             response["Access-Control-Expose-Headers"] = "Content-Disposition"
             return response
@@ -342,3 +357,136 @@ class InvoiceVerifyView(APIView):
             "recalculated_hash": invoice.display_hash,
             "stored_hash": invoice.display_hash,
         })
+
+
+class InvoiceAvailableMonthsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        """
+        Returns a list of distinct months where invoices exist, sorted descending,
+        along with invoice count per month.
+        """
+        month_aggregates = (
+            Invoice.objects.exclude(invoice_date__isnull=True)
+            .annotate(m=TruncMonth("invoice_date"))
+            .values("m")
+            .annotate(count=Count("id"))
+            .order_by("-m")
+        )
+
+        seen_keys = set()
+        results = []
+        for row in month_aggregates:
+            m_dt = row.get("m")
+            if not m_dt:
+                continue
+            month_key = m_dt.strftime("%Y-%m")
+            if month_key in seen_keys:
+                continue
+            seen_keys.add(month_key)
+            results.append({
+                "year": m_dt.year,
+                "month": m_dt.month,
+                "month_key": month_key,
+                "label": m_dt.strftime("%B %Y"),
+                "count": row["count"],
+            })
+
+        now = timezone.localdate()
+        current_key = now.strftime("%Y-%m")
+        if current_key not in seen_keys:
+            results.insert(0, {
+                "year": now.year,
+                "month": now.month,
+                "month_key": current_key,
+                "label": now.strftime("%B %Y"),
+                "count": 0,
+            })
+
+        return Response(results)
+
+
+class InvoiceBulkDownloadView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def perform_content_negotiation(self, request, force=False):
+        # Force DRF to bypass format-suffix content negotiation for binary file streams
+        return super().perform_content_negotiation(request, force=True)
+
+    def get_or_post(self, request):
+        months_raw = request.query_params.get("months") or request.data.get("months")
+        format_type = (
+            request.query_params.get("export_format")
+            or request.query_params.get("format")
+            or request.data.get("format")
+            or "pdf"
+        ).strip().lower()
+
+        month_keys = []
+        if isinstance(months_raw, list):
+            month_keys = [str(m).strip() for m in months_raw if str(m).strip()]
+        elif isinstance(months_raw, str):
+            month_keys = [m.strip() for m in months_raw.split(",") if m.strip()]
+
+        if not month_keys:
+            return Response(
+                {"detail": "Please select at least one month."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        q_filter = Q()
+        month_labels_list = []
+        for m_key in month_keys:
+            try:
+                parts = m_key.split("-")
+                y = int(parts[0])
+                m = int(parts[1])
+                q_filter |= Q(invoice_date__year=y, invoice_date__month=m)
+                dt_obj = datetime(y, m, 1)
+                month_labels_list.append(dt_obj.strftime("%B %Y"))
+            except Exception:
+                continue
+
+        if not q_filter:
+            return Response(
+                {"detail": "Invalid month format. Expected YYYY-MM."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        invoices = list(Invoice.objects.filter(q_filter).order_by("invoice_date", "invoice_number"))
+        if not invoices:
+            return Response(
+                {"detail": f"No invoices found for the selected month(s): {', '.join(month_labels_list)}"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        months_label_str = ", ".join(month_labels_list)
+        safe_file_suffix = "_".join([m.replace(" ", "_") for m in month_labels_list])
+        if len(safe_file_suffix) > 40:
+            safe_file_suffix = f"{len(month_labels_list)}_months"
+
+        if format_type in ("excel", "xlsx"):
+            excel_bytes = generate_invoices_excel(invoices, month_labels=months_label_str)
+            response = HttpResponse(
+                excel_bytes,
+                content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
+            filename = f"Invoices_{safe_file_suffix}.xlsx"
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            response["Access-Control-Expose-Headers"] = "Content-Disposition"
+            return response
+        else:
+            zip_bytes = generate_invoices_zip(invoices)
+            response = HttpResponse(zip_bytes, content_type="application/zip")
+            filename = f"Invoices_{safe_file_suffix}.zip"
+            response["Content-Disposition"] = f'attachment; filename="{filename}"'
+            response["Access-Control-Expose-Headers"] = "Content-Disposition"
+            return response
+
+    def get(self, request):
+        return self.get_or_post(request)
+
+    def post(self, request):
+        return self.get_or_post(request)
+

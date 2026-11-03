@@ -286,8 +286,19 @@ def generate_invoice_pdf(invoice) -> bytes:
             pat_age = str(getattr(invoice, 'patient_age_gender', '') or '').strip()
             srv_type = str(getattr(invoice, 'service_type', '') or '').strip()
             consult = str(getattr(invoice, 'consultant', '') or '').strip()
-            srv_start = format_date_ddmmyyyy(getattr(invoice, 'service_start_date', None) or getattr(invoice, 'start_date', None))
             rend_days = str(getattr(invoice, 'rendered_days', '') or '').strip()
+
+            # Billing Period from/to date range (dd/mm/yyyy to dd/mm/yyyy)
+            bp_start = format_date_ddmmyyyy(getattr(invoice, 'billing_period_start', None) or getattr(invoice, 'service_start_date', None) or getattr(invoice, 'start_date', None))
+            bp_end = format_date_ddmmyyyy(getattr(invoice, 'billing_period_end', None) or getattr(invoice, 'service_end_date', None))
+            if bp_start and bp_end:
+                bp_range_str = f"{bp_start} to {bp_end}"
+            elif bp_start:
+                bp_range_str = bp_start
+            elif bp_end:
+                bp_range_str = bp_end
+            else:
+                bp_range_str = ""
 
             # Dynamic card height calculation so all content fits with 0 truncation
             card1_rows_count = len(name_lines)
@@ -309,7 +320,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             if pat_age: card2_rows_count += 1
             if srv_type: card2_rows_count += 1
             if consult: card2_rows_count += 1
-            if srv_start: card2_rows_count += 1
+            if bp_range_str: card2_rows_count += 1
             if rend_days: card2_rows_count += 1
 
             max_rows = max(card1_rows_count, card2_rows_count, 4)
@@ -390,23 +401,23 @@ def generate_invoice_pdf(invoice) -> bytes:
 
             card2_y = cards_top - 26
             if pat_name:
-                draw_card_row(x2, card2_y, "Patient Name:", pat_name, val_offset=58)
+                draw_card_row(x2, card2_y, "Patient Name:", pat_name, val_offset=94)
                 card2_y -= 10.5
                 if pat_age:
-                    draw_card_row(x2, card2_y, "Age/Gender:", pat_age, val_offset=58)
+                    draw_card_row(x2, card2_y, "Age/Gender:", pat_age, val_offset=94)
                     card2_y -= 10.5
 
             if srv_type:
-                draw_card_row(x2, card2_y, "Service Type:", srv_type, val_offset=58)
+                draw_card_row(x2, card2_y, "Service Type:", srv_type, val_offset=94)
                 card2_y -= 10.5
             if consult:
-                draw_card_row(x2, card2_y, "Consultant:", consult, val_offset=58)
+                draw_card_row(x2, card2_y, "Consultant:", consult, val_offset=94)
                 card2_y -= 10.5
-            if srv_start:
-                draw_card_row(x2, card2_y, "Started On:", srv_start, val_offset=58)
+            if bp_range_str:
+                draw_card_row(x2, card2_y, "Billing Period:", bp_range_str, val_offset=94)
                 card2_y -= 10.5
             if rend_days:
-                draw_card_row(x2, card2_y, "Rendered Days:", rend_days, val_offset=68)
+                draw_card_row(x2, card2_y, "Service Rendered Days:", rend_days, val_offset=94)
                 card2_y -= 10.5
 
             # Card 3: OTHER INFORMATION
@@ -675,7 +686,7 @@ def generate_invoice_pdf(invoice) -> bytes:
             c.drawString(bx, by, "IFSC:")
             c.setFont("Times-Bold", 7)
             c.setFillColor(colors.HexColor("#1A1A1A"))
-            c.drawString(bx + 48, by, "HDFC0004211")
+            c.drawString(bx + 48, by, "HDFC0004277")
 
             by -= 9.5
             c.setFont("Times-Roman", 7)

@@ -2,7 +2,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import {
   LayoutDashboard, FileText, Search, ShieldCheck, Save, Download,
-  RefreshCw, Layers
+  RefreshCw, Layers, FolderDown
 } from 'lucide-react'
 
 interface InvoiceDashboardHeaderProps {
@@ -11,6 +11,7 @@ interface InvoiceDashboardHeaderProps {
   isAutoSaving: boolean
   lastSavedTime: string
   onDownloadPDF: () => void
+  onDownloadInvoices?: () => void
   onSaveDraft: () => void
   onSaveInvoice: () => void
   onVerifyModal: () => void
@@ -32,6 +33,7 @@ export const InvoiceDashboardHeader: React.FC<InvoiceDashboardHeaderProps> = ({
   isAutoSaving,
   lastSavedTime,
   onDownloadPDF,
+  onDownloadInvoices,
   onSaveDraft,
   onSaveInvoice,
   onVerifyModal,
@@ -169,6 +171,33 @@ export const InvoiceDashboardHeader: React.FC<InvoiceDashboardHeaderProps> = ({
               <>Saved {lastSavedTime}</>
             )}
           </div>
+
+          {onDownloadInvoices && (
+            <motion.button
+              whileHover={{ y: -1 }}
+              whileTap={{ scale: 0.96 }}
+              onClick={onDownloadInvoices}
+              title="Download Invoices for selected months (PDF Folder or Excel)"
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '7px 12px',
+                borderRadius: 8,
+                fontSize: 11,
+                fontWeight: 600,
+                color: '#0B2C8C',
+                background: '#EDF2FF',
+                border: '1px solid #DCE7FF',
+                cursor: 'pointer',
+                fontFamily: 'Poppins, sans-serif',
+                boxShadow: '0 1px 3px rgba(11, 44, 140, 0.08)',
+              }}
+            >
+              <FolderDown style={{ width: 14, height: 14 }} />
+              Download Invoices
+            </motion.button>
+          )}
 
           <motion.button
             whileHover={{ y: -1 }}

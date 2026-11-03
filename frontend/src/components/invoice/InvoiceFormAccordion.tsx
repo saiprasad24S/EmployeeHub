@@ -1687,9 +1687,32 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
         )}
         <InputField label="Service Type" icon={<Briefcase style={iconSize} />} value={data.serviceType || ''} onChange={v => updateField('serviceType', v)} />
         <InputField label="Consultant" icon={<UserCheck style={iconSize} />} value={data.consultant || ''} onChange={v => updateField('consultant', v)} />
-        <DatePickerField label="Service Started" value={data.serviceStarted || ''} onChange={v => updateField('serviceStarted', v)} placeholder="DD/MM/YYYY" />
-        <DatePickerField label="Service End" value={data.serviceEnd || ''} onChange={v => updateField('serviceEnd', v)} placeholder="DD/MM/YYYY" />
-        <InputField label="Rendered Days" icon={<Clock style={iconSize} />} value={data.renderedDays || ''} onChange={v => updateField('renderedDays', v)} />
+        <div>
+          <label style={{ fontSize: 11, fontWeight: 600, color: '#374151', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+            <Calendar style={iconSize} /> Billing Period : dd/mm/yyyy to dd/mm/yyyy
+          </label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
+            <DatePickerField
+              label="Billing Period (From)"
+              value={data.billingPeriodStart || data.serviceStarted || ''}
+              onChange={v => {
+                updateField('billingPeriodStart', v);
+                updateField('serviceStarted', v);
+              }}
+              placeholder="DD/MM/YYYY"
+            />
+            <DatePickerField
+              label="Billing Period (To)"
+              value={data.billingPeriodEnd || data.serviceEnd || ''}
+              onChange={v => {
+                updateField('billingPeriodEnd', v);
+                updateField('serviceEnd', v);
+              }}
+              placeholder="DD/MM/YYYY"
+            />
+          </div>
+        </div>
+        <InputField label="Service Rendered Days" icon={<Clock style={iconSize} />} value={data.renderedDays || ''} onChange={v => updateField('renderedDays', v)} placeholder="e.g. 30 Days" />
       </AccordionSection>
 
       {/* 4. Other Information */}

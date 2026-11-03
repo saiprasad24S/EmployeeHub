@@ -5,6 +5,7 @@ import { authedFetch } from '../lib/api'
 import { safeStorage } from '../lib/storage'
 import { motion, AnimatePresence } from 'framer-motion'
 import { InvoiceDashboardHeader } from '../components/invoice/InvoiceDashboardHeader'
+import { DownloadInvoicesModal } from '../components/invoice/DownloadInvoicesModal'
 import { InvoiceLivePreview, formatDisplayDate, computeInvoiceTotals } from '../components/invoice/InvoiceLivePreview'
 import type { InvoicePreviewData, ServiceItem } from '../components/invoice/InvoiceLivePreview'
 import { InvoiceFormAccordion } from '../components/invoice/InvoiceFormAccordion'
@@ -21,6 +22,8 @@ export interface Invoice {
   verification_hash?: string
   display_hash?: string
   invoice_date: string
+  billing_period_start?: string
+  billing_period_end?: string
   billing_period_text: string
   start_date: string
   company_gstin?: string
@@ -77,6 +80,8 @@ const defaultInvoiceData: InvoicePreviewData = {
   serviceType: '',
   consultant: '',
   renderedDays: '',
+  billingPeriodStart: '',
+  billingPeriodEnd: '',
   serviceStarted: '',
   serviceEnd: '',
   schoolBranch: '',
@@ -128,6 +133,7 @@ export function InvoicePage() {
   // Zoom
   const [zoom, setZoom] = useState(80)
   const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false)
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false)
 
   // Invoice Data
   const [invoiceData, setInvoiceData] = useState<InvoicePreviewData>(defaultInvoiceData)
@@ -314,6 +320,8 @@ export function InvoicePage() {
       consultant: invoiceData.consultant,
       service_start_date: invoiceData.serviceStarted || invoiceData.startDateText || '',
       service_end_date: invoiceData.serviceEnd || '',
+      billing_period_start: invoiceData.billingPeriodStart || invoiceData.serviceStarted || null,
+      billing_period_end: invoiceData.billingPeriodEnd || invoiceData.serviceEnd || null,
       rendered_days: invoiceData.renderedDays,
       school_branch: invoiceData.schoolBranch,
       contact_person: invoiceData.contactPerson,
@@ -377,6 +385,8 @@ export function InvoicePage() {
           consultant: target?.consultant || invoiceData.consultant,
           service_start_date: invoiceData.serviceStarted || invoiceData.startDateText || '',
           service_end_date: invoiceData.serviceEnd || '',
+      billing_period_start: invoiceData.billingPeriodStart || invoiceData.serviceStarted || null,
+      billing_period_end: invoiceData.billingPeriodEnd || invoiceData.serviceEnd || null,
           rendered_days: target?.rendered_days || invoiceData.renderedDays,
           school_branch: target?.school_branch || invoiceData.schoolBranch,
           contact_person: target?.contact_person || invoiceData.contactPerson,
@@ -411,7 +421,51 @@ export function InvoicePage() {
       a.style.display = 'none'
       a.href = url
       const invNum = (target?.invoice_number || invoiceData.invoiceNumber || '1369-0001').replace(/\s+/g, '_')
-      a.download = `Invoice_${invNum}.pdf`
+      const getMonth3 = () => {
+        const monthsMap: Record<string, string> = {
+          january: 'Jan', jan: 'Jan',
+          february: 'Feb', feb: 'Feb',
+          march: 'Mar', mar: 'Mar',
+          april: 'Apr', apr: 'Apr',
+          may: 'May',
+          june: 'Jun', jun: 'Jun',
+          july: 'Jul', jul: 'Jul',
+          august: 'Aug', aug: 'Aug',
+          september: 'Sep', sep: 'Sep',
+          october: 'Oct', oct: 'Oct',
+          november: 'Nov', nov: 'Nov',
+          december: 'Dec', dec: 'Dec',
+        }
+        const bp = (target as any)?.billing_period_text || invoiceData.billingPeriodText || ''
+        if (bp) {
+          const words = String(bp).replace(/[/-]/g, ' ').split(/\s+/)
+          for (const w of words) {
+            const m = monthsMap[w.toLowerCase()]
+            if (m) return m
+          }
+        }
+        const dateStr = (target as any)?.billing_period_start || invoiceData.billingPeriodStart || target?.invoice_date || invoiceData.invoiceDate || ''
+        if (dateStr) {
+          const d = new Date(dateStr)
+          if (!isNaN(d.getTime())) {
+            return d.toLocaleString('en-US', { month: 'short' })
+          }
+        }
+        return new Date().toLocaleString('en-US', { month: 'short' })
+      }
+
+      const month3 = getMonth3()
+      const clientName = (target?.client_name || invoiceData.clientName || 'Client').trim().replace(/[\\/*?:"<>|\s]+/g, '_')
+      let finalFilename = `${month3}_${invNum}_${clientName}.pdf`
+      const disposition = res.headers.get('Content-Disposition')
+      if (disposition && disposition.includes('filename=')) {
+        const matches = disposition.match(/filename="?([^";]+)"?/)
+        if (matches && matches[1]) {
+          finalFilename = matches[1]
+        }
+      }
+
+      a.download = finalFilename
       document.body.appendChild(a)
       a.click()
 
@@ -461,6 +515,10 @@ export function InvoicePage() {
       serviceType: inv.service_type,
       consultant: inv.consultant,
       renderedDays: inv.rendered_days,
+      billingPeriodStart: inv.billing_period_start || (inv as any).service_start_date || '',
+      billingPeriodEnd: inv.billing_period_end || (inv as any).service_end_date || '',
+      serviceStarted: (inv as any).service_start_date || inv.billing_period_start || '',
+      serviceEnd: (inv as any).service_end_date || inv.billing_period_end || '',
       schoolBranch: inv.school_branch,
       contactPerson: inv.contact_person,
       perDayCharges: inv.per_day_charges,
@@ -495,6 +553,7 @@ export function InvoicePage() {
         isAutoSaving={isAutoSaving}
         lastSavedTime={lastSavedTime}
         onDownloadPDF={() => handleDownloadPDF()}
+        onDownloadInvoices={() => setIsDownloadModalOpen(true)}
         onSaveDraft={() => {
           safeStorage.setItem('skandan_direct_invoice_draft', JSON.stringify(invoiceData))
           alert('Draft saved successfully!')
@@ -504,6 +563,11 @@ export function InvoicePage() {
         invoiceNumber={invoiceData.invoiceNumber}
         templateType={invoiceData.invoiceType}
         isSaving={saveMutation.isPending}
+      />
+
+      <DownloadInvoicesModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
       />
 
       {/* Main Content */}

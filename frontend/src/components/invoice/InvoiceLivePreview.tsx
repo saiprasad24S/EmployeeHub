@@ -35,6 +35,8 @@ export interface InvoicePreviewData {
   serviceType?: string;
   consultant?: string;
   renderedDays?: string;
+  billingPeriodStart?: string;
+  billingPeriodEnd?: string;
   serviceStarted?: string;
   serviceEnd?: string;
   schoolBranch?: string;
@@ -334,20 +336,38 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
               {data.patientName && data.patientName.trim() ? (
                 <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                  <span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Patient Name:</span>
+                  <span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Patient Name:</span>
                   <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.patientName.trim()}</span>
                 </div>
               ) : null}
               {data.patientAgeGender && data.patientAgeGender.trim() ? (
                 <div style={{ display: 'flex', alignItems: 'flex-start' }}>
-                  <span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Age/Gender:</span>
+                  <span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Age/Gender:</span>
                   <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.patientAgeGender.trim()}</span>
                 </div>
               ) : null}
-              {data.serviceType && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Service Type:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.serviceType}</span></div>}
-              {data.consultant && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Consultant:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.consultant}</span></div>}
-              {data.serviceStarted && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Started On:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{formatDisplayDate(data.serviceStarted)}</span></div>}
-              {data.renderedDays && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '85px', minWidth: '85px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Rendered Days:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.renderedDays}</span></div>}
+              {data.serviceType && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Service Type:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.serviceType}</span></div>}
+              {data.consultant && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Consultant:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.consultant}</span></div>}
+              {(() => {
+                const bStart = data.billingPeriodStart || data.serviceStarted
+                const bEnd = data.billingPeriodEnd || data.serviceEnd
+                let bpDisplay = ''
+                if (bStart && bEnd) {
+                  bpDisplay = `${formatDisplayDate(bStart)} to ${formatDisplayDate(bEnd)}`
+                } else if (bStart) {
+                  bpDisplay = formatDisplayDate(bStart)
+                } else if (bEnd) {
+                  bpDisplay = formatDisplayDate(bEnd)
+                }
+                if (!bpDisplay) return null
+                return (
+                  <div style={{ display: 'flex', alignItems: 'flex-start' }}>
+                    <span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Billing Period:</span>
+                    <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{bpDisplay}</span>
+                  </div>
+                )
+              })()}
+              {data.renderedDays && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Service Rendered Days:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.renderedDays}</span></div>}
             </div>
           </div>
 
@@ -489,7 +509,7 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
                     <div><span style={{ color: '#666', width: '60px', display: 'inline-block' }}>Beneficiary:</span> <strong>SKANDAN HOME CARRE CCLINIC LLP</strong></div>
                     <div><span style={{ color: '#666', width: '60px', display: 'inline-block' }}>Account:</span> <strong>50200090644327</strong></div>
                     <div><span style={{ color: '#666', width: '60px', display: 'inline-block' }}>Type:</span> <span>Current Account</span></div>
-                    <div><span style={{ color: '#666', width: '60px', display: 'inline-block' }}>IFSC:</span> <strong>HDFC0004211</strong></div>
+                    <div><span style={{ color: '#666', width: '60px', display: 'inline-block' }}>IFSC:</span> <strong>HDFC0004277</strong></div>
                     <div><span style={{ color: '#666', width: '60px', display: 'inline-block' }}>MICR:</span> <span>500240078</span></div>
                   </div>
                 </div>
