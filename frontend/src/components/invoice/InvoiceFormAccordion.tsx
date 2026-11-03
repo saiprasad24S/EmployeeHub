@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@clerk/clerk-react';
 import {
@@ -199,9 +200,35 @@ const DatePickerField: React.FC<{
   readOnly?: boolean;
 }> = ({ label, value, onChange, placeholder = 'DD/MM/YYYY', readOnly }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
   const nativeInputRef = useRef<HTMLInputElement>(null);
+  const [portalPos, setPortalPos] = useState<{ top: number; left: number } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const calendarWidth = 270;
+    const calendarHeight = 315;
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openUp = spaceBelow < calendarHeight && spaceAbove > spaceBelow;
+    const top = openUp
+      ? Math.max(10, rect.top - calendarHeight - 6)
+      : Math.min(window.innerHeight - calendarHeight - 10, rect.bottom + 6);
+
+    let left = rect.left;
+    if (left + calendarWidth > window.innerWidth - 16 || (rect.right - calendarWidth >= 10 && rect.left > 150)) {
+      left = rect.right - calendarWidth;
+    }
+    if (left < 10) left = 10;
+    if (left + calendarWidth > window.innerWidth - 10) {
+      left = window.innerWidth - calendarWidth - 10;
+    }
+
+    setPortalPos({ top, left });
+  }, []);
 
   // Parse current value to a valid Date object
   const parsedDate = useMemo(() => {
@@ -232,30 +259,37 @@ const DatePickerField: React.FC<{
     }
   }, [parsedDate]);
 
-  // Position detection to prevent clipping: open upward if near the bottom of viewport
   useEffect(() => {
-    if (isOpen && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      // If less than 320px below and more than 280px above, open upward
-      if (spaceBelow < 320 && spaceAbove > 280) {
-        setOpenUpward(true);
-      } else {
-        setOpenUpward(false);
-      }
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
+    updatePosition();
+
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen, updatePosition]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
+      const target = e.target as Node;
+      if (containerRef.current && containerRef.current.contains(target)) {
+        return;
       }
+      if (calendarRef.current && calendarRef.current.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
     };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+
+    document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
@@ -411,7 +445,10 @@ const DatePickerField: React.FC<{
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            if (!readOnly) setIsOpen(prev => !prev);
+            if (!readOnly) {
+              updatePosition();
+              setIsOpen(prev => !prev);
+            }
           }}
           title="Toggle Calendar"
           style={{
@@ -433,7 +470,7 @@ const DatePickerField: React.FC<{
           type="text"
           value={displayFormatted}
           onChange={handleInputChange}
-          onClick={() => { if (!readOnly && !isOpen) setIsOpen(true); }}
+          onClick={() => { if (!readOnly && !isOpen) { updatePosition(); setIsOpen(true); } }}
           placeholder={placeholder}
           readOnly={readOnly}
           style={{
@@ -494,26 +531,28 @@ const DatePickerField: React.FC<{
         )}
       </div>
 
-      <AnimatePresence>
-        {isOpen && (
+      {isOpen && portalPos && createPortal(
+        <AnimatePresence>
           <motion.div
-            initial={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
+            ref={calendarRef}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.15 }}
             style={{
-              position: 'absolute',
-              [openUpward ? 'bottom' : 'top']: 'calc(100% + 6px)',
-              left: 0,
-              zIndex: 99999,
+              position: 'fixed',
+              top: portalPos.top,
+              left: portalPos.left,
+              zIndex: 999999,
               background: '#FFFFFF',
               border: '1px solid #D8E3F5',
               borderRadius: 12,
-              boxShadow: '0 12px 36px rgba(11,44,140,0.22), 0 2px 8px rgba(0,0,0,0.06)',
+              boxShadow: '0 16px 40px rgba(11,44,140,0.25), 0 4px 12px rgba(0,0,0,0.08)',
               padding: '12px 14px',
               width: 270,
               fontFamily: 'Poppins, sans-serif',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Header: Month & Year navigation with Fast Select Dropdowns */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, gap: 6 }}>
@@ -704,8 +743,9 @@ const DatePickerField: React.FC<{
               </button>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
@@ -719,8 +759,34 @@ const MonthPickerField: React.FC<{
   readOnly?: boolean;
 }> = ({ label, value, onChange, placeholder = 'e.g. July 2026', readOnly }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [openUpward, setOpenUpward] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const monthCalendarRef = useRef<HTMLDivElement>(null);
+  const [portalPos, setPortalPos] = useState<{ top: number; left: number } | null>(null);
+
+  const updatePosition = useCallback(() => {
+    if (!containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const calendarWidth = 268;
+    const calendarHeight = 280;
+
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const openUp = spaceBelow < calendarHeight && spaceAbove > spaceBelow;
+    const top = openUp
+      ? Math.max(10, rect.top - calendarHeight - 6)
+      : Math.min(window.innerHeight - calendarHeight - 10, rect.bottom + 6);
+
+    let left = rect.left;
+    if (left + calendarWidth > window.innerWidth - 16 || (rect.right - calendarWidth >= 10 && rect.left > 150)) {
+      left = rect.right - calendarWidth;
+    }
+    if (left < 10) left = 10;
+    if (left + calendarWidth > window.innerWidth - 10) {
+      left = window.innerWidth - calendarWidth - 10;
+    }
+
+    setPortalPos({ top, left });
+  }, []);
 
   const initialYear = useMemo(() => {
     if (!value) return new Date().getFullYear();
@@ -735,29 +801,37 @@ const MonthPickerField: React.FC<{
     if (match) setViewYear(parseInt(match[1]));
   }, [value]);
 
-  // Position detection to prevent clipping: open upward if near the bottom of viewport
   useEffect(() => {
-    if (isOpen && containerRef.current) {
-      const rect = containerRef.current.getBoundingClientRect();
-      const spaceBelow = window.innerHeight - rect.bottom;
-      const spaceAbove = rect.top;
-      if (spaceBelow < 280 && spaceAbove > 250) {
-        setOpenUpward(true);
-      } else {
-        setOpenUpward(false);
-      }
-    }
-  }, [isOpen]);
+    if (!isOpen) return;
+    updatePosition();
+
+    const handleScrollOrResize = () => {
+      updatePosition();
+    };
+
+    window.addEventListener('scroll', handleScrollOrResize, true);
+    window.addEventListener('resize', handleScrollOrResize);
+    return () => {
+      window.removeEventListener('scroll', handleScrollOrResize, true);
+      window.removeEventListener('resize', handleScrollOrResize);
+    };
+  }, [isOpen, updatePosition]);
 
   useEffect(() => {
+    if (!isOpen) return;
+
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
-        setIsOpen(false);
+      const target = e.target as Node;
+      if (containerRef.current && containerRef.current.contains(target)) {
+        return;
       }
+      if (monthCalendarRef.current && monthCalendarRef.current.contains(target)) {
+        return;
+      }
+      setIsOpen(false);
     };
-    if (isOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-    }
+
+    document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [isOpen]);
 
@@ -818,7 +892,10 @@ const MonthPickerField: React.FC<{
           type="button"
           onClick={(e) => {
             e.stopPropagation();
-            if (!readOnly) setIsOpen(prev => !prev);
+            if (!readOnly) {
+              updatePosition();
+              setIsOpen(prev => !prev);
+            }
           }}
           title="Toggle Month Calendar"
           style={{
@@ -840,7 +917,7 @@ const MonthPickerField: React.FC<{
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          onClick={() => { if (!readOnly && !isOpen) setIsOpen(true); }}
+          onClick={() => { if (!readOnly && !isOpen) { updatePosition(); setIsOpen(true); } }}
           placeholder={placeholder}
           readOnly={readOnly}
           style={{
@@ -880,26 +957,28 @@ const MonthPickerField: React.FC<{
         )}
       </div>
 
-      <AnimatePresence>
-        {isOpen && (
+      {isOpen && portalPos && createPortal(
+        <AnimatePresence>
           <motion.div
-            initial={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: openUpward ? 6 : -6, scale: 0.98 }}
+            ref={monthCalendarRef}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
             transition={{ duration: 0.15 }}
             style={{
-              position: 'absolute',
-              [openUpward ? 'bottom' : 'top']: 'calc(100% + 6px)',
-              left: 0,
-              zIndex: 99999,
+              position: 'fixed',
+              top: portalPos.top,
+              left: portalPos.left,
+              zIndex: 999999,
               background: '#FFFFFF',
               border: '1px solid #D8E3F5',
               borderRadius: 12,
-              boxShadow: '0 12px 36px rgba(11,44,140,0.22), 0 2px 8px rgba(0,0,0,0.06)',
+              boxShadow: '0 16px 40px rgba(11,44,140,0.25), 0 4px 12px rgba(0,0,0,0.08)',
               padding: 12,
               width: 268,
               fontFamily: 'Poppins, sans-serif',
             }}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Year navigation & Direct Dropdown */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 6 }}>
@@ -1052,8 +1131,9 @@ const MonthPickerField: React.FC<{
               </button>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   );
 };
@@ -1559,11 +1639,11 @@ export const InvoiceFormAccordion: React.FC<InvoiceFormAccordionProps> = ({
           ]}
         />
         <InputField
-          label="Company GSTIN (Optional)"
+          label="Company GSTIN"
           icon={<FileText style={iconSize} />}
-          value={data.companyGstin || ''}
+          value={data.companyGstin || '36AFEFS2802K1ZY'}
           onChange={v => updateField('companyGstin', v)}
-          placeholder="e.g. 36AAACS1234A1Z5 (Displayed in header if entered)"
+          placeholder="36AFEFS2802K1ZY"
         />
       </AccordionSection>
 

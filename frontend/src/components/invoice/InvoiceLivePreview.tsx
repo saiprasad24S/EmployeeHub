@@ -254,12 +254,12 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
             <div style={{ display: 'flex', alignItems: 'center' }}><Phone size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> +91 96609 66369</div>
             <div style={{ display: 'flex', alignItems: 'center' }}><Mail size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> admin@skandanhomecarre.com</div>
             <div style={{ display: 'flex', alignItems: 'center' }}><Globe size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} /> www.skandanhomecarrecclinic.com</div>
-            {data.companyGstin && data.companyGstin.trim() ? (
+            {/* Permanent Company GSTIN */}
               <div style={{ display: 'flex', alignItems: 'center' }}>
                 <FileText size={14} color="#0B2C8C" style={{ marginRight: '8px', flexShrink: 0 }} />
-                <span><strong style={{ color: '#1A1A1A' }}>GSTIN:</strong> {data.companyGstin.trim()}</span>
+                <span><strong style={{ color: '#1A1A1A' }}>GSTIN:</strong> {(data.companyGstin && data.companyGstin.trim()) || '36AFEFS2802K1ZY'}</span>
               </div>
-            ) : null}
+
           </div>
           <div style={{ flex: 1.25, paddingLeft: '14px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
             <div style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}>
@@ -334,18 +334,20 @@ export const InvoiceLivePreview: React.FC<InvoiceLivePreviewProps> = ({ data, zo
               <Settings size={16} style={{ marginRight: '5px', flexShrink: 0 }} /> SERVICE PROFILE
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-              {data.patientName && data.patientName.trim() ? (
+              {data.patientName && data.patientName.trim() && (
                 <div style={{ display: 'flex', alignItems: 'flex-start' }}>
                   <span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Patient Name:</span>
                   <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.patientName.trim()}</span>
                 </div>
-              ) : null}
-              {data.patientAgeGender && data.patientAgeGender.trim() ? (
+  
+              )}
+              {data.patientAgeGender && data.patientAgeGender.trim() && (
                 <div style={{ display: 'flex', alignItems: 'flex-start' }}>
                   <span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Age/Gender:</span>
                   <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.patientAgeGender.trim()}</span>
                 </div>
-              ) : null}
+  
+              )}
               {data.serviceType && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Service Type:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.serviceType}</span></div>}
               {data.consultant && <div style={{ display: 'flex', alignItems: 'flex-start' }}><span style={{ width: '135px', minWidth: '135px', flexShrink: 0, color: '#1A1A1A', fontWeight: 600 }}>Consultant:</span> <span style={{ flex: 1, wordBreak: 'break-word', fontWeight: 400, color: '#333' }}>{data.consultant}</span></div>}
               {(() => {
